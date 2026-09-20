@@ -2,6 +2,13 @@
 
 _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
+## v2.9.2 — Kiểm nghiệm cập nhật online
+
+- Bản phát hành thử nghiệm không thay đổi chức năng panel, dùng để xác nhận
+  toàn bộ luồng tải ZIP, xác minh SHA-256 và thay bản cũ tự động.
+
+---
+
 ## v2.9.1 — Cập nhật ngay không cần đăng xuất
 
 - Bộ cài tạo lối tắt **Cập nhật Công cụ bình** trong Start Menu. Đóng hẳn
