@@ -10,7 +10,7 @@ LAN DAU TIEN (chi lam 1 lan):
 CAC LAN CAP NHAT SAU (khi co ban moi):
   - Neu da cau hinh update online: may tu kiem tra luc dang nhap Windows,
     va tu cai ban moi khi Illustrator dang dong.
-  - Muon cap nhat ngay: dong HAN Illustrator, mo Start Menu va bam
+  - Muon cap nhat ngay: dong HAN Illustrator, mo Start Menu > CongCuBinh va bam
     "Cap nhat Cong cu binh". Khong can khoi dong lai Windows.
   - Neu chua cau hinh online: dong HAN Illustrator truoc, bam dup install.bat.
   - Mo lai Illustrator (chi dong/mo panel khong nap lai script JSX).

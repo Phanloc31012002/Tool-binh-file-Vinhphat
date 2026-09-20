@@ -11,9 +11,9 @@ $updaterConfig = Join-Path $updaterHome "update-config.json"
 $updaterTaskName = "CongCuBinh-AutoUpdate"
 $startupDir = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\Startup"
 $startupLauncher = Join-Path $startupDir "$updaterTaskName.vbs"
-$programsDir = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\Công cụ bình"
-$manualUpdateLauncher = Join-Path $programsDir "Cập nhật Công cụ bình.cmd"
-$manualUpdateShortcut = Join-Path $programsDir "Cập nhật Công cụ bình.lnk"
+$programsDir = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\CongCuBinh"
+$manualUpdateLauncher = Join-Path $programsDir "Cap nhat Cong cu binh.cmd"
+$manualUpdateShortcut = Join-Path $programsDir "Cap nhat Cong cu binh.lnk"
 
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "   CÀI ĐẶT PANEL `"CÔNG CỤ BÌNH`" (CEP)" -ForegroundColor Cyan
@@ -97,7 +97,7 @@ if (Test-Path (Join-Path $dest "CSXS\manifest.xml")) {
                 $shortcut.TargetPath = $env:ComSpec
                 $shortcut.Arguments = '/c ""' + $manualUpdateLauncher + '""'
                 $shortcut.WorkingDirectory = $updaterHome
-                $shortcut.Description = 'Kiểm tra và cài bản mới của Công cụ bình'
+                $shortcut.Description = 'Kiem tra va cai ban moi cua Cong cu binh'
                 $shortcut.Save()
                 Write-Host "Đã thêm lối tắt Start Menu: Cập nhật Công cụ bình." -ForegroundColor Green
             } catch {

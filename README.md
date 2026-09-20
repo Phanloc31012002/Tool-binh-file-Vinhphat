@@ -23,8 +23,8 @@ _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
 **Các lần cập nhật sau**: khi đã cấu hình update online, máy sẽ tự kiểm tra
 bản mới khi đăng nhập Windows và cập nhật lúc Illustrator đang đóng. Không cần
-chép lại folder. Muốn cập nhật ngay, đóng Illustrator rồi bấm **Cập nhật Công
-cụ bình** trong Start Menu; không cần khởi động lại Windows. Nếu chưa cấu hình
+chép lại folder. Muốn cập nhật ngay, đóng Illustrator rồi bấm **CongCuBinh →
+Cap nhat Cong cu binh** trong Start Menu; không cần khởi động lại Windows. Nếu chưa cấu hình
 online, vẫn có thể bấm đúp `install.bat` (đóng Illustrator trước khi chạy) để
 cài thủ công.
 
@@ -94,8 +94,9 @@ Phiên bản hiện tại: **v2.9.1**.
 Lần đầu trên mỗi máy vẫn chạy `install.bat`. Bộ cài đặt đặt updater tại
 `%LOCALAPPDATA%\CongCuBinhUpdater`, tách riêng với panel để updater có thể thay
 panel an toàn. Updater chỉ nhận manifest và gói qua HTTPS, kiểm SHA-256 trước
-khi cài, và không thay file nếu Illustrator đang mở. Bộ cài thêm lối tắt **Cập
-nhật Công cụ bình** trong Start Menu để kiểm tra thủ công ngay khi cần. Nó tự
+khi cài, và không thay file nếu Illustrator đang mở. Bộ cài thêm lối tắt
+**CongCuBinh → Cap nhat Cong cu binh** trong Start Menu để kiểm tra thủ công
+ngay khi cần. Nó tự
 tạo tác vụ khi đăng nhập Windows; nếu máy chặn Task Scheduler, nó dùng Startup
 của user.
 
