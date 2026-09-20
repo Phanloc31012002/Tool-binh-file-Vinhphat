@@ -115,7 +115,7 @@ if (Test-Path (Join-Path $dest "CSXS\manifest.xml")) {
                     Write-Host "Đã bật tự kiểm tra cập nhật online khi đăng nhập Windows." -ForegroundColor Green
                     $autoUpdateEnabled = $true
                 } catch {
-                    Write-Host "Task Scheduler bị chặn: $registerError / $($_.Exception.Message)" -ForegroundColor Yellow
+                    Write-Host "Windows không cho tạo Task Scheduler cho user này; đang dùng Startup tự động thay thế." -ForegroundColor Yellow
                 }
             }
             if (-not $autoUpdateEnabled) {
