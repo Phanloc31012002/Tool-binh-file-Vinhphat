@@ -13,6 +13,11 @@ CAC LAN CAP NHAT SAU (khi co ban moi):
   - Muon cap nhat ngay: dong HAN Illustrator, mo Start Menu > CongCuBinh va bam
     "Cap nhat Cong cu binh". Khong can khoi dong lai Windows.
   - Neu chua cau hinh online: dong HAN Illustrator truoc, bam dup install.bat.
+
+PHAT HANH BAN MOI (may quan ly):
+  - Sua chuc nang can sua trong source.
+  - Bam dup PhatHanhCapNhat.bat, nhap mo ta ngan, roi doi script push xong.
+  - Khong sua tay version, online\latest.json hay file ZIP.
   - Mo lai Illustrator (chi dong/mo panel khong nap lai script JSX).
 
 LUU Y:

@@ -68,6 +68,8 @@ DanCard_Setup_23/
 ├── PACKAGEPS.ps1              # Script PowerShell thực thi bởi install.bat
 ├── Configure-OnlineUpdate.ps1 # Gắn GitHub raw làm kênh cập nhật
 ├── Publish-OnlineUpdate.ps1   # Tạo ZIP + latest.json để đăng bản mới
+├── PhatHanhCapNhat.bat         # Bấm một lần để tăng version, đóng gói, commit và push
+├── PhatHanhCapNhat.ps1         # Logic phát hành tự động của file .bat
 ├── CACH_DUNG.txt              # Hướng dẫn sử dụng nhanh
 ├── updater/                    # Updater cài một lần, nằm ngoài panel
 │   ├── DanCardUpdater.ps1
@@ -119,6 +121,13 @@ mỗi phiên bản chỉ cần chạy:
 Script tạo hai file trong thư mục `online/` (`DanCardCEP-<version>.zip` và
 `latest.json`). Commit và push hai file này cùng mã nguồn lên nhánh `main`.
 Máy khách tự tải đúng gói và kiểm hash trước khi cập nhật.
+
+### Phát hành bản mới
+
+Mỗi lần cần cập nhật, chỉ sửa chức năng trong source rồi bấm đúp
+`PhatHanhCapNhat.bat`. Script hỏi một mô tả ngắn, tự tăng version, tạo ZIP và
+`latest.json`, commit rồi push lên GitHub. Không tự sửa `online/`, version trong
+manifest hay file cấu hình updater.
 
 ### Đồng bộ thẳng tới AppData máy nhân viên
 
