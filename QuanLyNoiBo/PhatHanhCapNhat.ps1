@@ -6,12 +6,13 @@ param(
 
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-$root = $PSScriptRoot
+$root = Split-Path -Parent $PSScriptRoot
 $manifestPath = Join-Path $root 'DanCardCEP\CSXS\manifest.xml'
 $indexPath = Join-Path $root 'DanCardCEP\index.html'
-$readmePath = Join-Path $root 'README.md'
+$readmePath = Join-Path $PSScriptRoot 'README.md'
 $changelogPath = Join-Path $root 'DanCardCEP\LICH_SU_CAP_NHAT.md'
-$publishScript = Join-Path $root 'Publish-OnlineUpdate.ps1'
+$publishScript = Join-Path $PSScriptRoot 'Publish-OnlineUpdate.ps1'
+$employeePackageScript = Join-Path $PSScriptRoot 'DongGoiNhanVien.ps1'
 
 function Write-Utf8Bom {
     param([string]$Path, [string]$Text)
@@ -27,7 +28,7 @@ function Get-GitHubRepository {
     throw "Remote origin không phải GitHub: $origin"
 }
 
-foreach ($path in @($manifestPath, $indexPath, $readmePath, $changelogPath, $publishScript)) {
+foreach ($path in @($manifestPath, $indexPath, $readmePath, $changelogPath, $publishScript, $employeePackageScript)) {
     if (-not (Test-Path -LiteralPath $path)) { throw "Thiếu file: $path" }
 }
 
@@ -76,6 +77,8 @@ Write-Utf8Bom -Path $changelogPath -Text $changelogText
 
 & $publishScript -GitHubRepository $repository
 if ($LASTEXITCODE -ne 0) { throw 'Không tạo được gói cập nhật.' }
+
+& $employeePackageScript
 
 & git -C $root add --all
 if ($LASTEXITCODE -ne 0) { throw 'Git add thất bại.' }

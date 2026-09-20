@@ -1,10 +1,10 @@
 ﻿$ErrorActionPreference = "Stop"
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
-$root = Split-Path -Parent $MyInvocation.MyCommand.Path
+$root = Split-Path -Parent $PSScriptRoot
 $src  = Join-Path $root "DanCardCEP"
 $dest = Join-Path $env:APPDATA "Adobe\CEP\extensions\DanCardCEP"
-$updaterSource = Join-Path $root "updater"
+$updaterSource = Join-Path $PSScriptRoot "updater"
 $updaterHome = Join-Path $env:LOCALAPPDATA "CongCuBinhUpdater"
 $updaterScript = Join-Path $updaterHome "DanCardUpdater.ps1"
 $updaterConfig = Join-Path $updaterHome "update-config.json"
@@ -13,7 +13,8 @@ $updaterTaskName = "CongCuBinh-AutoUpdate"
 $startupDir = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\Startup"
 $startupLauncher = Join-Path $startupDir "$updaterTaskName.vbs"
 $programsDir = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\CongCuBinh"
-$manualUpdateLauncher = Join-Path $programsDir "Cap nhat Cong cu binh.cmd"
+$manualUpdateLauncher = Join-Path $updaterHome "Cap nhat Cong cu binh.cmd"
+$legacyManualUpdateLauncher = Join-Path $programsDir "Cap nhat Cong cu binh.cmd"
 $manualUpdateShortcut = Join-Path $programsDir "Cap nhat Cong cu binh.lnk"
 
 Write-Host "========================================" -ForegroundColor Cyan
@@ -23,7 +24,7 @@ Write-Host ""
 
 if (-not (Test-Path $src)) {
     Write-Host "[LỖI] Không tìm thấy thư mục DanCardCEP bên cạnh file này." -ForegroundColor Red
-    Write-Host "Hãy đặt install.bat CÙNG CHỖ với thư mục DanCardCEP." -ForegroundColor Yellow
+    Write-Host "Hãy giải nén đầy đủ bộ cài rồi chạy CAI_DAT_CONG_CU_BINH.bat." -ForegroundColor Yellow
     Read-Host "Nhấn Enter để thoát"
     exit 1
 }
@@ -99,6 +100,10 @@ if (Test-Path (Join-Path $dest "CSXS\manifest.xml")) {
                     'pause'
                 ) -join [Environment]::NewLine
                 [System.IO.File]::WriteAllText($manualUpdateLauncher, $manualUpdateContent + [Environment]::NewLine, [System.Text.Encoding]::ASCII)
+                # Start Menu chi hien shortcut co icon, con .cmd dat trong updater.
+                if (Test-Path -LiteralPath $legacyManualUpdateLauncher) {
+                    Remove-Item -LiteralPath $legacyManualUpdateLauncher -Force -ErrorAction SilentlyContinue
+                }
                 $shell = New-Object -ComObject WScript.Shell
                 $shortcut = $shell.CreateShortcut($manualUpdateShortcut)
                 $shortcut.TargetPath = $env:ComSpec
@@ -161,7 +166,7 @@ if (Test-Path (Join-Path $dest "CSXS\manifest.xml")) {
     Write-Host "===============================================" -ForegroundColor Red
     Write-Host ""
     if ($lanDau) {
-        Write-Host "(Đây là lần cài đầu tiên. Lần sau chỉ cần bấm lại install.bat để cập nhật.)" -ForegroundColor White
+        Write-Host "(Đây là lần cài đầu tiên. Các lần sau tool tự kiểm tra cập nhật online.)" -ForegroundColor White
     } else {
         Write-Host "(Đã cập nhật lên bản mới nhất.)" -ForegroundColor White
     }

@@ -10,7 +10,8 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$source = Join-Path $PSScriptRoot 'DanCardCEP'
+$root = Split-Path -Parent $PSScriptRoot
+$source = Join-Path $root 'DanCardCEP'
 $pushScript = Join-Path $PSScriptRoot 'Push-StaffUpdate.ps1'
 
 function Get-SourceFingerprint {

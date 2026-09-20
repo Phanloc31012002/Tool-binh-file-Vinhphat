@@ -6,7 +6,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $programsDir = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\CongCuBinh'
-$cmdPath = Join-Path $programsDir 'Cap nhat Cong cu binh.cmd'
+$cmdPath = Join-Path $UpdaterHome 'Cap nhat Cong cu binh.cmd'
+$legacyCmdPath = Join-Path $programsDir 'Cap nhat Cong cu binh.cmd'
 $shortcutPath = Join-Path $programsDir 'Cap nhat Cong cu binh.lnk'
 $updaterScript = Join-Path $UpdaterHome 'DanCardUpdater.ps1'
 $iconPath = Join-Path $UpdaterHome 'CongCuBinh.ico'
@@ -21,6 +22,12 @@ $cmdContent = @(
     'pause'
 ) -join [Environment]::NewLine
 [System.IO.File]::WriteAllText($cmdPath, $cmdContent + [Environment]::NewLine, [System.Text.Encoding]::ASCII)
+
+# Chi de lai shortcut .lnk trong Start Menu de hien icon Cong cu binh.
+# File .cmd nam trong thu muc updater va khong xuat hien nhu mot muc rieng.
+if (Test-Path -LiteralPath $legacyCmdPath) {
+    Remove-Item -LiteralPath $legacyCmdPath -Force -ErrorAction SilentlyContinue
+}
 
 $shell = New-Object -ComObject WScript.Shell
 $shortcut = $shell.CreateShortcut($shortcutPath)

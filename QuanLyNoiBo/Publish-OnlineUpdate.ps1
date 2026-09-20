@@ -10,11 +10,12 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$root = Split-Path -Parent $PSScriptRoot
 if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
-    $OutputDirectory = Join-Path $PSScriptRoot 'online'
+    $OutputDirectory = Join-Path $root 'online'
 }
-$source = Join-Path $PSScriptRoot 'DanCardCEP'
-$updaterSource = Join-Path $PSScriptRoot 'updater'
+$source = Join-Path $root 'DanCardCEP'
+$updaterSource = Join-Path $root 'updater'
 $manifestPath = Join-Path $source 'CSXS\manifest.xml'
 if (-not (Test-Path -LiteralPath $manifestPath)) { throw 'Không tìm thấy DanCardCEP\CSXS\manifest.xml.' }
 if (-not (Test-Path -LiteralPath (Join-Path $updaterSource 'DanCardUpdater.ps1'))) { throw 'Không tìm thấy updater\DanCardUpdater.ps1.' }

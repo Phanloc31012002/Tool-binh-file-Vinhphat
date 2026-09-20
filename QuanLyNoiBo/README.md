@@ -11,22 +11,19 @@ _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 - Adobe Illustrator (hỗ trợ CS6 → 2026+, host `ILST`).
 - Windows (các script cài đặt là `.bat` / PowerShell).
 
-## Cài đặt
+## Cài lần đầu cho nhân viên
 
-**Lần đầu tiên** (chỉ làm 1 lần):
-
-1. Bấm đúp `bat_debug_mode.bat` — bật `PlayerDebugMode` cho Illustrator, cho
-   phép chạy extension chưa ký (áp dụng CSXS.9 → CSXS.12).
-2. Bấm đúp `install.bat` — copy thư mục `DanCardCEP` vào
-   `%APPDATA%\Adobe\CEP\extensions\DanCardCEP`.
-3. Mở Illustrator: **Window > Extensions > Công cụ bình**.
+Không gửi cả thư mục mã nguồn này. Gửi file `CongCuBinh_CaiLanDau.zip` hoặc
+thư mục `GUI_NHAN_VIEN_CAI_LAN_DAU` đã được đóng gói sẵn. Nhân viên chỉ cần
+giải nén toàn bộ rồi bấm đúp
+`CAI_DAT_CONG_CU_BINH.bat`; file đó tự bật `PlayerDebugMode` và cài panel.
+Sau đó mở Illustrator: **Window > Extensions > Công cụ bình**.
 
 **Các lần cập nhật sau**: khi đã cấu hình update online, máy sẽ tự kiểm tra
 bản mới khi đăng nhập Windows và cập nhật lúc Illustrator đang đóng. Không cần
 chép lại folder. Muốn cập nhật ngay, đóng Illustrator rồi bấm **CongCuBinh →
-Cap nhat Cong cu binh** trong Start Menu; không cần khởi động lại Windows. Nếu chưa cấu hình
-online, vẫn có thể bấm đúp `install.bat` (đóng Illustrator trước khi chạy) để
-cài thủ công.
+Cap nhat Cong cu binh** trong Start Menu; không cần khởi động lại Windows.
+Nếu máy không có Internet, người quản lý gửi lại bộ cài mới khi cần.
 
 > Lưu ý: đặt 2 file `.bat` cùng chỗ với thư mục `DanCardCEP`. Nếu Windows
 > cảnh báo "Windows protected your PC" khi chạy `.bat`, bấm **More info** >
@@ -39,7 +36,7 @@ Panel gồm 7 tab:
 | Tab | Chức năng |
 |---|---|
 | **Dàn file** | Accordion gồm **Dàn Card** (6 loại card, hỗ trợ card đôi 18.4×5.6, voucher ghép card) và **Dàn Decal** (17 khổ: 1.5, 2, 2.5, rồi 3–9.5 cm mỗi 0.5 cm), tự raster/clip/resize theo khung. |
-| **Dàn theo mẫu** | **Học mẫu**: học bố cục từ 1 bản đã dàn tay (1 hoặc 2 mặt), gồm vị trí, kích thước và góc xoay của từng ô. **Áp mẫu**: mỗi artboard gán lần lượt nhiều nguồn vào từng ô đã học; thiếu nguồn thì bù bằng con cuối rồi gần cuối. Dùng được với hình tròn và các mẫu có artwork xoay khác nhau. |
+| **Dàn theo mẫu** | **Học mẫu**: học bố cục từ 1 bản đã dàn tay (1 hoặc 2 mặt), gồm vị trí, kích thước và góc xoay của từng ô. **Áp mẫu** có hai chế độ: mặc định mỗi nguồn tạo một artboard và nhân vào các ô; tick chọn nhiều mẫu thì các nguồn lần lượt vào từng ô, thiếu nguồn bù bằng con cuối rồi gần cuối. Dùng được với hình tròn và artwork xoay khác nhau. |
 | **Catalogue** | Dàn trang catalogue đóng gáy giữa, khổ A4 hoặc A5 (hoặc khổ tùy chỉnh nhỏ hơn), tự nhớ pon riêng theo từng khổ. |
 | **CTL Offset** | Dàn bình cho in offset khổ lớn 65×86: **Đóng ghim giữa** (bìa TT4 + ruột AB tự trở) và **Keo gáy** (mỗi tay 16 trang, dàn AB tuần tự). |
 | **Đổi tên** | Đổi tên hàng loạt object: tiền tố, số/chữ thường/HOA, vị trí bắt đầu, đệm số 0, hướng đếm trên/dưới, lặp nhãn. |
@@ -63,17 +60,15 @@ vào (cm/mm/in), canh giữa.
 
 ```
 DanCard_Setup_23/
-├── install.bat              # Cài / cập nhật panel vào Illustrator
-├── bat_debug_mode.bat        # Bật PlayerDebugMode (chỉ chạy 1 lần)
-├── PACKAGEPS.ps1              # Script PowerShell thực thi bởi install.bat
-├── Configure-OnlineUpdate.ps1 # Gắn GitHub raw làm kênh cập nhật
-├── Publish-OnlineUpdate.ps1   # Tạo ZIP + latest.json để đăng bản mới
-├── PhatHanhCapNhat.bat         # Bấm một lần để tăng version, đóng gói, commit và push
-├── PhatHanhCapNhat.ps1         # Logic phát hành tự động của file .bat
-├── CACH_DUNG.txt              # Hướng dẫn sử dụng nhanh
-├── updater/                    # Updater cài một lần, nằm ngoài panel
-│   ├── DanCardUpdater.ps1
-│   └── update-config.json
+├── GUI_NHAN_VIEN_CAI_LAN_DAU/  # Bộ cài gọn để gửi nhân viên (sinh tự động)
+├── CongCuBinh_CaiLanDau.zip    # File ZIP gửi nhân viên (sinh tự động)
+├── QuanLyNoiBo/                # Chỉ máy quản lý dùng: phát hành, GitHub, LAN sync
+│   ├── PhatHanhCapNhat.bat      # Bấm một lần để tăng version, đóng gói, commit và push
+│   ├── DongGoiNhanVien.ps1      # Tạo lại bộ cài gọn khi cần
+│   ├── Publish-OnlineUpdate.ps1 # Tạo ZIP + latest.json cho kênh online
+│   └── staff-sync/              # Cấu hình đồng bộ LAN/VPN
+├── online/                     # Gói online mà máy nhân viên tự tải
+├── updater/                    # Mã updater dùng khi phát hành
 └── DanCardCEP/                 # Mã nguồn panel CEP
     ├── CSXS/manifest.xml        # Khai báo extension (host, kích thước panel...)
     ├── index.html                # Giao diện panel
@@ -87,13 +82,13 @@ DanCard_Setup_23/
 ## Cập nhật / Changelog
 
 Xem chi tiết từng phiên bản tại
-[`DanCardCEP/LICH_SU_CAP_NHAT.md`](DanCardCEP/LICH_SU_CAP_NHAT.md).
+[`DanCardCEP/LICH_SU_CAP_NHAT.md`](../DanCardCEP/LICH_SU_CAP_NHAT.md).
 
 Phiên bản hiện tại: **v2.9.6**.
 
 ### Cập nhật online
 
-Lần đầu trên mỗi máy vẫn chạy `install.bat`. Bộ cài đặt đặt updater tại
+Lần đầu trên mỗi máy chạy `CAI_DAT_CONG_CU_BINH.bat` trong bộ gửi nhân viên. Bộ cài đặt đặt updater tại
 `%LOCALAPPDATA%\CongCuBinhUpdater`, tách riêng với panel để updater có thể thay
 panel an toàn. Updater chỉ nhận manifest và gói qua HTTPS, kiểm SHA-256 trước
 khi cài, và không thay file nếu Illustrator đang mở. Bộ cài thêm lối tắt
@@ -103,8 +98,8 @@ tạo tác vụ khi đăng nhập Windows; nếu máy chặn Task Scheduler, nó
 của user.
 
 Kênh phát hành được cấu hình một lần trong
-`updater\update-config.json`, bằng GitHub Contents API cho `latest.json` trong
-thư mục `online/`. Sau đó,
+`..\updater\update-config.json`, bằng GitHub Contents API cho `latest.json` trong
+thư mục `..\online\`. Sau đó, từ thư mục `QuanLyNoiBo`,
 một lần trên máy tạo bản phát hành, chạy:
 
 ```powershell
@@ -147,9 +142,10 @@ mạng và cách điền danh sách tại [`staff-sync/README.md`](staff-sync/RE
 ## Xử lý sự cố
 
 - **Cài xong vẫn thấy bản cũ**: đóng hẳn Illustrator (không chỉ đóng panel)
-  trước khi chạy `install.bat`, vì Illustrator giữ bản cũ trong bộ nhớ.
-- **Panel không hiện trong Window > Extensions**: kiểm tra đã chạy
-  `bat_debug_mode.bat` trước đó chưa (chỉ cần 1 lần cho mỗi máy).
+  trước khi chạy `CAI_DAT_CONG_CU_BINH.bat` hoặc cập nhật thủ công, vì
+  Illustrator giữ bản cũ trong bộ nhớ.
+- **Panel không hiện trong Window > Extensions**: chạy lại
+  `CAI_DAT_CONG_CU_BINH.bat`; file này tự bật PlayerDebugMode.
 - **Lỗi khi dàn**: panel hiển thị thông báo tiếng Việt rõ ràng (object nào
   sai, kích thước hiện tại vs kích thước cần) ngay trong ô kết quả.
 

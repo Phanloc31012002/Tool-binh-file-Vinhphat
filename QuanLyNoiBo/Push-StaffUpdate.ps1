@@ -6,7 +6,8 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$source = Join-Path $PSScriptRoot 'DanCardCEP'
+$root = Split-Path -Parent $PSScriptRoot
+$source = Join-Path $root 'DanCardCEP'
 $product = 'com.locdev.dancard'
 
 function Write-PushLog {

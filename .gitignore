@@ -1,6 +1,13 @@
 # Legacy Release assets are generated locally when needed.
 release/
 
+# Bộ cài gọn sinh tự động để gửi nhân viên, không cần lưu trong Git.
+GUI_NHAN_VIEN_CAI_LAN_DAU/
+CongCuBinh_CaiLanDau.zip
+
+# Tài liệu/bản cũ chỉ giữ local trong thư mục quản lý.
+QuanLyNoiBo/legacy/
+
 # Local logs and temporary files
 *.log
 *.tmp

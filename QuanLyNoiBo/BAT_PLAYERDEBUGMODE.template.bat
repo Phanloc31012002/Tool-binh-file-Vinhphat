@@ -14,6 +14,6 @@ reg add "HKCU\Software\Adobe\CSXS.12" /v PlayerDebugMode /t REG_SZ /d 1 /f >nul 
 echo Xong! Da bat PlayerDebugMode cho CSXS.9 -> CSXS.12
 echo.
 echo Chi can chay file nay 1 LAN duy nhat.
-echo Sau do dung install.bat de cai panel.
+echo Sau do chay 02_CAI_CONG_CU_BINH.bat de cai panel.
 echo.
 pause
