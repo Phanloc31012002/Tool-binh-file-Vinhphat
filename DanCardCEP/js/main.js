@@ -1576,14 +1576,23 @@
   }
   var btnApMau = document.getElementById("btnApMau");
   var outApMau = document.getElementById("outApMau");
+  var multiSourcePerArtboard = document.getElementById(
+    "multiSourcePerArtboard",
+  );
   if (btnApMau) {
     btnApMau.addEventListener("click", function () {
       show(outApMau, "Đang áp mẫu…");
       btnApMau.disabled = true;
-      cs.evalScript("dcApMau()", function (res) {
-        btnApMau.disabled = false;
-        handleRes(outApMau, res);
-      });
+      var useMultiSource = !!(
+        multiSourcePerArtboard && multiSourcePerArtboard.checked
+      );
+      cs.evalScript(
+        "dcApMau(" + (useMultiSource ? "true" : "false") + ")",
+        function (res) {
+          btnApMau.disabled = false;
+          handleRes(outApMau, res);
+        },
+      );
     });
   }
 

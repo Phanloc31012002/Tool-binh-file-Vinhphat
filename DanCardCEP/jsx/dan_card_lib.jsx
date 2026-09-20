@@ -16271,7 +16271,7 @@ function dcRunKeoGay(wCm, hCm) {
 // ============================================================
 //  DÀN THEO MẪU (tích hợp vào panel) — 2 hàm gọi từ CEP:
 //    dcHocMau()  = FILE 1 (học mẫu, bước 1/2)
-//    dcApMau()   = FILE 2 (áp mẫu, bước 2/2)
+//    dcApMau(multiSourcePerArtboard) = FILE 2 (áp mẫu, bước 2/2)
 //  Logic giữ nguyên từ 1_hoc_mau.jsx / 2_ap_mau.jsx (bản Loc gửi).
 //  Chỉ đổi: bọc thành hàm, trả chuỗi "OK:"/"ERR:" cho panel.
 // ============================================================
@@ -16963,8 +16963,11 @@ function dcXoaPreviewMau(pathsText) {
 }
 
 // ---------- FILE 2: ÁP MẪU ----------
-function dcApMau() {
+function dcApMau(multiSourcePerArtboard) {
   var MM = 2.834645669;
+  // Mặc định giữ cách dàn gốc: 1 con nguồn -> 1 artboard.
+  // Chỉ khi tick trên panel mới gán nhiều nguồn khác nhau vào từng slot.
+  var useMultiSource = multiSourcePerArtboard === true;
   if (app.documents.length === 0) {
     alert("Chưa mở tài liệu.");
     return "ERR: Chưa mở tài liệu.";
@@ -17532,8 +17535,9 @@ function dcApMau() {
   var ARTBOARDS_PER_COLUMN = 15;
   var oldAb = doc.artboards.length;
 
-  // Một artboard chứa cả một lô nguồn: mỗi slot lấy đúng object tương ứng.
-  // Các object lặp do thiếu nguồn vẫn dùng chung raster tạm, không làm giảm chất lượng.
+  // Một job tạo một artboard. Ở chế độ nhiều mẫu, mỗi slot nhận nguồn tương ứng;
+  // ở chế độ gốc, tất cả slot dùng cùng một nguồn.
+  // Các object lặp vẫn dùng chung raster tạm, không làm giảm chất lượng.
   function danMotCon(block, slotSources, cxBo, cyBo, pon, tag) {
     var bSlots = block.slots;
     var bHiPt = block.sideHi * MM,
@@ -17759,6 +17763,17 @@ function dcApMau() {
     return batches;
   }
 
+  // Chế độ gốc: mỗi nguồn là một artboard riêng, nhân nguồn đó vào toàn bộ slot.
+  function buildSingleSourceBatches(items, slotCount) {
+    var batches = [];
+    for (var ss = 0; ss < items.length; ss++) {
+      var repeated = [];
+      for (var sl = 0; sl < slotCount; sl++) repeated.push(items[ss]);
+      batches.push({ sources: repeated, extra: 0 });
+    }
+    return batches;
+  }
+
   // Bản hai mặt bù theo từng CẶP, nhờ vậy mặt trước và mặt sau của cùng nguồn
   // luôn đi cùng nhau khi thiếu nguồn.
   function buildPairSourceBatches(frontItems, backItems, slotCount) {
@@ -17785,16 +17800,31 @@ function dcApMau() {
     return batches;
   }
 
+  // Chế độ gốc cho 2 mặt: một cặp trái/phải tạo một cặp artboard,
+  // mỗi mặt nhân chính nguồn của mặt đó vào toàn bộ slot đã học.
+  function buildSinglePairSourceBatches(frontItems, backItems, slotCount) {
+    var batches = [];
+    for (var sp = 0; sp < frontItems.length; sp++) {
+      var frontRepeated = [],
+        backRepeated = [];
+      for (var sl = 0; sl < slotCount; sl++) {
+        frontRepeated.push(frontItems[sp]);
+        backRepeated.push(backItems[sp]);
+      }
+      batches.push({ front: frontRepeated, back: backRepeated, extra: 0 });
+    }
+    return batches;
+  }
+
   if (MODE === "one") {
     var orderedSources = orderSourceItems(sourceItems);
     if (orderedSources.length === 0) {
       removePonCopy(ponF);
       return "ERR: Không có nguồn nào có biên dạng hợp lệ. Chưa tạo kết quả nào.";
     }
-    var sourceBatches = buildSourceBatches(
-      orderedSources,
-      blocks.F.slots.length,
-    );
+    var sourceBatches = useMultiSource
+      ? buildSourceBatches(orderedSources, blocks.F.slots.length)
+      : buildSingleSourceBatches(orderedSources, blocks.F.slots.length);
     outputBatchCount = sourceBatches.length;
     var jobs = [];
     for (var bi = 0; bi < sourceBatches.length; bi++) {
@@ -17885,11 +17915,13 @@ function dcApMau() {
       frontItems.push(colTrai[cp].it);
       backItems.push(colPhai[cp].it);
     }
-    var pairBatches = buildPairSourceBatches(
-      frontItems,
-      backItems,
-      blocks.F.slots.length,
-    );
+    var pairBatches = useMultiSource
+      ? buildPairSourceBatches(frontItems, backItems, blocks.F.slots.length)
+      : buildSinglePairSourceBatches(
+          frontItems,
+          backItems,
+          blocks.F.slots.length,
+        );
     outputBatchCount = pairBatches.length;
 
     var stepX = ponF.W + ponB.W;
@@ -17958,16 +17990,22 @@ function dcApMau() {
         sourceItems.length +
         " nguồn thành " +
         outputBatchCount +
-        " artboard; mỗi artboard gán " +
-        blocks.F.slots.length +
-        " nguồn vào " +
-        blocks.F.slots.length +
-        " slot mẫu."
+        " artboard; " +
+        (useMultiSource
+          ? "mỗi artboard gán các nguồn lần lượt vào " +
+            blocks.F.slots.length +
+            " slot mẫu."
+          : "mỗi artboard nhân 1 nguồn vào " +
+            blocks.F.slots.length +
+            " slot mẫu.")
       : "Đã dàn 2 mặt " +
         sourceItems.length / 2 +
         " cặp nguồn thành " +
         outputBatchCount +
-        " cặp artboard (trái=trước, phải=sau).";
+        " cặp artboard (trái=trước, phải=sau); " +
+        (useMultiSource
+          ? "mỗi artboard gán các nguồn lần lượt vào slot mẫu."
+          : "mỗi artboard nhân 1 nguồn tương ứng vào toàn bộ slot mẫu.");
   if (filledSlotCount > 0)
     msg +=
       "\nĐã bù " +
@@ -17995,11 +18033,15 @@ function dcApMau() {
         sourceItems.length +
         " nguồn thành " +
         outputBatchCount +
-        " artboard." +
+        " artboard (" +
+        (useMultiSource ? "nhiều mẫu/1 artboard" : "1 mẫu/1 artboard") +
+        ")." +
         (errors.length ? " (" + errors.length + " lưu ý)" : "")
       : "Đã dàn 2 mặt " +
         outputBatchCount +
-        " cặp artboard." +
+        " cặp artboard (" +
+        (useMultiSource ? "nhiều mẫu/1 artboard" : "1 mẫu/1 artboard") +
+        ")." +
         (errors.length ? " (" + errors.length + " lưu ý)" : ""))
   );
 }

@@ -2,6 +2,12 @@
 
 _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
+## v2.9.6 — Khoi phuc 2 che do dan theo mau
+
+- Phát hành tự động qua PhatHanhCapNhat.bat.
+
+---
+
 ## v2.9.5 — Them icon va tien do cap nhat
 
 - Phát hành tự động qua PhatHanhCapNhat.bat.

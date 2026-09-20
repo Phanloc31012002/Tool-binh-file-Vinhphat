@@ -313,8 +313,10 @@
             bấm <b>Học mẫu</b>, rồi bấm <b>Học 1 mặt</b>; hoặc học 2 mặt bằng
             <b>Học Mặt trước</b> rồi <b>Học Mặt sau</b>.<br />
             <b>Bước 2 — Áp mẫu:</b> chọn các CON NGUỒN theo thứ tự trái→phải,
-            trên→dưới → bấm <b>Áp mẫu</b>. Nếu mẫu học có 5 slot thì 5 nguồn
-            lần lượt vào 5 slot; thiếu nguồn thì tool bù bằng con cuối và gần cuối.
+            trên→dưới → bấm <b>Áp mẫu</b>. Không tick chế độ nhiều mẫu: mỗi con
+            nguồn tạo 1 artboard và được nhân vào các slot. Tick chế độ nhiều mẫu:
+            nếu mẫu học có 5 slot thì 5 nguồn lần lượt vào 5 slot; thiếu nguồn thì
+            tool bù bằng con cuối và gần cuối.
             Tool đọc hướng artwork, raster từng nguồn một lần, xoay/resize/cắt đúng
             từng slot. Hỗ trợ path, compound path (có lỗ), group có clipping mask,
             hình tròn, tim, đa giác và path tự vẽ. 2 mặt: đặt nguồn 2 cột
@@ -324,6 +326,16 @@
 
         <button id="btnHocMau" class="btn btn-primary"><span class="btn-label">Học mẫu</span></button>
         <div id="outHocMau" class="out">Chọn bản mẫu rồi bấm Học mẫu.</div>
+
+        <label class="check" style="margin-top: 10px">
+          <input type="checkbox" id="multiSourcePerArtboard" />
+          <span>Dàn nhiều mẫu nguồn khác nhau vào 1 artboard</span>
+        </label>
+        <p class="hint" style="margin-top: 2px">
+          Không tick: mỗi con nguồn tạo 1 artboard riêng và được nhân vào toàn bộ slot mẫu.
+          Tick: nhiều con lần lượt vào các slot của cùng 1 artboard; thiếu slot thì tool bù
+          bằng con cuối, rồi gần cuối.
+        </p>
 
         <button id="btnApMau" class="btn btn-primary" style="margin-top: 10px">
           <span class="btn-label">Áp mẫu</span>
@@ -632,7 +644,7 @@
       </main>
 
       <footer class="foot">
-        <span class="ver">v2.9.5</span>
+        <span class="ver">v2.9.6</span>
       </footer>
     </div>
 
