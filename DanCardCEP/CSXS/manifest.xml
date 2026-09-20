@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ExtensionManifest Version="7.0" ExtensionBundleId="com.locdev.dancard"
-    ExtensionBundleVersion="2.9.3"
+    ExtensionBundleVersion="2.9.4"
     ExtensionBundleName="Công cụ bình"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <ExtensionList>
-    <Extension Id="com.locdev.dancard.panel" Version="2.9.3" />
+    <Extension Id="com.locdev.dancard.panel" Version="2.9.4" />
   </ExtensionList>
   <ExecutionEnvironment>
     <HostList>

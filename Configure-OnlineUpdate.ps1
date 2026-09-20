@@ -9,7 +9,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$url = "https://raw.githubusercontent.com/$GitHubRepository/main/online/latest.json"
+$url = "https://api.github.com/repos/$GitHubRepository/contents/online/latest.json?ref=main"
 $config = [ordered]@{
     product = 'com.locdev.dancard'
     manifestUrl = $url

@@ -1,5 +1,5 @@
 ﻿{
     "product":  "com.locdev.dancard",
-    "manifestUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/latest.json",
+    "manifestUrl":  "https://api.github.com/repos/Phanloc31012002/Tool-binh-file-Vinhphat/contents/online/latest.json?ref=main",
     "checkIntervalHours":  6
 }

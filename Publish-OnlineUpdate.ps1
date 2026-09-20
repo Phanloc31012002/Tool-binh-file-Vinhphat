@@ -60,7 +60,7 @@ try {
     Write-Host "Đã tạo: $latestPath" -ForegroundColor Green
     Write-Host "Commit va push ca thu muc online/ len nhanh main." -ForegroundColor Yellow
     Write-Host "URL manifest dùng cho máy khách:" -ForegroundColor Cyan
-    Write-Host "https://raw.githubusercontent.com/$GitHubRepository/main/online/latest.json" -ForegroundColor White
+    Write-Host "https://api.github.com/repos/$GitHubRepository/contents/online/latest.json?ref=main" -ForegroundColor White
 } finally {
     Remove-Item -LiteralPath $stageRoot -Recurse -Force -ErrorAction SilentlyContinue
 }

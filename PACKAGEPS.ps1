@@ -71,7 +71,7 @@ if (Test-Path (Join-Path $dest "CSXS\manifest.xml")) {
                 $currentUpdateUrl = [string]((Get-Content -LiteralPath $updaterConfig -Raw -Encoding UTF8 | ConvertFrom-Json).manifestUrl)
             }
         } catch {}
-        if ((-not (Test-Path $updaterConfig)) -or ((-not [string]::IsNullOrWhiteSpace($sourceUpdateUrl)) -and [string]::IsNullOrWhiteSpace($currentUpdateUrl))) {
+        if ((-not (Test-Path $updaterConfig)) -or ((-not [string]::IsNullOrWhiteSpace($sourceUpdateUrl)) -and ( [string]::IsNullOrWhiteSpace($currentUpdateUrl) -or $currentUpdateUrl -match '^https://raw\.githubusercontent\.com/' ))) {
             Copy-Item -LiteralPath (Join-Path $updaterSource "update-config.json") -Destination $updaterConfig -Force
         }
 

@@ -2,6 +2,14 @@
 
 _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
+## v2.9.4 — Nhận bản mới không chờ cache GitHub Raw
+
+- Updater đọc `latest.json` qua GitHub Contents API, tránh cache tối đa năm
+  phút của GitHub Raw khi vừa publish bản mới.
+- Bộ cài tự đổi cấu hình GitHub Raw cũ sang API ở lần cài tiếp theo.
+
+---
+
 ## v2.9.3 — Kiểm nghiệm thủ công bằng CMD
 
 - Bản phát hành thử nghiệm không thay đổi chức năng panel, dùng để kiểm tra

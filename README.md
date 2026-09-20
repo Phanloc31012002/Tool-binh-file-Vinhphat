@@ -87,7 +87,7 @@ DanCard_Setup_23/
 Xem chi tiết từng phiên bản tại
 [`DanCardCEP/LICH_SU_CAP_NHAT.md`](DanCardCEP/LICH_SU_CAP_NHAT.md).
 
-Phiên bản hiện tại: **v2.9.3**.
+Phiên bản hiện tại: **v2.9.4**.
 
 ### Cập nhật online
 
@@ -101,7 +101,8 @@ tạo tác vụ khi đăng nhập Windows; nếu máy chặn Task Scheduler, nó
 của user.
 
 Kênh phát hành được cấu hình một lần trong
-`updater\update-config.json`, bằng URL `latest.json` trong thư mục `online/` trên GitHub. Sau đó,
+`updater\update-config.json`, bằng GitHub Contents API cho `latest.json` trong
+thư mục `online/`. Sau đó,
 một lần trên máy tạo bản phát hành, chạy:
 
 ```powershell

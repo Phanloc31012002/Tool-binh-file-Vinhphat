@@ -116,9 +116,20 @@ try {
     Write-UpdateLog 'Đang kiểm tra bản cập nhật online…'
     # GitHub Raw returns latest.json as text/plain.  Parse it explicitly and
     # remove an optional UTF-8 BOM so Windows PowerShell 5 can read it too.
-    $manifestResponse = Invoke-WebRequest -Uri $manifestUrl -UseBasicParsing -TimeoutSec 20
+    $manifestResponse = Invoke-WebRequest -Uri $manifestUrl -UseBasicParsing -TimeoutSec 20 -Headers @{ 'User-Agent' = 'CongCuBinhUpdater' }
     $manifestText = ([string]$manifestResponse.Content).TrimStart([char]0xFEFF)
     $remote = $manifestText | ConvertFrom-Json
+    # GitHub Contents API returns the manifest as base64.  Supporting this
+    # endpoint avoids the five-minute CDN cache used by raw.githubusercontent.
+    if (([string]$remote.encoding).ToLowerInvariant() -eq 'base64' -and -not [string]::IsNullOrWhiteSpace([string]$remote.content)) {
+        try {
+            $base64 = ([string]$remote.content) -replace '\s', ''
+            $manifestText = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($base64)).TrimStart([char]0xFEFF)
+            $remote = $manifestText | ConvertFrom-Json
+        } catch {
+            throw 'Không đọc được nội dung latest.json từ GitHub API.'
+        }
+    }
     if ([string]$remote.product -ne $product) { throw 'Manifest online không đúng sản phẩm.' }
     $remoteVersion = ConvertTo-Version $remote.version
     $packageUrl = Test-HttpsUrl -Value $remote.packageUrl -Label 'packageUrl'
