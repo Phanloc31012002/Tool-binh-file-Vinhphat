@@ -14,8 +14,10 @@ if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
     $OutputDirectory = Join-Path $PSScriptRoot 'online'
 }
 $source = Join-Path $PSScriptRoot 'DanCardCEP'
+$updaterSource = Join-Path $PSScriptRoot 'updater'
 $manifestPath = Join-Path $source 'CSXS\manifest.xml'
 if (-not (Test-Path -LiteralPath $manifestPath)) { throw 'Không tìm thấy DanCardCEP\CSXS\manifest.xml.' }
+if (-not (Test-Path -LiteralPath (Join-Path $updaterSource 'DanCardUpdater.ps1'))) { throw 'Không tìm thấy updater\DanCardUpdater.ps1.' }
 [xml]$manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8
 $product = [string]$manifest.ExtensionManifest.ExtensionBundleId
 $version = [string]$manifest.ExtensionManifest.ExtensionBundleVersion
@@ -41,8 +43,14 @@ $stageRoot = Join-Path $env:TEMP ('DanCardPublish-' + [Guid]::NewGuid().ToString
 try {
     New-Item -ItemType Directory -Path $stageRoot -Force | Out-Null
     Copy-Item -LiteralPath $source -Destination (Join-Path $stageRoot 'DanCardCEP') -Recurse -Force
+    Copy-Item -LiteralPath $updaterSource -Destination (Join-Path $stageRoot 'updater') -Recurse -Force
     if (Test-Path -LiteralPath $zipPath) { Remove-Item -LiteralPath $zipPath -Force }
-    Compress-Archive -LiteralPath (Join-Path $stageRoot 'DanCardCEP') -DestinationPath $zipPath -CompressionLevel Optimal
+    # Cả panel lẫn updater phải nằm trong cùng ZIP.  Updater dùng phần này
+    # để tự đổi icon/logic sau khi process hiện tại đã thoát.
+    Compress-Archive -LiteralPath @(
+        (Join-Path $stageRoot 'DanCardCEP'),
+        (Join-Path $stageRoot 'updater')
+    ) -DestinationPath $zipPath -CompressionLevel Optimal
     $hash = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash.ToUpperInvariant()
     $packageUrl = "https://raw.githubusercontent.com/$GitHubRepository/main/online/$zipName"
     $onlineManifest = [ordered]@{

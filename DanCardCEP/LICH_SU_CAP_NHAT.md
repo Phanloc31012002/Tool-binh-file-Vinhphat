@@ -1,6 +1,12 @@
-# Lịch sử cập nhật — Công cụ bình
+﻿# Lịch sử cập nhật — Công cụ bình
 
 _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
+
+## v2.9.5 — Them icon va tien do cap nhat
+
+- Phát hành tự động qua PhatHanhCapNhat.bat.
+
+---
 
 ## v2.9.4 — Nhận bản mới không chờ cache GitHub Raw
 

@@ -19,6 +19,130 @@ function Write-UpdateLog {
     if (-not $Quiet) { Write-Host "[Công cụ bình] $Message" -ForegroundColor $Color }
 }
 
+function Format-ByteSize {
+    param([Int64]$Bytes)
+    if ($Bytes -ge 1GB) { return ('{0:N2} GB' -f ($Bytes / 1GB)) }
+    if ($Bytes -ge 1MB) { return ('{0:N2} MB' -f ($Bytes / 1MB)) }
+    if ($Bytes -ge 1KB) { return ('{0:N1} KB' -f ($Bytes / 1KB)) }
+    return "$Bytes B"
+}
+
+function Write-UpdateProgress {
+    param(
+        [string]$Phase,
+        [Int64]$Completed,
+        [Int64]$Total,
+        [Int32]$LastPercent
+    )
+    if ($Total -le 0) {
+        if (-not $Quiet -and $LastPercent -lt 0) { Write-Host "[$Phase] Đang xử lý…" -ForegroundColor Cyan }
+        return $LastPercent
+    }
+    $percent = [Math]::Min(100, [Math]::Max(0, [Int32][Math]::Floor(($Completed * 100.0) / $Total)))
+    if ($percent -gt $LastPercent) {
+        if (-not $Quiet) {
+            Write-Host "[$Phase] $percent% — $(Format-ByteSize $Completed) / $(Format-ByteSize $Total)" -ForegroundColor Cyan
+        }
+        return $percent
+    }
+    return $LastPercent
+}
+
+function Download-FileWithProgress {
+    param([string]$Url, [string]$Destination)
+    $request = $response = $input = $output = $null
+    try {
+        $request = [System.Net.HttpWebRequest]::Create($Url)
+        $request.UserAgent = 'CongCuBinhUpdater'
+        $request.Timeout = 120000
+        $request.ReadWriteTimeout = 120000
+        $response = $request.GetResponse()
+        [Int64]$total = $response.ContentLength
+        $input = $response.GetResponseStream()
+        $output = [System.IO.File]::Open($Destination, [System.IO.FileMode]::Create, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
+        [byte[]]$buffer = New-Object byte[] 131072
+        [Int64]$completed = 0
+        [Int32]$lastPercent = -5
+        $lastPercent = Write-UpdateProgress -Phase 'Tải DanCardCEP' -Completed 0 -Total $total -LastPercent $lastPercent
+        while (($read = $input.Read($buffer, 0, $buffer.Length)) -gt 0) {
+            $output.Write($buffer, 0, $read)
+            $completed += $read
+            $lastPercent = Write-UpdateProgress -Phase 'Tải DanCardCEP' -Completed $completed -Total $total -LastPercent $lastPercent
+        }
+        if ($total -le 0 -and -not $Quiet) {
+            Write-Host "[Tải DanCardCEP] Hoàn thành — $(Format-ByteSize $completed)" -ForegroundColor Cyan
+        }
+    } finally {
+        if ($output) { $output.Dispose() }
+        if ($input) { $input.Dispose() }
+        if ($response) { $response.Dispose() }
+    }
+}
+
+function Copy-DirectoryWithProgress {
+    param([string]$Source, [string]$Destination)
+    # Giữ nguyên cả file ẩn và thư mục rỗng như Copy-Item -Recurse -Force
+    # trước đây, đồng thời tính được tổng byte để hiện phần trăm chính xác.
+    New-Item -ItemType Directory -Path $Destination -Force | Out-Null
+    $prefix = $Source.TrimEnd('\') + '\'
+    $directories = @(Get-ChildItem -LiteralPath $Source -Force -Recurse -Directory)
+    foreach ($directory in $directories) {
+        $relativeDirectory = $directory.FullName.Substring($prefix.Length)
+        New-Item -ItemType Directory -Path (Join-Path $Destination $relativeDirectory) -Force | Out-Null
+    }
+    $files = @(Get-ChildItem -LiteralPath $Source -Force -Recurse -File)
+    [Int64]$total = 0
+    foreach ($file in $files) { $total += [Int64]$file.Length }
+    [Int64]$completed = 0
+    [Int32]$lastPercent = -5
+    $lastPercent = Write-UpdateProgress -Phase 'Chép vào AppData' -Completed 0 -Total $total -LastPercent $lastPercent
+    foreach ($file in $files) {
+        $relativePath = $file.FullName.Substring($prefix.Length)
+        $targetPath = Join-Path $Destination $relativePath
+        New-Item -ItemType Directory -Path (Split-Path -Parent $targetPath) -Force | Out-Null
+        $input = $output = $null
+        try {
+            $input = [System.IO.File]::Open($file.FullName, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::Read)
+            $output = [System.IO.File]::Open($targetPath, [System.IO.FileMode]::Create, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
+            [byte[]]$buffer = New-Object byte[] 131072
+            while (($read = $input.Read($buffer, 0, $buffer.Length)) -gt 0) {
+                $output.Write($buffer, 0, $read)
+                $completed += $read
+                $lastPercent = Write-UpdateProgress -Phase 'Chép vào AppData' -Completed $completed -Total $total -LastPercent $lastPercent
+            }
+        } finally {
+            if ($output) { $output.Dispose() }
+            if ($input) { $input.Dispose() }
+        }
+    }
+    if ($total -eq 0 -and -not $Quiet) { Write-Host '[Chép vào AppData] 100%' -ForegroundColor Cyan }
+}
+
+function Schedule-UpdaterPayload {
+    param([string]$PackageBase)
+    $packageUpdater = Join-Path $PackageBase 'updater'
+    if (-not (Test-Path -LiteralPath (Join-Path $packageUpdater 'DanCardUpdater.ps1'))) { return }
+    $stageRoot = Join-Path $PSScriptRoot ('payload-' + [Guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $stageRoot -Force | Out-Null
+    foreach ($name in @('DanCardUpdater.ps1', 'SetupShortcuts.ps1', 'ApplyUpdaterPayload.ps1', 'CongCuBinh.ico')) {
+        $source = Join-Path $packageUpdater $name
+        if (Test-Path -LiteralPath $source) { Copy-Item -LiteralPath $source -Destination (Join-Path $stageRoot $name) -Force }
+    }
+    $applyScript = Join-Path $stageRoot 'ApplyUpdaterPayload.ps1'
+    if (-not (Test-Path -LiteralPath $applyScript)) {
+        Remove-Item -LiteralPath $stageRoot -Recurse -Force -ErrorAction SilentlyContinue
+        return
+    }
+    $arguments = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$applyScript`" -ParentProcessId $PID -StageRoot `"$stageRoot`" -UpdaterHome `"$PSScriptRoot`""
+    try {
+        Start-Process -FilePath 'powershell.exe' -ArgumentList $arguments -WindowStyle Hidden
+    } catch {
+        Remove-Item -LiteralPath $stageRoot -Recurse -Force -ErrorAction SilentlyContinue
+        throw
+    }
+    Write-UpdateLog 'Đang làm mới updater và icon cho lần cập nhật sau…' DarkCyan
+}
+
 # Chỉ một updater được phép đổi folder extension tại một thời điểm. File lock
 # tự được Windows nhả khi tiến trình kết thúc, kể cả khi updater lỗi giữa chừng.
 $lockPath = Join-Path $PSScriptRoot 'update.lock'
@@ -164,7 +288,7 @@ try {
     New-Item -ItemType Directory -Path $extractRoot -Force | Out-Null
     try {
         Write-UpdateLog "Đang tải bản $remoteVersion…"
-        Invoke-WebRequest -Uri $packageUrl -OutFile $zipPath -UseBasicParsing -TimeoutSec 120
+        Download-FileWithProgress -Url $packageUrl -Destination $zipPath
         $actualHash = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash.ToUpperInvariant()
         if ($actualHash -ne $expectedHash) { throw 'SHA-256 của gói tải về không khớp manifest.' }
         Expand-Archive -LiteralPath $zipPath -DestinationPath $extractRoot -Force
@@ -180,7 +304,7 @@ try {
             Move-Item -LiteralPath $installRoot -Destination $backup -Force
         }
         try {
-            Copy-Item -LiteralPath $packageRoot -Destination $installRoot -Recurse -Force
+            Copy-DirectoryWithProgress -Source $packageRoot -Destination $installRoot
             if (-not (Test-Path -LiteralPath (Join-Path $installRoot 'CSXS\manifest.xml'))) {
                 throw 'Chép gói mới không hoàn tất.'
             }
@@ -188,6 +312,14 @@ try {
             if (Test-Path -LiteralPath $installRoot) { Remove-Item -LiteralPath $installRoot -Recurse -Force }
             if (Test-Path -LiteralPath $backup) { Move-Item -LiteralPath $backup -Destination $installRoot -Force }
             throw
+        }
+        # Gói online cũng mang theo updater và icon.  Chép chúng vào thư mục
+        # tạm trước, rồi một tiến trình con sẽ thay file sau khi updater này
+        # thoát để không ghi đè script đang chạy.
+        try {
+            Schedule-UpdaterPayload -PackageBase (Split-Path -Parent $packageRoot)
+        } catch {
+            Write-UpdateLog "Panel đã cập nhật, nhưng chưa làm mới được updater: $($_.Exception.Message)" DarkYellow
         }
         Get-ChildItem -LiteralPath (Split-Path -Parent $installRoot) -Directory -Filter 'DanCardCEP.backup-*' |
             Sort-Object LastWriteTime -Descending | Select-Object -Skip 1 |

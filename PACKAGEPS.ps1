@@ -8,6 +8,7 @@ $updaterSource = Join-Path $root "updater"
 $updaterHome = Join-Path $env:LOCALAPPDATA "CongCuBinhUpdater"
 $updaterScript = Join-Path $updaterHome "DanCardUpdater.ps1"
 $updaterConfig = Join-Path $updaterHome "update-config.json"
+$updaterIcon = Join-Path $updaterHome "CongCuBinh.ico"
 $updaterTaskName = "CongCuBinh-AutoUpdate"
 $startupDir = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\Startup"
 $startupLauncher = Join-Path $startupDir "$updaterTaskName.vbs"
@@ -60,6 +61,12 @@ if (Test-Path (Join-Path $dest "CSXS\manifest.xml")) {
     if (Test-Path $updaterSource) {
         New-Item -ItemType Directory -Path $updaterHome -Force | Out-Null
         Copy-Item -LiteralPath (Join-Path $updaterSource "DanCardUpdater.ps1") -Destination $updaterScript -Force
+        foreach ($updaterFileName in @("SetupShortcuts.ps1", "ApplyUpdaterPayload.ps1", "CongCuBinh.ico")) {
+            $updaterFileSource = Join-Path $updaterSource $updaterFileName
+            if (Test-Path -LiteralPath $updaterFileSource) {
+                Copy-Item -LiteralPath $updaterFileSource -Destination (Join-Path $updaterHome $updaterFileName) -Force
+            }
+        }
         $sourceUpdaterConfig = Join-Path $updaterSource "update-config.json"
         $sourceUpdateUrl = ""
         $currentUpdateUrl = ""
@@ -98,6 +105,7 @@ if (Test-Path (Join-Path $dest "CSXS\manifest.xml")) {
                 $shortcut.Arguments = '/c ""' + $manualUpdateLauncher + '""'
                 $shortcut.WorkingDirectory = $updaterHome
                 $shortcut.Description = 'Kiem tra va cai ban moi cua Cong cu binh'
+                if (Test-Path -LiteralPath $updaterIcon) { $shortcut.IconLocation = "$updaterIcon,0" }
                 $shortcut.Save()
                 Write-Host "Đã thêm lối tắt Start Menu: Cập nhật Công cụ bình." -ForegroundColor Green
             } catch {

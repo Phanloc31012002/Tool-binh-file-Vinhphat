@@ -1,4 +1,4 @@
-# Công cụ bình — DanCard CEP Panel
+﻿# Công cụ bình — DanCard CEP Panel
 
 Panel mở rộng (CEP extension) cho Adobe Illustrator, hỗ trợ dàn bình các loại
 ấn phẩm in ấn: card, decal, catalogue, offset khổ lớn, đổi tên hàng loạt và
@@ -89,7 +89,7 @@ DanCard_Setup_23/
 Xem chi tiết từng phiên bản tại
 [`DanCardCEP/LICH_SU_CAP_NHAT.md`](DanCardCEP/LICH_SU_CAP_NHAT.md).
 
-Phiên bản hiện tại: **v2.9.4**.
+Phiên bản hiện tại: **v2.9.5**.
 
 ### Cập nhật online
 
