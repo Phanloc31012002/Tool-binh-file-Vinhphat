@@ -9,6 +9,8 @@ $updaterHome = Join-Path $env:LOCALAPPDATA "CongCuBinhUpdater"
 $updaterScript = Join-Path $updaterHome "DanCardUpdater.ps1"
 $updaterConfig = Join-Path $updaterHome "update-config.json"
 $updaterTaskName = "CongCuBinh-AutoUpdate"
+$startupDir = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\Startup"
+$startupLauncher = Join-Path $startupDir "$updaterTaskName.vbs"
 
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "   CÀI ĐẶT PANEL `"CÔNG CỤ BÌNH`" (CEP)" -ForegroundColor Cyan
@@ -76,15 +78,39 @@ if (Test-Path (Join-Path $dest "CSXS\manifest.xml")) {
             $updateUrl = [string]$updateConfigData.manifestUrl
         } catch {}
         if (-not [string]::IsNullOrWhiteSpace($updateUrl)) {
+            $autoUpdateEnabled = $false
+            $taskCommand = "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$updaterScript`" -Quiet"
             try {
                 $taskAction = New-ScheduledTaskAction -Execute "powershell.exe" -Argument ("-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$updaterScript`" -Quiet")
                 $taskTrigger = New-ScheduledTaskTrigger -AtLogOn
                 $taskSettings = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
                 Register-ScheduledTask -TaskName $updaterTaskName -Action $taskAction -Trigger $taskTrigger -Settings $taskSettings -Description "Tự kiểm tra cập nhật Công cụ bình" -Force | Out-Null
                 Write-Host "Đã bật tự kiểm tra cập nhật online khi đăng nhập Windows." -ForegroundColor Green
+                $autoUpdateEnabled = $true
             } catch {
-                Write-Host "Chưa tạo được tác vụ tự update: $($_.Exception.Message)" -ForegroundColor Yellow
-                Write-Host "Vẫn có thể chạy: $updaterScript" -ForegroundColor Yellow
+                $registerError = $_.Exception.Message
+                try {
+                    # Một số bản Windows chặn Register-ScheduledTask của user thường.
+                    # schtasks tạo tác vụ đăng nhập cho chính user mà không cần quyền admin.
+                    $taskOutput = & schtasks.exe /Create /TN $updaterTaskName /TR $taskCommand /SC ONLOGON /F 2>&1
+                    if ($LASTEXITCODE -ne 0) { throw ($taskOutput -join ' ') }
+                    Write-Host "Đã bật tự kiểm tra cập nhật online khi đăng nhập Windows." -ForegroundColor Green
+                    $autoUpdateEnabled = $true
+                } catch {
+                    Write-Host "Task Scheduler bị chặn: $registerError / $($_.Exception.Message)" -ForegroundColor Yellow
+                }
+            }
+            if (-not $autoUpdateEnabled) {
+                try {
+                    New-Item -ItemType Directory -Path $startupDir -Force | Out-Null
+                    $vbsLine = 'CreateObject("Wscript.Shell").Run "' + $taskCommand.Replace('"', '""') + '", 0, False'
+                    [System.IO.File]::WriteAllText($startupLauncher, $vbsLine + [Environment]::NewLine, [System.Text.Encoding]::ASCII)
+                    Write-Host "Đã bật tự kiểm tra cập nhật bằng Startup của user." -ForegroundColor Green
+                    $autoUpdateEnabled = $true
+                } catch {
+                    Write-Host "Chưa bật được tự update: $($_.Exception.Message)" -ForegroundColor Yellow
+                    Write-Host "Vẫn có thể chạy: $updaterScript" -ForegroundColor Yellow
+                }
             }
         } else {
             Write-Host "Chưa cấu hình URL update online; panel vẫn cài bình thường." -ForegroundColor Yellow

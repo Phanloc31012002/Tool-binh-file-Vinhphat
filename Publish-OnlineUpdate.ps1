@@ -36,7 +36,9 @@ try {
         publishedUtc = [DateTime]::UtcNow.ToString('o')
     }
     $latestPath = Join-Path $OutputDirectory 'latest.json'
-    $onlineManifest | ConvertTo-Json | Set-Content -LiteralPath $latestPath -Encoding UTF8
+    $latestJson = $onlineManifest | ConvertTo-Json
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllText($latestPath, $latestJson + [Environment]::NewLine, $utf8NoBom)
     Write-Host "Đã tạo: $zipPath" -ForegroundColor Green
     Write-Host "Đã tạo: $latestPath" -ForegroundColor Green
     Write-Host "Commit va push ca thu muc online/ len nhanh main." -ForegroundColor Yellow

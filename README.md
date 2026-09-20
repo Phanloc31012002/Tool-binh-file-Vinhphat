@@ -92,7 +92,8 @@ Phiên bản hiện tại: **v2.9.0**.
 Lần đầu trên mỗi máy vẫn chạy `install.bat`. Bộ cài đặt đặt updater tại
 `%LOCALAPPDATA%\CongCuBinhUpdater`, tách riêng với panel để updater có thể thay
 panel an toàn. Updater chỉ nhận manifest và gói qua HTTPS, kiểm SHA-256 trước
-khi cài, và không thay file nếu Illustrator đang mở.
+khi cài, và không thay file nếu Illustrator đang mở. Bộ cài tự tạo tác vụ khi
+đăng nhập Windows; nếu máy chặn Task Scheduler, nó dùng Startup của user.
 
 Kênh phát hành được cấu hình một lần trong
 `updater\update-config.json`, bằng URL `latest.json` trong thư mục `online/` trên GitHub. Sau đó,
