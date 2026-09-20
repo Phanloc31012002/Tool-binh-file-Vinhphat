@@ -1,7 +1,7 @@
 {
     "product":  "com.locdev.dancard",
-    "version":  "2.9.2",
-    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.9.2.zip",
-    "sha256":  "04A1CE9EC7C083A36CDD408134EE33AE28768CABB8664FFCB5F1F52857209D7C",
-    "publishedUtc":  "2026-09-20T09:42:58.3885306Z"
+    "version":  "2.9.3",
+    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.9.3.zip",
+    "sha256":  "39C8892932C07A3187734C713C6F3A5CD054E5B5B01C1F1A4E6D3F0A2932444F",
+    "publishedUtc":  "2026-09-20T09:45:05.1752197Z"
 }

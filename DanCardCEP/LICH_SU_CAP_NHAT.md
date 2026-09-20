@@ -2,6 +2,13 @@
 
 _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
+## v2.9.3 — Kiểm nghiệm thủ công bằng CMD
+
+- Bản phát hành thử nghiệm không thay đổi chức năng panel, dùng để kiểm tra
+  lối tắt CMD cập nhật thủ công trong Start Menu.
+
+---
+
 ## v2.9.2 — Kiểm nghiệm cập nhật online
 
 - Bản phát hành thử nghiệm không thay đổi chức năng panel, dùng để xác nhận
