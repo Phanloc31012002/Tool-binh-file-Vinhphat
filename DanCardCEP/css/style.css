@@ -1,0 +1,1850 @@
+/* ===== FONT NHÚNG ===== */
+@font-face {
+  font-family: "Blastine";
+  src: url("../fonts/Blastine.otf") format("opentype");
+}
+@font-face {
+  font-family: "Frankfurter";
+  src: url("../fonts/Frankfurter.ttf") format("truetype");
+}
+@font-face {
+  font-family: "MinecraftDC";
+  src: url("../fonts/Minecraft.ttf") format("truetype");
+}
+@font-face {
+  font-family: "ThuphapLoc";
+  src: url("../fonts/ThuphapCongthuy.ttf") format("truetype");
+}
+@font-face {
+  font-family: "TH Hope It Issed";
+  src: url("../fonts/TH-HOPEITISSED.TTF") format("truetype");
+}
+@font-face {
+  font-family: "SVN Gretoon";
+  src: url("../fonts/SVN-GRETOON.TTF") format("truetype");
+}
+@font-face {
+  font-family: "SVN Ziclets";
+  src: url("../fonts/SVN-ZICLETS.TTF") format("truetype");
+}
+@font-face {
+  font-family: "SVN Diamond";
+  src: url("../fonts/SVN-DIAMOND.OTF") format("opentype");
+}
+@font-face {
+  font-family: "SVN Braga";
+  src: url("../fonts/SVN-BRAGA.OTF") format("opentype");
+}
+
+@property --btn-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+:root {
+  --bg: #20242b;
+  --bg-raise: #2b3039;
+  --bg-input: #1d2229;
+  --line: #171b21;
+  --line-soft: #3b4350;
+  --ink: #ecf2f8;
+  --ink-dim: #9daab9;
+  --accent: #4da1ff;
+  --accent-ink: #ffffff;
+  --btn-pink: #14d5a1;
+  --btn-peach: #13abe8;
+  --btn-yellow: #ffb550;
+  --btn-blue: #287ed8;
+  --ok: #73d3a6;
+  --warn: #ff9292;
+  --radius: 5px;
+  --pad: 12px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--ink);
+  font-family:
+    "Segoe UI",
+    system-ui,
+    -apple-system,
+    sans-serif;
+  font-size: 12px;
+  line-height: 1.5;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+/* ---- Header ---- */
+.head {
+  padding: var(--pad);
+  border-bottom: 1px solid var(--line);
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.mark {
+  width: 0.6cm;
+  height: 0.6cm;
+  flex: 0 0 0.6cm;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.mark img {
+  display: block;
+  width: 0.6cm;
+  height: 0.6cm;
+}
+.title {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.header-raster {
+  margin-left: auto;
+  appearance: none;
+  cursor: pointer;
+  min-width: 66px;
+  padding: 5px 8px;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  background: var(--bg-raise);
+  color: var(--ink);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+}
+.header-raster:hover {
+  background: #39414d;
+}
+.header-raster:disabled {
+  cursor: wait;
+  opacity: 0.58;
+}
+.sub {
+  font-size: 10px;
+  color: var(--ink-dim);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* ---- Body ---- */
+.body {
+  flex: 1;
+  padding: var(--pad);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--pad);
+}
+.hint {
+  color: var(--ink-dim);
+  font-size: 11px;
+}
+
+/* ---- Button ---- */
+.btn {
+  appearance: none;
+  border: 1px solid var(--line-soft);
+  background: var(--bg-raise);
+  color: var(--ink);
+  padding: 9px 12px;
+  border-radius: var(--radius);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  transition:
+    background 0.12s,
+    border-color 0.12s;
+}
+.btn:hover {
+  background: #39414d;
+}
+.btn:active {
+  background: #333b46;
+}
+.btn-primary {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background:
+    linear-gradient(var(--bg-raise), var(--bg-raise)) padding-box,
+    conic-gradient(
+        from var(--btn-angle),
+        var(--btn-pink),
+        var(--btn-peach),
+        var(--btn-yellow),
+        var(--btn-blue),
+        var(--btn-pink)
+      )
+      border-box;
+  color: #fff;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  box-shadow: 0 0 7px rgba(97, 255, 47, 0.28);
+  animation: button-gradient-spin 1.5s linear infinite;
+}
+.btn-primary:hover {
+  background:
+    linear-gradient(#39414d, #39414d) padding-box,
+    conic-gradient(
+        from var(--btn-angle),
+        var(--btn-pink),
+        var(--btn-peach),
+        var(--btn-yellow),
+        var(--btn-blue),
+        var(--btn-pink)
+      )
+      border-box;
+  box-shadow: 0 0 11px rgba(255, 112, 28, 0.5);
+}
+.btn-primary:active {
+  transform: translateY(1px);
+}
+@keyframes button-gradient-spin {
+  to {
+    --btn-angle: 360deg;
+  }
+}
+/* Chữ nút chính: gradient sặc sỡ, chạy màu, đậm, ập vào mắt */
+.btn-primary .btn-label {
+  display: inline-block;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  background-image: linear-gradient(
+    90deg,
+    #ff2d95,
+    #ff8a00,
+    #ffee00,
+    #37ff5e,
+    #00e5ff,
+    #8a5cff,
+    #ff2d95
+  );
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: btn-label-flow 3s linear infinite;
+  filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.35));
+}
+@keyframes btn-label-flow {
+  to {
+    background-position: 300% 0;
+  }
+}
+
+/* ---- Output ---- */
+.out {
+  min-height: 40px;
+  height: auto;          /* cao tự động theo nội dung */
+  flex: 0 0 auto;        /* trong .body (flex column) KHÔNG bị co lại */
+  width: 100%;
+  max-width: 100%;
+  padding: 11px 12px;
+  background: var(--bg-input);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font-family: "Consolas", "SF Mono", monospace;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--ink);
+  /* Ô cao ra ôm hết chữ; đường dẫn dài tự xuống dòng trong ô. */
+  white-space: pre-wrap;
+  word-break: break-all;
+  overflow-wrap: anywhere;
+  overflow: visible;
+}
+.out.ok {
+  color: var(--ok);
+  border-color: #2f5c46;
+}
+.out.warn {
+  color: var(--warn);
+  border-color: #5c4630;
+}
+
+/* ---- Footer ---- */
+.foot {
+  padding: 8px var(--pad);
+  border-top: 1px solid var(--line);
+  font-size: 10px;
+  color: var(--ink-dim);
+}
+
+/* ---- Field / label ---- */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.field.hidden {
+  display: none;
+}
+.label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-dim);
+}
+
+/* ---- Radio list ---- */
+.radio-list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.radio-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 11px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--line);
+  transition: background 0.1s;
+}
+.radio-row:last-child {
+  border-bottom: none;
+}
+.radio-row:hover {
+  background: var(--bg-raise);
+}
+.radio-row input {
+  accent-color: var(--accent);
+}
+.radio-row span {
+  font-size: 12px;
+}
+
+/* ---- Checkbox ---- */
+.check {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  cursor: pointer;
+  padding: 4px 0;
+}
+.check input {
+  accent-color: var(--accent);
+}
+
+/* ---- Credits trong header (author/tester) ---- */
+/* ============ HEADER CREDITS (viết lại sạch) ============ */
+.credits {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 12px 40px;
+  margin-top: 10px;
+  padding-top: 10px;
+  padding-bottom: 6px;
+  border-top: 1px solid var(--line-soft);
+}
+.credit {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+/* Author (ô đầu) đẩy sang phải để vòng tròn không bị cắt mép trái */
+.credits .credit:first-child {
+  margin-left: 30px;
+}
+/* Ô tester co được, không đẩy tràn ra ngoài panel khi thu hẹp */
+.credits .credit:last-child {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.credit-role {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink-dim);
+}
+.credit-name {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  height: 40px;
+  padding: 0;
+  overflow: visible;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 40px;
+}
+.loc-name {
+  font-family: "ThuphapLoc", cursive;
+  font-size: 30px;
+  line-height: 40px;
+  overflow: visible;
+}
+.tan {
+  font-family: "TH Hope It Issed", cursive;
+  font-size: 30px;
+  line-height: 40px;
+}
+.loc-name .cd {
+  font-family: "SVN Braga", sans-serif;
+  font-size: 13px;
+  font-weight: 400;
+  margin-left: 26px;
+  position: relative;
+  z-index: 3;
+}
+/* Vòng tia sáng nổ quanh chữ Lộc (author) */
+.loc-burst {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  overflow: visible;
+  vertical-align: middle;
+}
+.loc-burst-canvas {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 180px;
+  height: 180px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.loc-burst .loc-core {
+  position: relative;
+  z-index: 2;
+  font-family: "ThuphapLoc", cursive;
+  font-size: 30px;
+  line-height: 1;
+  color: #fff;
+  text-shadow:
+    0 0 4px #fff,
+    0 0 9px #7fd0ff,
+    0 0 15px #ff5a7a,
+    0 0 22px #ff2d55;
+}
+.goku {
+  font-family: "SVN Ziclets", sans-serif;
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0.02em;
+}
+
+/* ============ UFO chiếu tia -> hiện chữ "Duẫn" (tester CTL Offset) ============ */
+/* Chu kỳ ~6.5s: UFO lượn tới -> bật tia (hạt sáng rơi + vũng sáng + sóng lan)
+   -> chữ Duẫn hiện lung linh -> tắt kiểu tivi -> lặp lại. */
+.ufo-tester {
+  position: relative;
+  display: inline-block;
+  width: 120px;
+  height: 46px;
+  vertical-align: middle;
+  overflow: visible;
+}
+
+/* Quầng sáng mờ sau UFO (cho ảo) */
+.ufo-tester .ufo-glow {
+  position: absolute;
+  left: 50%;
+  top: -6px;
+  width: 62px;
+  height: 40px;
+  transform: translateX(-50%);
+  background: radial-gradient(
+    ellipse at center,
+    rgba(122, 214, 255, 0.5),
+    rgba(122, 214, 255, 0.14) 45%,
+    rgba(122, 214, 255, 0) 72%
+  );
+  filter: blur(2px);
+  z-index: 0;
+  animation: ufo-glow 6.5s ease-in-out infinite;
+}
+@keyframes ufo-glow {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: translateX(-50%) scale(0.9);
+  }
+  25%,
+  70% {
+    opacity: 0.95;
+    transform: translateX(-50%) scale(1.08);
+  }
+}
+
+/* Con UFO: bay bồng bềnh + nghiêng lắc nhẹ (ảo) */
+.ufo-tester .ufo {
+  position: absolute;
+  left: 50%;
+  top: -14px;
+  width: 46px;
+  height: 22px;
+  transform: translateX(-50%);
+  animation: ufo-bob 3.4s ease-in-out infinite;
+  z-index: 3;
+  will-change: transform;
+}
+@keyframes ufo-bob {
+  0% {
+    transform: translateX(-50%) translateY(0) rotate(-3deg);
+  }
+  50% {
+    transform: translateX(-50%) translateY(-4px) rotate(3deg);
+  }
+  100% {
+    transform: translateX(-50%) translateY(0) rotate(-3deg);
+  }
+}
+
+/* Thân đĩa */
+.ufo-tester .ufo-body {
+  position: absolute;
+  left: 50%;
+  top: 9px;
+  width: 46px;
+  height: 12px;
+  transform: translateX(-50%);
+  background: linear-gradient(#9aa2b6 0%, #5b6172 55%, #343947 100%);
+  border-radius: 50%;
+  box-shadow:
+    0 1px 4px rgba(0, 0, 0, 0.55),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.4),
+    inset 0 1px 1px rgba(255, 255, 255, 0.25);
+}
+
+/* Vòm kính + người ngoài hành tinh */
+.ufo-tester .ufo-dome {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 20px;
+  height: 16px;
+  transform: translateX(-50%);
+  background: linear-gradient(#d3f1ff, #74c6ea 70%, #4aa6cf);
+  border-radius: 50% 50% 45% 45% / 70% 70% 30% 30%;
+  overflow: hidden;
+  box-shadow:
+    inset 0 -2px 3px rgba(0, 0, 0, 0.18),
+    0 0 6px rgba(150, 225, 255, 0.5);
+}
+.ufo-tester .ufo-shine {
+  position: absolute;
+  left: 3px;
+  top: 2px;
+  width: 7px;
+  height: 5px;
+  background: rgba(255, 255, 255, 0.75);
+  border-radius: 50%;
+  filter: blur(0.5px);
+}
+.ufo-tester .ufo-alien {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 11px;
+  height: 12px;
+  transform: translateX(-50%);
+  background: linear-gradient(#7bf0b6, #3fce90);
+  border-radius: 50% 50% 40% 40% / 60% 60% 40% 40%;
+  animation: alien-peek 6.5s ease-in-out infinite;
+}
+@keyframes alien-peek {
+  0%,
+  25% {
+    transform: translateX(-50%) translateY(1px);
+  }
+  40%,
+  60% {
+    transform: translateX(-50%) translateY(-1px);
+  }
+  100% {
+    transform: translateX(-50%) translateY(1px);
+  }
+}
+.ufo-tester .ufo-alien::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 3px;
+  width: 4px;
+  height: 4px;
+  transform: translateX(-50%);
+  background: #16303a;
+  border-radius: 50%;
+  box-shadow:
+    0 0 3px #0a1a20,
+    0 0 6px rgba(120, 240, 200, 0.6);
+  animation: alien-blink 6.5s linear infinite;
+}
+@keyframes alien-blink {
+  0%,
+  46%,
+  52%,
+  100% {
+    transform: translateX(-50%) scaleY(1);
+  }
+  49% {
+    transform: translateX(-50%) scaleY(0.1);
+  }
+}
+
+/* Đèn dưới bụng đĩa: đổi màu chạy vòng */
+.ufo-tester .ufo-lights {
+  position: absolute;
+  left: 50%;
+  top: 18px;
+  width: 34px;
+  height: 4px;
+  transform: translateX(-50%);
+  z-index: 4;
+}
+.ufo-tester .ufo-lights span {
+  position: absolute;
+  top: 0;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  animation: ufo-light 1.5s linear infinite;
+}
+.ufo-tester .ufo-lights span:nth-child(1) {
+  left: 3px;
+  animation-delay: 0s;
+}
+.ufo-tester .ufo-lights span:nth-child(2) {
+  left: 15px;
+  animation-delay: 0.5s;
+}
+.ufo-tester .ufo-lights span:nth-child(3) {
+  left: 27px;
+  animation-delay: 1s;
+}
+@keyframes ufo-light {
+  0% {
+    background: #ffd76a;
+    box-shadow: 0 0 6px #ffcf49;
+    opacity: 1;
+  }
+  33% {
+    background: #6af0ff;
+    box-shadow: 0 0 6px #6adfff;
+    opacity: 0.5;
+  }
+  66% {
+    background: #ff7ad6;
+    box-shadow: 0 0 6px #ff7ad6;
+    opacity: 1;
+  }
+  100% {
+    background: #ffd76a;
+    box-shadow: 0 0 6px #ffcf49;
+    opacity: 0.5;
+  }
+}
+
+/* Tia chiếu (hình thang loe xuống) */
+.ufo-tester .ufo-beam {
+  position: absolute;
+  left: 50%;
+  top: 16px;
+  width: 44px;
+  height: 36px;
+  transform: translateX(-50%);
+  transform-origin: top center;
+  z-index: 1;
+  opacity: 0;
+  animation: ufo-beam 6.5s ease-in-out infinite;
+}
+.ufo-tester .beam-ray {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(150, 235, 255, 0.65),
+    rgba(120, 220, 255, 0.16) 68%,
+    rgba(120, 220, 255, 0)
+  );
+  clip-path: polygon(36% 0, 64% 0, 100% 100%, 0 100%);
+  filter: blur(0.5px);
+  animation: beam-flicker 0.5s steps(2, end) infinite;
+}
+@keyframes beam-flicker {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.86;
+  }
+}
+@keyframes ufo-beam {
+  0% {
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.95;
+  }
+  66% {
+    opacity: 0.95;
+  }
+  74% {
+    opacity: 0.75;
+  }
+  80% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Hạt sáng lấp lánh rơi trong tia */
+.ufo-tester .beam-particles {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+}
+.ufo-tester .beam-particles i {
+  position: absolute;
+  top: 4px;
+  width: 2.5px;
+  height: 2.5px;
+  border-radius: 50%;
+  background: #eaffff;
+  box-shadow: 0 0 4px #9be9ff;
+  opacity: 0;
+  animation: beam-fall 1.6s linear infinite;
+}
+.ufo-tester .beam-particles i:nth-child(1) {
+  left: 46%;
+  animation-delay: 0s;
+}
+.ufo-tester .beam-particles i:nth-child(2) {
+  left: 54%;
+  animation-delay: 0.2s;
+}
+.ufo-tester .beam-particles i:nth-child(3) {
+  left: 40%;
+  animation-delay: 0.45s;
+}
+.ufo-tester .beam-particles i:nth-child(4) {
+  left: 60%;
+  animation-delay: 0.7s;
+}
+.ufo-tester .beam-particles i:nth-child(5) {
+  left: 33%;
+  animation-delay: 0.95s;
+}
+.ufo-tester .beam-particles i:nth-child(6) {
+  left: 67%;
+  animation-delay: 1.15s;
+}
+.ufo-tester .beam-particles i:nth-child(7) {
+  left: 50%;
+  animation-delay: 1.35s;
+}
+.ufo-tester .beam-particles i:nth-child(8) {
+  left: 58%;
+  animation-delay: 1.55s;
+}
+@keyframes beam-fall {
+  0% {
+    opacity: 0;
+    transform: translateY(0) scale(0.6);
+  }
+  15% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(30px) scale(1);
+  }
+}
+
+/* Vũng sáng nơi tia chạm (dưới chữ) */
+.ufo-tester .ufo-puddle {
+  position: absolute;
+  left: 50%;
+  top: 44px;
+  width: 52px;
+  height: 12px;
+  transform: translateX(-50%);
+  background: radial-gradient(
+    ellipse at center,
+    rgba(160, 240, 255, 0.7),
+    rgba(120, 220, 255, 0.18) 55%,
+    rgba(120, 220, 255, 0) 75%
+  );
+  filter: blur(1px);
+  opacity: 0;
+  z-index: 1;
+  animation: ufo-puddle 6.5s ease-in-out infinite;
+}
+@keyframes ufo-puddle {
+  0%,
+  8% {
+    opacity: 0;
+    transform: translateX(-50%) scaleX(0.5);
+  }
+  18%,
+  66% {
+    opacity: 0.9;
+    transform: translateX(-50%) scaleX(1);
+  }
+  80%,
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) scaleX(0.5);
+  }
+}
+
+/* Vòng sóng lan ra từ vũng sáng */
+.ufo-tester .ufo-ring {
+  position: absolute;
+  left: 50%;
+  top: 44px;
+  width: 20px;
+  height: 6px;
+  transform: translate(-50%, -50%);
+  border: 1px solid rgba(170, 240, 255, 0.8);
+  border-radius: 50%;
+  opacity: 0;
+  z-index: 1;
+  animation: ufo-ring 2.3s ease-out infinite;
+}
+@keyframes ufo-ring {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.3);
+  }
+  10% {
+    opacity: 0.8;
+  }
+  70% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(2.6);
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Chữ Duẫn: hiện lung linh khi tia sáng, tắt kiểu tivi */
+.ufo-tester .duan-word {
+  position: absolute;
+  left: 50%;
+  top: 22px;
+  transform: translateX(-50%) scale(0.6);
+  font-family: "TH Hope It Issed", cursive;
+  font-size: 26px;
+  line-height: 1.45;
+  padding: 6px 12px 2px;
+  white-space: nowrap;
+  opacity: 0;
+  z-index: 2;
+  /* gradient riêng, không dính background-attachment:fixed của rainbow-text
+     (thứ khiến chữ bị lệch/cắt khi clip-to-text) */
+  background-image: linear-gradient(
+    90deg,
+    #e5484d,
+    #f8863d,
+    #f5c518,
+    #4caf7d,
+    #2d8ceb,
+    #6a5acd,
+    #e5484d
+  );
+  background-size: 300% 100%;
+  background-repeat: repeat;
+  background-attachment: scroll;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation:
+    flow 4s linear infinite,
+    ufo-duan 6.5s ease-in-out infinite;
+}
+@keyframes ufo-duan {
+  /* Hiện ra: mờ -> nét, phóng nhẹ, glow lung linh */
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) scale(0.5);
+    filter: blur(4px) drop-shadow(0 0 5px rgba(150, 235, 255, 0.9));
+  }
+  10% {
+    opacity: 0;
+    transform: translateX(-50%) scale(0.62);
+    filter: blur(4px) drop-shadow(0 0 5px rgba(150, 235, 255, 0.9));
+  }
+  20% {
+    opacity: 1;
+    transform: translateX(-50%) scale(1.06, 1);
+    filter: blur(0) drop-shadow(0 0 7px rgba(150, 235, 255, 0.95))
+      brightness(1.2);
+  }
+  26% {
+    opacity: 1;
+    transform: translateX(-50%) scale(1, 1);
+    filter: blur(0) drop-shadow(0 0 3px rgba(150, 235, 255, 0.6)) brightness(1);
+  }
+  /* GIỮ LÂU, khẽ dập dờn */
+  40% {
+    opacity: 1;
+    transform: translateX(-50%) scale(1, 1);
+    filter: blur(0) drop-shadow(0 0 5px rgba(150, 235, 255, 0.8))
+      brightness(1.08);
+  }
+  58% {
+    opacity: 1;
+    transform: translateX(-50%) scale(1, 1);
+    filter: blur(0) drop-shadow(0 0 3px rgba(150, 235, 255, 0.5)) brightness(1);
+  }
+  /* NHIỄU (glitch): giật ngang + chớp + lệch màu */
+  66% {
+    opacity: 1;
+    transform: translateX(-53%) scale(1.02, 1);
+    filter: blur(0) brightness(1.4) contrast(1.4) hue-rotate(-18deg);
+  }
+  68% {
+    opacity: 0.55;
+    transform: translateX(-46%) scale(0.98, 1.05) skewX(-6deg);
+    filter: blur(0.6px) brightness(1.7) contrast(1.6) hue-rotate(20deg);
+  }
+  70% {
+    opacity: 1;
+    transform: translateX(-52%) scale(1.03, 0.96) skewX(4deg);
+    filter: blur(0) brightness(1.2) contrast(1.5) hue-rotate(-10deg);
+  }
+  72% {
+    opacity: 0.4;
+    transform: translateX(-48%) scale(0.97, 1.04);
+    filter: blur(0.8px) brightness(1.8) contrast(1.7) hue-rotate(30deg);
+  }
+  74% {
+    opacity: 1;
+    transform: translateX(-51%) scale(1.01, 1) skewX(-3deg);
+    filter: blur(0) brightness(1.3) contrast(1.4);
+  }
+  76% {
+    opacity: 0.65;
+    transform: translateX(-49%) scale(1, 1.02);
+    filter: blur(0.5px) brightness(1.6) contrast(1.5) hue-rotate(-24deg);
+  }
+  /* TẮT TIVI: dẹp thành vạch ngang chói */
+  80% {
+    opacity: 1;
+    transform: translateX(-50%) scale(1.08, 0.05);
+    filter: blur(0) brightness(2.8) drop-shadow(0 0 6px #fff);
+  }
+  85% {
+    opacity: 1;
+    transform: translateX(-50%) scale(0.02, 0.05);
+    filter: blur(0) brightness(3);
+  }
+  88% {
+    opacity: 0;
+    transform: translateX(-50%) scale(0, 0.03);
+    filter: blur(1px) brightness(3);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) scale(0, 0.03);
+    filter: blur(1px);
+  }
+}
+
+/* ============ SAITAMA đấm chữ "Tân 1 cú" (tester mặc định) ============ */
+.tan-battle {
+  position: relative;
+  display: inline-block;
+  vertical-align: baseline;
+  isolation: isolate;
+}
+.tan-battle .battle-fx {
+  position: absolute;
+  /* Khung gọn quanh chữ để vùng kính vỡ không lan quá rộng. */
+  left: -98px;
+  top: -91px;
+  width: 350px;
+  height: 220px;
+  z-index: 3;
+  pointer-events: none;
+}
+/* Saitama: JS set transform để đi vào / gồng / đấm */
+.tan-battle .saitama {
+  position: absolute;
+  left: 100%;
+  bottom: -6px;
+  width: 30px;
+  height: 40px;
+  z-index: 4;
+  margin-left: 10px;
+  transform: scaleX(-1) translateX(-70px);
+  transform-origin: center bottom;
+  will-change: transform;
+}
+.tan-battle .saitama svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+/* áo choàng bay */
+.tan-battle .saitama .s-cape {
+  transform-origin: 26px 28px;
+  animation: cape-flap 0.9s ease-in-out infinite;
+}
+@keyframes cape-flap {
+  0%,
+  100% {
+    transform: rotate(4deg) skewX(3deg);
+  }
+  50% {
+    transform: rotate(-5deg) skewX(-5deg);
+  }
+}
+/* tay đấm: JS thêm class wind/punch lên .saitama (đã scaleX(-1) nên đấm sang trái vào chữ) */
+.tan-battle .saitama .s-arm-g {
+  transform-box: view-box;
+  transform-origin: 40px 35px;
+  transition: transform 0.12s cubic-bezier(0.5, -0.4, 0.3, 1.5);
+}
+.tan-battle .saitama.wind .s-arm-g {
+  transform: translateX(-10px) scaleX(0.5) rotate(-8deg);
+}
+.tan-battle .saitama.punch .s-arm-g {
+  transform: translateX(7px) scaleX(1.35);
+}
+.tan-battle .saitama.wind {
+  animation: sai-gong 0.09s linear infinite;
+}
+@keyframes sai-gong {
+  0%,
+  100% {
+    margin-left: 10px;
+  }
+  50% {
+    margin-left: 11.4px;
+  }
+}
+
+/* cụm chữ + mảnh vỡ (Tân và 1 cú) */
+.tan-battle .tan-word {
+  position: relative;
+  display: inline-block;
+  z-index: 2;
+  white-space: nowrap;
+}
+.tan-battle .shatter-unit {
+  position: relative;
+  display: inline-block;
+}
+.tan-battle .wsp {
+  display: inline-block;
+  width: 6px;
+}
+.tan-battle .unit-base {
+  position: relative;
+  display: inline-block;
+}
+.tan-battle .unit-shards {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+.tan-battle .unit-shards .shard {
+  position: absolute;
+  left: 0;
+  top: 0;
+  /* mảnh giữ màu gradient nhưng ám lạnh + viền băng xanh (nứt kính) */
+  background-size: 300%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  filter: brightness(0.9) saturate(0.8)
+    drop-shadow(0 1px 1px rgba(0, 0, 0, 0.5));
+  white-space: nowrap;
+  opacity: 0;
+  will-change: transform, opacity;
+}
+.tan-battle .unit-tan .shard {
+  background-image: linear-gradient(
+    90deg,
+    #e5484d,
+    #f8863d,
+    #f5c518,
+    #4caf7d,
+    #2d8ceb,
+    #6a5acd,
+    #e5484d
+  );
+}
+.tan-battle .unit-gu .shard {
+  background-image: linear-gradient(
+    90deg,
+    #8a5cff,
+    #c94bd8,
+    #ff5a7a,
+    #ffb347,
+    #8a5cff
+  );
+}
+.tan-battle .unit-shards .shard-1 {
+  clip-path: polygon(0 0, 30% 0, 24% 48%, 0 44%);
+}
+.tan-battle .unit-shards .shard-2 {
+  clip-path: polygon(30% 0, 58% 0, 52% 40%, 24% 48%);
+}
+.tan-battle .unit-shards .shard-3 {
+  clip-path: polygon(58% 0, 82% 0, 78% 38%, 52% 40%);
+}
+.tan-battle .unit-shards .shard-4 {
+  clip-path: polygon(82% 0, 100% 0, 100% 42%, 78% 38%);
+}
+.tan-battle .unit-shards .shard-5 {
+  clip-path: polygon(0 44%, 24% 48%, 20% 74%, 0 76%);
+}
+.tan-battle .unit-shards .shard-6 {
+  clip-path: polygon(24% 48%, 52% 40%, 50% 72%, 20% 74%);
+}
+.tan-battle .unit-shards .shard-7 {
+  clip-path: polygon(52% 40%, 78% 38%, 80% 70%, 50% 72%);
+}
+.tan-battle .unit-shards .shard-8 {
+  clip-path: polygon(78% 38%, 100% 42%, 100% 72%, 80% 70%);
+}
+.tan-battle .unit-shards .shard-9 {
+  clip-path: polygon(0 76%, 50% 72%, 46% 100%, 0 100%);
+}
+.tan-battle .unit-shards .shard-10 {
+  clip-path: polygon(50% 72%, 100% 72%, 100% 100%, 46% 100%);
+}
+
+/* ---- Tab bar ---- */
+.tabbar {
+  display: flex;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg);
+}
+.tab {
+  flex: 1;
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--ink-dim);
+  -webkit-text-fill-color: var(--ink-dim);
+  padding: 11px 8px;
+  font-size: 12px;
+  font-family: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s;
+}
+.tab:hover {
+  color: #fff;
+  -webkit-text-fill-color: #fff;
+  background: rgba(245, 95, 141, 0.1);
+}
+.tab.active {
+  color: #fff;
+  -webkit-text-fill-color: #fff;
+  background: linear-gradient(
+    180deg,
+    rgba(245, 95, 141, 0.15),
+    rgba(248, 174, 86, 0.05)
+  );
+  border-bottom: 2px solid #f8863d;
+}
+
+/* ---- Tab panes ---- */
+.tabpane {
+  display: none;
+}
+.tabpane.active {
+  display: flex;
+}
+
+/* ---- Footer: version bên phải ---- */
+.foot {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+}
+.ver {
+  font-size: 10px;
+  color: var(--ink-dim);
+  opacity: 0.7;
+}
+
+/* ---- Accordion ---- */
+.acc {
+  border-bottom: 1px solid var(--line);
+}
+.acc-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  appearance: none;
+  border: none;
+  background: var(--bg-raise);
+  color: var(--ink);
+  padding: 11px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.acc-head:hover {
+  background: #39414d;
+}
+.acc-arrow {
+  font-size: 9px;
+  color: var(--ink-dim);
+  width: 12px;
+}
+.acc-body {
+  display: none;
+  flex-direction: column;
+  gap: var(--pad);
+  padding: var(--pad);
+}
+.acc-body.open {
+  display: flex;
+}
+
+/* ---- Input ---- */
+.inp {
+  width: 100%;
+  appearance: none;
+  border: 1px solid var(--line-soft);
+  background: var(--bg-input);
+  color: var(--ink);
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  font-size: 12px;
+  font-family: inherit;
+}
+.inp:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* ---- Select + ô nhập kích thước (Catalogue) ---- */
+.select {
+  width: 100%;
+  appearance: none;
+  border: 1px solid var(--line-soft);
+  background: var(--bg-input);
+  color: var(--ink);
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  font-size: 12px;
+  font-family: inherit;
+}
+.select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.size-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.num {
+  flex: 1;
+  width: 100%;
+  appearance: none;
+  border: 1px solid var(--line-soft);
+  background: var(--bg-input);
+  color: var(--ink);
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  font-size: 12px;
+  font-family: inherit;
+  text-align: center;
+}
+.num:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.times {
+  color: var(--ink-dim);
+  font-size: 13px;
+}
+
+/* ---- Catalogue ---- */
+.catalogue-card {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  background: var(--bg-raise);
+}
+.catalogue-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* ---- Field row (2 cột) ---- */
+.field-row {
+  display: flex;
+  gap: 10px;
+}
+.field.half {
+  flex: 1;
+}
+
+/* ===== TÊN CHẠY GRADIENT CẦU VỒNG 7 MÀU ===== */
+/* ============ HIỆU ỨNG GRADIENT CHỮ ============ */
+/* Dùng chung: clip gradient vào chữ. Vì đặt trên inline chữ đã có
+   line-height rộng ở .credit-name nên nét không bị cắt. */
+@keyframes flow {
+  from {
+    background-position: 0%;
+  }
+  to {
+    background-position: 300%;
+  }
+}
+@keyframes rainbow-glow {
+  from {
+    filter: drop-shadow(0 0 2px #ff5ca8) drop-shadow(0 0 5px #ff5ca8);
+  }
+  33% {
+    filter: drop-shadow(0 0 2px #ffd34d) drop-shadow(0 0 5px #ffd34d);
+  }
+  66% {
+    filter: drop-shadow(0 0 2px #36e6ff) drop-shadow(0 0 5px #36e6ff);
+  }
+  to {
+    filter: drop-shadow(0 0 2px #ff5ca8) drop-shadow(0 0 5px #ff5ca8);
+  }
+}
+
+/* Lộc, Tân: cầu vồng 7 màu chạy */
+.rainbow-text {
+  background: linear-gradient(
+    90deg,
+    #e5484d,
+    #f8863d,
+    #f5c518,
+    #4caf7d,
+    #2d8ceb,
+    #6a5acd,
+    #e5484d
+  );
+  background-size: 300%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation:
+    flow 4s linear infinite,
+    rainbow-glow 4s linear infinite;
+}
+/* Một dải gradient toàn cục cho Lộc + Tân/Duẫn: chạy liên tục từ phải sang trái. */
+@keyframes connected-name-gradient {
+  from {
+    background-position: 440px 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+/* Background fixed dùng chung cùng hệ tọa độ panel, nên hai cụm là một hàng gradient duy nhất. */
+.rainbow-text {
+  background-size: 440px 100%;
+  background-repeat: repeat-x;
+  background-attachment: fixed;
+  animation:
+    connected-name-gradient 2.5s linear infinite,
+    rainbow-glow 4s linear infinite;
+}
+/* Code dạo: SVG giữ nguyên nét font, filter tạo sóng không cần cắt chữ. */
+.neon-text {
+  display: inline-block;
+  width: 72px;
+  height: 22px;
+  overflow: visible;
+  vertical-align: -6px;
+}
+.neon-text text {
+  font-family: "SVN Braga", sans-serif;
+  font-size: 13px;
+  font-weight: 400;
+}
+/* 1 cú: gradient tím-vàng chạy */
+.tim-vang {
+  background: linear-gradient(
+    90deg,
+    #8c237b,
+    #d629d9,
+    #f5c518,
+    #d629d9,
+    #8c237b
+  );
+  background-size: 300%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: flow 0.7s linear infinite;
+}
+
+/* ===== TESTER ELECTRIC EFFECT: TÂN 1 CÚ ===== */
+/* SVG chỉ phủ phần tên, tia chớp lệch nhịp để luôn đổi vị trí và dáng. */
+#testerName {
+  position: relative;
+  isolation: isolate;
+}
+#testerName > .tan,
+#testerName > .goku {
+  position: relative;
+  z-index: 2;
+}
+.tester-lightning {
+  position: absolute;
+  left: -10px;
+  top: -12px;
+  width: calc(100% + 20px);
+  height: 64px;
+  z-index: 1;
+  overflow: visible;
+  pointer-events: none;
+}
+.tester-bolt {
+  position: absolute;
+  display: block;
+  overflow: visible;
+  opacity: 0;
+  transform-origin: 50% 50%;
+  pointer-events: none;
+  -webkit-filter: drop-shadow(0 0 2px rgba(122, 45, 157, 0.78))
+    drop-shadow(0 0 5px rgba(46, 112, 205, 0.96));
+  filter: drop-shadow(0 0 2px rgba(122, 45, 157, 0.78))
+    drop-shadow(0 0 5px rgba(46, 112, 205, 0.96));
+  -webkit-animation-name: none;
+  animation-name: none;
+  -webkit-animation-timing-function: steps(0, end);
+  animation-timing-function: steps(0, end);
+  -webkit-animation-iteration-count: 1;
+  animation-iteration-count: 1;
+  -webkit-animation-fill-mode: both;
+  animation-fill-mode: both;
+  -webkit-animation-duration: 1s;
+  animation-duration: 1s;
+}
+.tester-bolt polyline {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.tester-bolt .bolt-halo {
+  stroke: #0059ff;
+  stroke-width: 6.2;
+  opacity: 0.3;
+}
+.tester-bolt .bolt-mid {
+  stroke: #0059ff;
+  stroke-width: 2.5;
+  opacity: 0.94;
+}
+.tester-bolt .bolt-core {
+  stroke: #d9efff;
+  stroke-width: 1.3;
+  opacity: 1;
+}
+@-webkit-keyframes tester-electric-flash {
+  0%,
+  54%,
+  100% {
+    opacity: 0;
+    -webkit-transform: scale(0.78);
+  }
+  57% {
+    opacity: 0.18;
+    -webkit-transform: scale(1);
+  }
+  59% {
+    opacity: 1;
+    -webkit-transform: scale(1.06);
+  }
+  62% {
+    opacity: 0.13;
+  }
+  65% {
+    opacity: 0.92;
+    -webkit-transform: scale(1);
+  }
+  68% {
+    opacity: 0.2;
+  }
+  71% {
+    opacity: 0.82;
+  }
+  75% {
+    opacity: 0;
+  }
+}
+@keyframes tester-electric-flash {
+  0%,
+  54%,
+  100% {
+    opacity: 0;
+    transform: scale(0.78);
+  }
+  57% {
+    opacity: 0.18;
+    transform: scale(1);
+  }
+  59% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+  62% {
+    opacity: 0.13;
+  }
+  65% {
+    opacity: 0.92;
+    transform: scale(1);
+  }
+  68% {
+    opacity: 0.2;
+  }
+  71% {
+    opacity: 0.82;
+  }
+  75% {
+    opacity: 0;
+  }
+}
+
+/* 7 tia mẫu: gradient xanh–tím, lõi trắng. */
+
+/* 7 tia mẫu cũ + 10 tia dọc dài hơn. Hình cố định, chỉ chọn để chớp là ngẫu nhiên. */
+.tester-bolt.bolt-active {
+  -webkit-animation-name: tester-electric-burst;
+  animation-name: tester-electric-burst;
+  -webkit-animation-duration: 1s;
+  animation-duration: 1s;
+  -webkit-animation-timing-function: steps(0, end);
+  animation-timing-function: steps(0, end);
+  -webkit-animation-iteration-count: 1;
+  animation-iteration-count: 1;
+  -webkit-animation-fill-mode: both;
+  animation-fill-mode: both;
+}
+@-webkit-keyframes tester-electric-burst {
+  0%,
+  100% {
+    opacity: 0;
+    -webkit-transform: scale(0.78);
+  }
+  12% {
+    opacity: 0.18;
+    -webkit-transform: scale(1);
+  }
+  17% {
+    opacity: 1;
+    -webkit-transform: scale(1.06);
+  }
+  23% {
+    opacity: 0.13;
+  }
+  31% {
+    opacity: 0.92;
+    -webkit-transform: scale(1);
+  }
+  38% {
+    opacity: 0.2;
+  }
+  45% {
+    opacity: 0.82;
+  }
+  54% {
+    opacity: 0;
+  }
+}
+@keyframes tester-electric-burst {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(0.78);
+  }
+  12% {
+    opacity: 0.18;
+    transform: scale(1);
+  }
+  17% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+  23% {
+    opacity: 0.13;
+  }
+  31% {
+    opacity: 0.92;
+    transform: scale(1);
+  }
+  38% {
+    opacity: 0.2;
+  }
+  45% {
+    opacity: 0.82;
+  }
+  54% {
+    opacity: 0;
+  }
+}
+/* Vị trí của 17 tia: 8–17 là các tia dọc, dài hơn. */
+.tester-bolt.bolt-1 {
+  left: 0%;
+  top: 4px;
+  width: 16px;
+  height: 38px;
+}
+.tester-bolt.bolt-2 {
+  left: 14%;
+  top: 15px;
+  width: 26px;
+  height: 18px;
+}
+.tester-bolt.bolt-3 {
+  left: 29%;
+  top: 1px;
+  width: 20px;
+  height: 30px;
+}
+.tester-bolt.bolt-4 {
+  left: 43%;
+  top: 19px;
+  width: 30px;
+  height: 16px;
+}
+.tester-bolt.bolt-5 {
+  left: 58%;
+  top: 1px;
+  width: 22px;
+  height: 33px;
+}
+.tester-bolt.bolt-6 {
+  left: 72%;
+  top: 16px;
+  width: 25px;
+  height: 21px;
+}
+.tester-bolt.bolt-7 {
+  left: 88%;
+  top: 3px;
+  width: 15px;
+  height: 37px;
+}
+.tester-bolt.bolt-8 {
+  left: 7%;
+  top: -9px;
+  width: 14px;
+  height: 61px;
+}
+.tester-bolt.bolt-9 {
+  left: 20%;
+  top: -11px;
+  width: 15px;
+  height: 64px;
+}
+.tester-bolt.bolt-10 {
+  left: 25%;
+  top: -8px;
+  width: 13px;
+  height: 59px;
+}
+.tester-bolt.bolt-11 {
+  left: 36%;
+  top: -12px;
+  width: 17px;
+  height: 66px;
+}
+.tester-bolt.bolt-12 {
+  left: 50%;
+  top: -10px;
+  width: 14px;
+  height: 63px;
+}
+.tester-bolt.bolt-13 {
+  left: 64%;
+  top: -8px;
+  width: 16px;
+  height: 60px;
+}
+.tester-bolt.bolt-14 {
+  left: 70%;
+  top: -12px;
+  width: 13px;
+  height: 67px;
+}
+.tester-bolt.bolt-15 {
+  left: 80%;
+  top: -9px;
+  width: 15px;
+  height: 62px;
+}
+.tester-bolt.bolt-16 {
+  left: 92%;
+  top: -11px;
+  width: 14px;
+  height: 65px;
+}
+.tester-bolt.bolt-17 {
+  left: 98%;
+  top: -8px;
+  width: 16px;
+  height: 61px;
+}
+
+/* ===== Nút Clip + bảng nhập KT (header) ===== */
+.header-clip {
+  margin-left: 6px;
+}
+.head {
+  position: relative;
+}
+.clip-pop {
+  position: absolute;
+  right: 10px;
+  top: 46px;
+  z-index: 50;
+  width: 236px;
+  padding: 12px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--bg-input);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.5);
+}
+.clip-pop.hidden {
+  display: none;
+}
+.clip-pop-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+.clip-pop-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.clip-inp {
+  flex: 1;
+  width: 100%;
+  appearance: none;
+  border: 1px solid var(--line-soft);
+  background: var(--bg-input);
+  color: var(--ink);
+  padding: 7px 8px;
+  border-radius: var(--radius, 6px);
+  font-size: 12px;
+  font-family: inherit;
+  text-align: center;
+}
+.clip-inp:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.clip-unit {
+  appearance: none;
+  border: 1px solid var(--line-soft);
+  background: var(--bg-input);
+  color: var(--ink);
+  padding: 7px 6px;
+  border-radius: var(--radius, 6px);
+  font-size: 12px;
+  font-family: inherit;
+}
+.clip-pop-btns {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.clip-pop-btns .btn {
+  min-width: 60px;
+  padding: 6px 12px;
+}
+
+/* ===== Ô mã 1088 khoá — chữ cam đậm ===== */
+.inp-locked {
+  color: #ffb550 !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.5px;
+  cursor: default;
+  background: var(--bg-input) !important;
+}
+.inp-locked:focus {
+  border-color: var(--line-soft) !important;
+  outline: none;
+}
+
+/* ===== Scrollbar mảnh, hợp tông slate + ẩn scroll ngang ===== */
+html, body {
+  overflow-x: hidden;   /* bỏ thanh cuộn ngang thô */
+}
+.panel {
+  overflow: hidden;     /* panel không tự sinh scroll ngang */
+}
+.body {
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin;                     /* Firefox */
+  scrollbar-color: #3b4350 transparent;
+}
+/* WebKit (CEP dùng Chromium) */
+::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #3b4350;
+  border-radius: 6px;
+  border: 2px solid var(--bg);   /* tạo khoảng đệm, thanh trông mảnh */
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #4b5563;
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}

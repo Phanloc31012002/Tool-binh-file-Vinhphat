@@ -1,0 +1,642 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Công cụ bình</title>
+    <link rel="stylesheet" href="./css/style.css" />
+  </head>
+  <body>
+    <div class="panel">
+      <header class="head">
+        <div class="brand">
+          <span class="mark" aria-hidden="true"
+            ><img src="./assets/logo-4-mau.png" alt=""
+          /></span>
+          <div class="brand-txt"><div class="title">Công cụ bình</div></div>
+          <button
+            id="btnRaster"
+            class="header-raster"
+            type="button"
+            title="Raster CMYK · 450 ppi · nền trong suốt"
+          >
+            Raster
+          </button>
+          <button
+            id="btnClip"
+            class="header-raster header-clip"
+            type="button"
+            title="Clip object đang chọn thành khung KT nhập vào (canh giữa)"
+          >
+            Clip
+          </button>
+        </div>
+
+        <!-- Bảng nhập KT clip (ẩn, hiện khi bấm Clip) -->
+        <div id="clipPopover" class="clip-pop hidden">
+          <div class="clip-pop-title">Clip kích thước (canh giữa)</div>
+          <div class="clip-pop-row">
+            <input type="text" id="clipW" class="clip-inp" value="5" />
+            <span class="times">×</span>
+            <input type="text" id="clipH" class="clip-inp" value="5" />
+            <select id="clipUnit" class="clip-unit">
+              <option value="cm">cm</option>
+              <option value="mm">mm</option>
+              <option value="in">in</option>
+            </select>
+          </div>
+          <div class="clip-pop-btns">
+            <button id="clipCancel" class="btn" type="button">Huỷ</button>
+            <button id="clipOk" class="btn btn-primary" type="button">
+              <span class="btn-label">OK</span>
+            </button>
+          </div>
+          <div id="clipMsg" class="hint"></div>
+        </div>
+        <div class="credits">
+          <div class="credit">
+            <span class="credit-role">AUTHOR</span>
+            <span class="credit-name loc-name">
+              <span class="loc-burst" aria-label="Lộc">
+                <canvas class="loc-burst-canvas" aria-hidden="true"></canvas>
+                <span class="loc-core">Lộc</span>
+              </span>
+              <svg
+                class="cd neon-text"
+                viewBox="0 0 72 22"
+                role="img"
+                aria-label="Code dạo"
+              >
+                <defs>
+                  <linearGradient
+                    id="codeDaoGradient"
+                    x1="0%"
+                    y1="0%"
+                    x2="100%"
+                    y2="0%"
+                    spreadMethod="repeat"
+                  >
+                    <stop offset="0%" stop-color="#ffd428" />
+                    <stop offset="25%" stop-color="#ff1a0a" />
+                    <stop offset="50%" stop-color="#13abe8" />
+                    <stop offset="75%" stop-color="#61ff2f" />
+                    <stop offset="100%" stop-color="#ffd428" />
+                    <animateTransform
+                      attributeName="gradientTransform"
+                      type="translate"
+                      from="0 0"
+                      to="-1 0"
+                      dur="0.5s"
+                      repeatCount="indefinite"
+                    />
+                  </linearGradient>
+                  <filter
+                    id="codeDaoWave"
+                    x="-10%"
+                    y="-30%"
+                    width="120%"
+                    height="160%"
+                  >
+                    <feTurbulence
+                      type="fractalNoise"
+                      baseFrequency="0.012 0.11"
+                      numOctaves="1"
+                      seed="8"
+                      result="waveNoise"
+                    >
+                      <animate
+                        attributeName="baseFrequency"
+                        values="0.012 0.11;0.03 0.11;0.012 0.11"
+                        dur="0.3s"
+                        repeatCount="indefinite"
+                      />
+                    </feTurbulence>
+                    <feDisplacementMap
+                      in="SourceGraphic"
+                      in2="waveNoise"
+                      scale="1.5"
+                      xChannelSelector="R"
+                      yChannelSelector="G"
+                    />
+                  </filter>
+                </defs>
+                <text
+                  x="0"
+                  y="16"
+                  filter="url(#codeDaoWave)"
+                  fill="url(#codeDaoGradient)"
+                >
+                  Code dạo
+                </text>
+              </svg>
+            </span>
+          </div>
+          <div class="credit">
+            <span class="credit-role">TESTER</span>
+            <span class="credit-name" id="testerName"
+              ><span class="tan rainbow-text">Tân</span>
+              <span class="goku tim-vang">1 cú</span></span
+            >
+          </div>
+        </div>
+      </header>
+
+      <div class="tabbar">
+        <button class="tab active" data-tab="danfile">Dàn file</button>
+        <button class="tab" data-tab="danmau">Dàn theo mẫu</button>
+        <button class="tab" data-tab="catalogue">Catalogue</button>
+        <button class="tab" data-tab="offset">CTL Offset</button>
+        <button class="tab" data-tab="rename">Đổi tên</button>
+        <button class="tab" data-tab="variable">Variable</button>
+        <button class="tab" data-tab="autosave">Auto Save</button>
+      </div>
+
+      <!-- TAB: DÀN FILE (accordion Card + Decal) -->
+      <main class="body tabpane active" id="pane-danfile">
+        <!-- Accordion: Card -->
+        <div class="acc">
+          <button class="acc-head" data-acc="card">
+            <span class="acc-arrow">&#9654;</span>
+            <span>Dàn Card</span>
+          </button>
+          <div class="acc-body" id="acc-card">
+            <div class="field">
+              <div class="label">Loại card</div>
+              <div id="layoutList" class="radio-list"></div>
+            </div>
+            <div id="voucherOpt" class="field hidden">
+              <label class="check"
+                ><input type="checkbox" id="voucherCard" /><span
+                  >Ghép thêm card 9.2×5.6</span
+                ></label
+              >
+            </div>
+            <button id="btnDan" class="btn btn-primary"><span class="btn-label">Dàn card</span></button>
+            <div id="out" class="out">Chọn loại card rồi bấm Dàn.</div>
+          </div>
+        </div>
+
+        <!-- Accordion: Decal -->
+        <div class="acc">
+          <button class="acc-head" data-acc="decal">
+            <span class="acc-arrow">&#9654;</span>
+            <span>Dàn Decal</span>
+          </button>
+          <div class="acc-body" id="acc-decal">
+            <div class="field">
+              <div class="label">Cỡ decal</div>
+              <div class="radio-list">
+                <label class="radio-row"
+                  ><input type="radio" name="decalSize" value="1.5" /><span
+                    >1.5 cm (464 chỗ)</span
+                  ></label
+                >
+                <label class="radio-row"
+                  ><input type="radio" name="decalSize" value="2" /><span
+                    >2 cm (268 chỗ)</span
+                  ></label
+                >
+
+                <label class="radio-row"
+                  ><input type="radio" name="decalSize" value="2.5" /><span
+                    >2.5 cm (162 chỗ)</span
+                  ></label
+                >
+                <label class="radio-row"
+                  ><input type="radio" name="decalSize" value="3" /><span
+                    >3 cm (114 chỗ)</span
+                  ></label
+                >
+                <label class="radio-row"
+                  ><input type="radio" name="decalSize" value="3.5" /><span
+                    >3.5 cm (83 chỗ)</span
+                  ></label
+                >
+                <label class="radio-row"
+                  ><input type="radio" name="decalSize" value="4" /><span
+                    >4 cm (63 chỗ)</span
+                  ></label
+                >
+                <label class="radio-row"
+                  ><input type="radio" name="decalSize" value="4.5" /><span
+                    >4.5 cm (54 chỗ)</span
+                  ></label
+                >
+                <label class="radio-row"
+                  ><input type="radio" name="decalSize" value="5" /><span
+                    >5 cm (42 chỗ)</span
+                  ></label
+                >
+                <label class="radio-row"
+                  ><input type="radio" name="decalSize" value="5.5" /><span
+                    >5.5 cm (33 chỗ)</span
+                  ></label
+                >
+                <label class="radio-row"
+                  ><input
+                    type="radio"
+                    name="decalSize"
+                    value="6"
+                    checked
+                  /><span>6 cm (27 chỗ)</span></label
+                >
+                <label class="radio-row"
+                  ><input type="radio" name="decalSize" value="6.5" /><span
+                    >6.5 cm (23 chỗ)</span
+                  ></label
+                >
+                <label class="radio-row"
+                  ><input type="radio" name="decalSize" value="7" /><span
+                    >7 cm (20 chỗ)</span
+                  ></label
+                >
+                <label class="radio-row"
+                  ><input type="radio" name="decalSize" value="7.5" /><span
+                    >7.5 cm (18 chỗ)</span
+                  ></label
+                >
+                <label class="radio-row"
+                  ><input type="radio" name="decalSize" value="8" /><span
+                    >8 cm (14 chỗ)</span
+                  ></label
+                >
+                <label class="radio-row"
+                  ><input type="radio" name="decalSize" value="8.5" /><span
+                    >8.5 cm (14 chỗ)</span
+                  ></label
+                >
+                <label class="radio-row"
+                  ><input type="radio" name="decalSize" value="9" /><span
+                    >9 cm (12 chỗ)</span
+                  ></label
+                >
+                <label class="radio-row"
+                  ><input type="radio" name="decalSize" value="9.5" /><span
+                    >9.5 cm (10 chỗ)</span
+                  ></label
+                >
+              </div>
+            </div>
+            <div class="field">
+              <div class="label">Khổ pon</div>
+              <div class="radio-list">
+                <label class="radio-row"
+                  ><input
+                    type="radio"
+                    name="decalPon"
+                    value="33x35.4"
+                    checked
+                  /><span>33 × 35.4</span></label
+                >
+                <label class="radio-row"
+                  ><input type="radio" name="decalPon" value="33x35" /><span
+                    >33 × 35</span
+                  ></label
+                >
+              </div>
+            </div>
+            <p class="hint">
+              Chọn object → chọn cỡ + khổ → bấm Dàn. Nhiều object sẽ chia đều.
+            </p>
+            <button id="btnDecal" class="btn btn-primary"><span class="btn-label">Dàn Decal</span></button>
+            <div id="outDecal" class="out">Chọn object rồi bấm Dàn.</div>
+          </div>
+        </div>
+      </main>
+
+      <!-- TAB: DÀN THEO MẪU (học 1 con mẫu rồi áp cho nhiều con nguồn) -->
+      <main class="body tabpane" id="pane-danmau">
+        <div class="field">
+          <div class="label">Dàn theo mẫu (học bố cục → gán nhiều mẫu nguồn)</div>
+          <p class="hint">
+            <b>Bước 1 — Học mẫu:</b> chọn TẤT CẢ bản đã dàn tay của 1 con mẫu →
+            bấm <b>Học mẫu</b>, rồi bấm <b>Học 1 mặt</b>; hoặc học 2 mặt bằng
+            <b>Học Mặt trước</b> rồi <b>Học Mặt sau</b>.<br />
+            <b>Bước 2 — Áp mẫu:</b> chọn các CON NGUỒN theo thứ tự trái→phải,
+            trên→dưới → bấm <b>Áp mẫu</b>. Nếu mẫu học có 5 slot thì 5 nguồn
+            lần lượt vào 5 slot; thiếu nguồn thì tool bù bằng con cuối và gần cuối.
+            Tool đọc hướng artwork, raster từng nguồn một lần, xoay/resize/cắt đúng
+            từng slot. Hỗ trợ path, compound path (có lỗ), group có clipping mask,
+            hình tròn, tim, đa giác và path tự vẽ. 2 mặt: đặt nguồn 2 cột
+            (trái=trước, phải=sau). Hỏi chọn pon (.ai) cho artboard.
+          </p>
+        </div>
+
+        <button id="btnHocMau" class="btn btn-primary"><span class="btn-label">Học mẫu</span></button>
+        <div id="outHocMau" class="out">Chọn bản mẫu rồi bấm Học mẫu.</div>
+
+        <button id="btnApMau" class="btn btn-primary" style="margin-top: 10px">
+          <span class="btn-label">Áp mẫu</span>
+        </button>
+        <div id="outApMau" class="out">Chọn con nguồn rồi bấm Áp mẫu.</div>
+      </main>
+
+      <!-- TAB: CATALOGUE (accordion: A4+nhỏ hơn / A5+nhỏ hơn) -->
+      <main class="body tabpane" id="pane-catalogue">
+        <div class="field">
+          <div class="label">Dàn trang catalogue đóng gáy giữa</div>
+          <p class="hint">
+            Chọn các trang theo thứ tự đọc (trái → phải, trên → dưới). Số trang
+            phải là bội số của 4. Tool sẽ hỏi chọn file pon ở lần chạy đầu.
+          </p>
+        </div>
+
+        <!-- Accordion: A4 + nhỏ hơn A4 -->
+        <div class="acc">
+          <button class="acc-head" data-acc="catA4">
+            <span class="acc-arrow">&#9654;</span>
+            <span>A4 + nhỏ hơn A4</span>
+          </button>
+          <div class="acc-body" id="acc-catA4">
+            <div class="field">
+              <div class="label">Khổ</div>
+              <select id="selCatA4" class="select">
+                <option value="a4">A4 (21.1 × 29.9 cm)</option>
+                <option value="custom">Khổ khác (nhỏ hơn A4)</option>
+              </select>
+            </div>
+            <div class="field hidden" id="sizeCatA4">
+              <div class="label">Kích thước đích (cm)</div>
+              <div class="size-row">
+                <input type="text" id="wCatA4" class="num" placeholder="rộng" />
+                <span class="times">×</span>
+                <input type="text" id="hCatA4" class="num" placeholder="cao" />
+              </div>
+              <p class="hint">
+                Ví dụ trang gốc 14.7 × 26.7 → nhập 14.9 × 26.9. Mỗi khổ nhớ pon
+                riêng.
+              </p>
+            </div>
+            <button id="btnCatA4" class="btn btn-primary"><span class="btn-label">Dàn Catalogue</span></button>
+          </div>
+        </div>
+
+        <!-- Accordion: A5 + nhỏ hơn A5 -->
+        <div class="acc">
+          <button class="acc-head" data-acc="catA5">
+            <span class="acc-arrow">&#9654;</span>
+            <span>A5 + nhỏ hơn A5</span>
+          </button>
+          <div class="acc-body" id="acc-catA5">
+            <div class="field">
+              <div class="label">Khổ</div>
+              <select id="selCatA5" class="select">
+                <option value="a5">A5 dọc (14.95 × 21.1 cm)</option>
+                <option value="custom">
+                  Khổ khác (nhỏ hơn A5) — 2 con 1 tờ
+                </option>
+              </select>
+            </div>
+            <div class="field hidden" id="sizeCatA5">
+              <div class="label">Kích thước 1 trang (cm)</div>
+              <div class="size-row">
+                <input type="text" id="wCatA5" class="num" placeholder="rộng" />
+                <span class="times">×</span>
+                <input type="text" id="hCatA5" class="num" placeholder="cao" />
+              </div>
+              <p class="hint">Dàn 2 con 1 tờ. Mỗi khổ nhớ pon riêng.</p>
+            </div>
+            <button id="btnCatA5" class="btn btn-primary"><span class="btn-label">Dàn Catalogue</span></button>
+          </div>
+        </div>
+
+        <div id="outCatalogue" class="out">
+          Chọn các trang catalogue rồi chọn khổ để dàn.
+        </div>
+      </main>
+
+      <!-- TAB: CTL OFFSET (signature 8 - khổ lớn 65x68) -->
+      <main class="body tabpane" id="pane-offset">
+        <div class="field">
+          <div class="label">Dàn CTL Offset (in offset khổ lớn 65×86)</div>
+          <p class="hint">
+            Chọn các trang theo thứ tự đọc. Tool hỏi chọn pon ở lần chạy đầu
+            (nhớ theo khổ).
+          </p>
+        </div>
+
+        <!-- Accordion: Đóng ghim giữa (signature 8) -->
+        <div class="acc">
+          <button class="acc-head" data-acc="offSig">
+            <span class="acc-arrow">&#9654;</span>
+            <span>Đóng ghim giữa</span>
+          </button>
+          <div class="acc-body" id="acc-offSig">
+            <p class="hint">
+              Bình bài AB + tự trở (đóng gáy giữa lồng nhau). Bìa = 4 trang
+              ngoài cùng làm TT4. Bội số của 4; phần ruột dư 0/4/8/12. Pon chính
+              65×86 + pon TT4 65×43.
+            </p>
+            <div class="field">
+              <div class="label">Kích thước 1 trang (cm)</div>
+              <div class="size-row">
+                <input
+                  type="text"
+                  id="wOffset"
+                  class="num"
+                  placeholder="rộng"
+                />
+                <span class="times">×</span>
+                <input type="text" id="hOffset" class="num" placeholder="cao" />
+              </div>
+            </div>
+            <label class="check"
+              ><input type="checkbox" id="offsetCoBia" checked /><span
+                >Có bìa (chọn cả file: bìa + ruột)</span
+              ></label
+            >
+            <button id="btnOffset" class="btn btn-primary">
+              <span class="btn-label">Dàn Đóng ghim giữa</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Accordion: Keo gáy -->
+        <div class="acc">
+          <button class="acc-head" data-acc="offKeo">
+            <span class="acc-arrow">&#9654;</span>
+            <span>Keo gáy</span>
+          </button>
+          <div class="acc-body" id="acc-offKeo">
+            <p class="hint">
+              Dán keo gáy (tuần tự, không bóp, không khe). Mỗi tay 16 trang liên
+              tiếp, dàn AB. Phần dư cuối tự trở (TT8/TT4). Bìa tự dàn tay. Bội
+              số của 4; dư 0/4/8/12.
+            </p>
+            <div class="field">
+              <div class="label">Kích thước 1 trang (cm)</div>
+              <div class="size-row">
+                <input type="text" id="wKeo" class="num" placeholder="rộng" />
+                <span class="times">×</span>
+                <input type="text" id="hKeo" class="num" placeholder="cao" />
+              </div>
+            </div>
+            <button id="btnKeo" class="btn btn-primary"><span class="btn-label">Dàn Keo gáy</span></button>
+          </div>
+        </div>
+
+        <div id="outOffset" class="out">Nhập kích thước rồi bấm Dàn.</div>
+      </main>
+
+      <!-- TAB: ĐỔI TÊN -->
+      <main class="body tabpane" id="pane-rename">
+        <div class="field">
+          <div class="label">Tiền tố</div>
+          <input type="text" id="rnPrefix" class="inp" value="s" />
+        </div>
+        <div class="field">
+          <div class="label">Kiểu đánh</div>
+          <div class="radio-list">
+            <label class="radio-row"
+              ><input type="radio" name="rnMode" value="num" checked /><span
+                >Số: 1, 2, 3…</span
+              ></label
+            >
+            <label class="radio-row"
+              ><input type="radio" name="rnMode" value="low" /><span
+                >Chữ thường: a, b, c…</span
+              ></label
+            >
+            <label class="radio-row"
+              ><input type="radio" name="rnMode" value="up" /><span
+                >Chữ HOA: A, B, C…</span
+              ></label
+            >
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field half">
+            <div class="label">Bắt đầu</div>
+            <input type="text" id="rnStart" class="inp" value="1" />
+          </div>
+          <div class="field half">
+            <div class="label">Đệm số 0</div>
+            <input type="text" id="rnPad" class="inp" value="0" />
+          </div>
+        </div>
+        <div class="field">
+          <div class="label">Số layer lặp mỗi nhãn</div>
+          <input type="text" id="rnRepeat" class="inp" value="1" />
+          <div class="hint">1 = bình thường; 2 → s1,s1,s2,s2</div>
+        </div>
+        <div class="field">
+          <div class="label">Hướng đếm</div>
+          <div class="radio-list">
+            <label class="radio-row"
+              ><input type="radio" name="rnDir" value="bottom" checked /><span
+                >Dưới cùng = đầu tiên</span
+              ></label
+            >
+            <label class="radio-row"
+              ><input type="radio" name="rnDir" value="top" /><span
+                >Trên cùng = đầu tiên</span
+              ></label
+            >
+          </div>
+        </div>
+        <button id="btnRename" class="btn btn-primary"><span class="btn-label">Đổi tên</span></button>
+        <div id="outRename" class="out">Chọn object rồi bấm Đổi tên.</div>
+      </main>
+
+      <!-- TAB: VARIABLE -->
+      <main class="body tabpane" id="pane-variable">
+        <div class="field">
+          <p class="hint">
+            Công cụ nhập dữ liệu biến (Variable Importer) — tạo nhiều bản từ 1
+            template + file dữ liệu. Bấm nút để mở công cụ.
+          </p>
+        </div>
+        <button id="btnVariable" class="btn btn-primary">
+          <span class="btn-label">Mở Variable Importer</span>
+        </button>
+        <div id="outVariable" class="out">Bấm để mở công cụ.</div>
+      </main>
+
+      <!-- TAB: AUTO SAVE PDF -->
+      <main class="body tabpane" id="pane-autosave">
+        <div class="field">
+          <p class="hint">
+            Xếp object theo hàng: cột trái = mặt trước, cột phải = mặt sau.
+            Hàng đủ 2 cột sẽ lưu PDF 2 trang; hàng chỉ có cột trái sẽ lưu PDF 1
+            trang và thêm “1 mat” vào tên file trước cm/km. File gốc KHÔNG bị sửa.
+          </p>
+        </div>
+
+        <div class="field">
+          <div class="label">Mã bắt buộc</div>
+          <input type="text" id="asPrefix" class="inp inp-locked" value="1088" readonly />
+        </div>
+
+        <div class="field-row">
+          <div class="field half">
+            <div class="label">STT bắt đầu</div>
+            <input type="text" id="asStart" class="inp" value="1" />
+          </div>
+          <div class="field half">
+            <div class="label">Đệm số 0</div>
+            <input type="text" id="asPad" class="inp" value="2" />
+          </div>
+        </div>
+        <div class="hint">Đệm 2 → 01, 02, 03… ; 0 → 1, 2, 3…</div>
+
+        <div class="field">
+          <div class="label">Số hộp</div>
+          <div class="size-row">
+            <input type="text" id="asHop" class="num" value="5" style="text-align:left" />
+            <span class="times">hộp</span>
+          </div>
+          <div class="hint">Mỗi số hộp = 1 file. Nhập nhiều số cách nhau dấu phẩy → mỗi con card xuất 1 file cho mỗi số (vd chọn 1 con, nhập 100, 200, 300 → 3 file 100/200/300 hộp).</div>
+        </div>
+
+        <div class="field">
+          <div class="label">Ghi chú (tuỳ chọn)</div>
+          <input type="text" id="asNote" class="inp" value="" placeholder="để trống nếu không cần" />
+          <div class="hint">Có điền thì chèn vào tên file, giữa số hộp và cán màng.</div>
+        </div>
+
+        <div class="field">
+          <div class="label">Cán màng</div>
+          <select id="asCanMang" class="select">
+            <option value="cm">cm — cán màng</option>
+            <option value="km">km — không màng</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <div class="label">Ngày đặt in</div>
+          <input type="text" id="asNgay" class="inp" value="" />
+        </div>
+
+        <div class="field">
+          <div class="label">Thư mục lưu (bỏ trống = hỏi khi chạy)</div>
+          <div class="size-row">
+            <input type="text" id="asFolder" class="inp" value="" placeholder="vd: D:\\PDF\\1088" />
+            <button id="btnPickFolder" class="btn" type="button" style="white-space:nowrap;padding:8px 12px">Chọn…</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <div class="label">Xem trước tên file</div>
+          <div id="asPreview" class="out" style="font-family:monospace"></div>
+        </div>
+
+        <button id="btnClipCard" class="btn" type="button" style="margin-bottom:8px">
+          <span class="btn-label">Clip 9.2 × 5.6 (tự xoay)</span>
+        </button>
+        <div id="outClipCard" class="hint"></div>
+
+        <button id="btnAutoSave" class="btn btn-primary">
+          <span class="btn-label">OK — Auto Save PDF</span>
+        </button>
+        <div id="outAutoSave" class="out">Chọn object rồi bấm OK.</div>
+      </main>
+
+      <footer class="foot">
+        <span class="ver">v2.9.0</span>
+      </footer>
+    </div>
+
+    <script src="./js/CSInterface.js"></script>
+    <script src="./js/main.js"></script>
+  </body>
+</html>

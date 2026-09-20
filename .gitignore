@@ -1,0 +1,6 @@
+# Release assets are uploaded to GitHub Releases by Publish-OnlineUpdate.ps1.
+release/
+
+# Local logs and temporary files
+*.log
+*.tmp

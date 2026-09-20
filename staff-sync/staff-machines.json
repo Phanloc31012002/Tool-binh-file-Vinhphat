@@ -1,0 +1,12 @@
+{
+  "machines": [
+    {
+      "computer": "TEN-MAY-NHAN-VIEN-01",
+      "profile": "ten-user-windows-01"
+    },
+    {
+      "computer": "TEN-MAY-NHAN-VIEN-02",
+      "profile": "ten-user-windows-02"
+    }
+  ]
+}

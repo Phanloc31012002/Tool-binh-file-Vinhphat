@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ExtensionManifest Version="7.0" ExtensionBundleId="com.locdev.dancard"
+    ExtensionBundleVersion="2.9.0"
+    ExtensionBundleName="Công cụ bình"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <ExtensionList>
+    <Extension Id="com.locdev.dancard.panel" Version="2.9.0" />
+  </ExtensionList>
+  <ExecutionEnvironment>
+    <HostList>
+      <!-- Illustrator: ID "ILST". Hỗ trợ nhiều phiên bản (CS6 -> 2026+) -->
+      <Host Name="ILST" Version="[16.0,99.9]" />
+    </HostList>
+    <LocaleList>
+      <Locale Code="All" />
+    </LocaleList>
+    <RequiredRuntimeList>
+      <RequiredRuntime Name="CSXS" Version="[6.0,99.0]" />
+    </RequiredRuntimeList>
+  </ExecutionEnvironment>
+  <DispatchInfoList>
+    <Extension Id="com.locdev.dancard.panel">
+      <DispatchInfo>
+        <Resources>
+          <MainPath>./index.html</MainPath>
+          <ScriptPath>./jsx/dan_card_lib.jsx</ScriptPath>
+        </Resources>
+        <Lifecycle>
+          <AutoVisible>true</AutoVisible>
+        </Lifecycle>
+        <UI>
+          <Type>Panel</Type>
+          <Menu>Công cụ bình</Menu>
+          <Geometry>
+            <Size>
+              <Height>650</Height>
+              <Width>320</Width>
+            </Size>
+            <MinSize>
+              <Height>360</Height>
+              <Width>260</Width>
+            </MinSize>
+            <MaxSize>
+              <Height>900</Height>
+              <Width>500</Width>
+            </MaxSize>
+          </Geometry>
+        </UI>
+      </DispatchInfo>
+    </Extension>
+  </DispatchInfoList>
+</ExtensionManifest>
