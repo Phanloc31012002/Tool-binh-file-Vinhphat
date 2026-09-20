@@ -13,6 +13,7 @@ $startupDir = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\Star
 $startupLauncher = Join-Path $startupDir "$updaterTaskName.vbs"
 $programsDir = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\Công cụ bình"
 $manualUpdateLauncher = Join-Path $programsDir "Cập nhật Công cụ bình.cmd"
+$manualUpdateShortcut = Join-Path $programsDir "Cập nhật Công cụ bình.lnk"
 
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "   CÀI ĐẶT PANEL `"CÔNG CỤ BÌNH`" (CEP)" -ForegroundColor Cyan
@@ -91,6 +92,13 @@ if (Test-Path (Join-Path $dest "CSXS\manifest.xml")) {
                     'pause'
                 ) -join [Environment]::NewLine
                 [System.IO.File]::WriteAllText($manualUpdateLauncher, $manualUpdateContent + [Environment]::NewLine, [System.Text.Encoding]::ASCII)
+                $shell = New-Object -ComObject WScript.Shell
+                $shortcut = $shell.CreateShortcut($manualUpdateShortcut)
+                $shortcut.TargetPath = $env:ComSpec
+                $shortcut.Arguments = '/c ""' + $manualUpdateLauncher + '""'
+                $shortcut.WorkingDirectory = $updaterHome
+                $shortcut.Description = 'Kiểm tra và cài bản mới của Công cụ bình'
+                $shortcut.Save()
                 Write-Host "Đã thêm lối tắt Start Menu: Cập nhật Công cụ bình." -ForegroundColor Green
             } catch {
                 Write-Host "Chưa tạo được lối tắt cập nhật thủ công: $($_.Exception.Message)" -ForegroundColor Yellow
