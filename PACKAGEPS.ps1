@@ -11,6 +11,8 @@ $updaterConfig = Join-Path $updaterHome "update-config.json"
 $updaterTaskName = "CongCuBinh-AutoUpdate"
 $startupDir = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\Startup"
 $startupLauncher = Join-Path $startupDir "$updaterTaskName.vbs"
+$programsDir = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\Công cụ bình"
+$manualUpdateLauncher = Join-Path $programsDir "Cập nhật Công cụ bình.cmd"
 
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "   CÀI ĐẶT PANEL `"CÔNG CỤ BÌNH`" (CEP)" -ForegroundColor Cyan
@@ -78,7 +80,23 @@ if (Test-Path (Join-Path $dest "CSXS\manifest.xml")) {
             $updateUrl = [string]$updateConfigData.manifestUrl
         } catch {}
         if (-not [string]::IsNullOrWhiteSpace($updateUrl)) {
+            try {
+                New-Item -ItemType Directory -Path $programsDir -Force | Out-Null
+                $manualUpdateContent = @(
+                    '@echo off'
+                    'chcp 65001 >nul'
+                    'echo Dong Illustrator truoc khi cap nhat.'
+                    'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%LOCALAPPDATA%\CongCuBinhUpdater\DanCardUpdater.ps1" -Force'
+                    'echo.'
+                    'pause'
+                ) -join [Environment]::NewLine
+                [System.IO.File]::WriteAllText($manualUpdateLauncher, $manualUpdateContent + [Environment]::NewLine, [System.Text.Encoding]::ASCII)
+                Write-Host "Đã thêm lối tắt Start Menu: Cập nhật Công cụ bình." -ForegroundColor Green
+            } catch {
+                Write-Host "Chưa tạo được lối tắt cập nhật thủ công: $($_.Exception.Message)" -ForegroundColor Yellow
+            }
             $autoUpdateEnabled = $false
+            $usingStartupFallback = $false
             $taskCommand = "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$updaterScript`" -Quiet"
             try {
                 $taskAction = New-ScheduledTaskAction -Execute "powershell.exe" -Argument ("-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$updaterScript`" -Quiet")
@@ -107,10 +125,14 @@ if (Test-Path (Join-Path $dest "CSXS\manifest.xml")) {
                     [System.IO.File]::WriteAllText($startupLauncher, $vbsLine + [Environment]::NewLine, [System.Text.Encoding]::ASCII)
                     Write-Host "Đã bật tự kiểm tra cập nhật bằng Startup của user." -ForegroundColor Green
                     $autoUpdateEnabled = $true
+                    $usingStartupFallback = $true
                 } catch {
                     Write-Host "Chưa bật được tự update: $($_.Exception.Message)" -ForegroundColor Yellow
                     Write-Host "Vẫn có thể chạy: $updaterScript" -ForegroundColor Yellow
                 }
+            }
+            if ($autoUpdateEnabled -and -not $usingStartupFallback -and (Test-Path -LiteralPath $startupLauncher)) {
+                Remove-Item -LiteralPath $startupLauncher -Force -ErrorAction SilentlyContinue
             }
         } else {
             Write-Host "Chưa cấu hình URL update online; panel vẫn cài bình thường." -ForegroundColor Yellow

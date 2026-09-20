@@ -23,8 +23,10 @@ _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
 **Các lần cập nhật sau**: khi đã cấu hình update online, máy sẽ tự kiểm tra
 bản mới khi đăng nhập Windows và cập nhật lúc Illustrator đang đóng. Không cần
-chép lại folder. Nếu chưa cấu hình online, vẫn có thể bấm đúp `install.bat`
-(đóng Illustrator trước khi chạy) để cài thủ công.
+chép lại folder. Muốn cập nhật ngay, đóng Illustrator rồi bấm **Cập nhật Công
+cụ bình** trong Start Menu; không cần khởi động lại Windows. Nếu chưa cấu hình
+online, vẫn có thể bấm đúp `install.bat` (đóng Illustrator trước khi chạy) để
+cài thủ công.
 
 > Lưu ý: đặt 2 file `.bat` cùng chỗ với thư mục `DanCardCEP`. Nếu Windows
 > cảnh báo "Windows protected your PC" khi chạy `.bat`, bấm **More info** >
@@ -85,15 +87,17 @@ DanCard_Setup_23/
 Xem chi tiết từng phiên bản tại
 [`DanCardCEP/LICH_SU_CAP_NHAT.md`](DanCardCEP/LICH_SU_CAP_NHAT.md).
 
-Phiên bản hiện tại: **v2.9.0**.
+Phiên bản hiện tại: **v2.9.1**.
 
 ### Cập nhật online
 
 Lần đầu trên mỗi máy vẫn chạy `install.bat`. Bộ cài đặt đặt updater tại
 `%LOCALAPPDATA%\CongCuBinhUpdater`, tách riêng với panel để updater có thể thay
 panel an toàn. Updater chỉ nhận manifest và gói qua HTTPS, kiểm SHA-256 trước
-khi cài, và không thay file nếu Illustrator đang mở. Bộ cài tự tạo tác vụ khi
-đăng nhập Windows; nếu máy chặn Task Scheduler, nó dùng Startup của user.
+khi cài, và không thay file nếu Illustrator đang mở. Bộ cài thêm lối tắt **Cập
+nhật Công cụ bình** trong Start Menu để kiểm tra thủ công ngay khi cần. Nó tự
+tạo tác vụ khi đăng nhập Windows; nếu máy chặn Task Scheduler, nó dùng Startup
+của user.
 
 Kênh phát hành được cấu hình một lần trong
 `updater\update-config.json`, bằng URL `latest.json` trong thư mục `online/` trên GitHub. Sau đó,

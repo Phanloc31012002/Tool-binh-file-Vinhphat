@@ -2,6 +2,18 @@
 
 _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
+## v2.9.1 — Cập nhật ngay không cần đăng xuất
+
+- Bộ cài tạo lối tắt **Cập nhật Công cụ bình** trong Start Menu. Đóng hẳn
+  Illustrator rồi bấm lối tắt này để kiểm tra và cài bản mới ngay, không cần
+  khởi động lại hoặc đăng xuất Windows.
+- Updater đọc được `latest.json` từ GitHub Raw trên cả Windows PowerShell 5,
+  kể cả khi file có UTF-8 BOM.
+- Nếu Windows chặn Task Scheduler, updater tự chạy từ Startup của user khi
+  đăng nhập Windows.
+
+---
+
 ## v2.9.0 — Cập nhật online an toàn
 
 - Thêm updater Windows độc lập với panel: kiểm tra `latest.json` qua HTTPS,

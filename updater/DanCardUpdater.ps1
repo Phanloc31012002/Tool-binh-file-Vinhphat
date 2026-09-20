@@ -19,6 +19,16 @@ function Write-UpdateLog {
     if (-not $Quiet) { Write-Host "[Công cụ bình] $Message" -ForegroundColor $Color }
 }
 
+# Chỉ một updater được phép đổi folder extension tại một thời điểm. File lock
+# tự được Windows nhả khi tiến trình kết thúc, kể cả khi updater lỗi giữa chừng.
+$lockPath = Join-Path $PSScriptRoot 'update.lock'
+try {
+    $updaterLock = [System.IO.File]::Open($lockPath, [System.IO.FileMode]::OpenOrCreate, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None)
+} catch [System.IO.IOException] {
+    Write-UpdateLog 'Đang có một tiến trình cập nhật khác; bỏ qua lần này.' DarkYellow
+    exit 0
+}
+
 function Read-JsonFile {
     param([string]$Path, [object]$Default)
     if (-not (Test-Path -LiteralPath $Path)) { return $Default }

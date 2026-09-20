@@ -4,10 +4,15 @@ param(
     [ValidatePattern('^[^/\s]+/[^/\s]+$')]
     [string]$GitHubRepository,
 
-    [string]$OutputDirectory = (Join-Path $PSScriptRoot 'online')
+    [string]$OutputDirectory = '',
+
+    [switch]$AllowSameVersion
 )
 
 $ErrorActionPreference = 'Stop'
+if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
+    $OutputDirectory = Join-Path $PSScriptRoot 'online'
+}
 $source = Join-Path $PSScriptRoot 'DanCardCEP'
 $manifestPath = Join-Path $source 'CSXS\manifest.xml'
 if (-not (Test-Path -LiteralPath $manifestPath)) { throw 'Không tìm thấy DanCardCEP\CSXS\manifest.xml.' }
@@ -18,6 +23,18 @@ if ($product -ne 'com.locdev.dancard') { throw 'Manifest không đúng mã sản
 if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "Version phải có dạng x.y.z, hiện là $version." }
 
 New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
+$existingLatestPath = Join-Path $OutputDirectory 'latest.json'
+if ((Test-Path -LiteralPath $existingLatestPath) -and -not $AllowSameVersion) {
+    try {
+        $existingManifest = Get-Content -LiteralPath $existingLatestPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        $existingVersion = [Version]([string]$existingManifest.version)
+    } catch {
+        throw "Không đọc được version trong $existingLatestPath."
+    }
+    if ([Version]$version -le $existingVersion) {
+        throw "Version $version chưa cao hơn bản đang phát hành $existingVersion. Hãy tăng version trước khi publish."
+    }
+}
 $zipName = "DanCardCEP-$version.zip"
 $zipPath = Join-Path $OutputDirectory $zipName
 $stageRoot = Join-Path $env:TEMP ('DanCardPublish-' + [Guid]::NewGuid().ToString('N'))
