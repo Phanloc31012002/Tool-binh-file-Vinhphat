@@ -1,4 +1,4 @@
-# Release assets are uploaded to GitHub Releases by Publish-OnlineUpdate.ps1.
+# Legacy Release assets are generated locally when needed.
 release/
 
 # Local logs and temporary files

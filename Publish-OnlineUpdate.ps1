@@ -4,7 +4,7 @@ param(
     [ValidatePattern('^[^/\s]+/[^/\s]+$')]
     [string]$GitHubRepository,
 
-    [string]$OutputDirectory = (Join-Path $PSScriptRoot 'release')
+    [string]$OutputDirectory = (Join-Path $PSScriptRoot 'online')
 )
 
 $ErrorActionPreference = 'Stop'
@@ -27,7 +27,7 @@ try {
     if (Test-Path -LiteralPath $zipPath) { Remove-Item -LiteralPath $zipPath -Force }
     Compress-Archive -LiteralPath (Join-Path $stageRoot 'DanCardCEP') -DestinationPath $zipPath -CompressionLevel Optimal
     $hash = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash.ToUpperInvariant()
-    $packageUrl = "https://github.com/$GitHubRepository/releases/download/v$version/$zipName"
+    $packageUrl = "https://raw.githubusercontent.com/$GitHubRepository/main/online/$zipName"
     $onlineManifest = [ordered]@{
         product = $product
         version = $version
@@ -39,9 +39,9 @@ try {
     $onlineManifest | ConvertTo-Json | Set-Content -LiteralPath $latestPath -Encoding UTF8
     Write-Host "Đã tạo: $zipPath" -ForegroundColor Green
     Write-Host "Đã tạo: $latestPath" -ForegroundColor Green
-    Write-Host "Upload hai file này làm assets của GitHub Release có tag: v$version" -ForegroundColor Yellow
+    Write-Host "Commit va push ca thu muc online/ len nhanh main." -ForegroundColor Yellow
     Write-Host "URL manifest dùng cho máy khách:" -ForegroundColor Cyan
-    Write-Host "https://github.com/$GitHubRepository/releases/latest/download/latest.json" -ForegroundColor White
+    Write-Host "https://raw.githubusercontent.com/$GitHubRepository/main/online/latest.json" -ForegroundColor White
 } finally {
     Remove-Item -LiteralPath $stageRoot -Recurse -Force -ErrorAction SilentlyContinue
 }

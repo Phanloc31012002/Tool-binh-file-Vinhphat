@@ -64,7 +64,7 @@ DanCard_Setup_23/
 ├── install.bat              # Cài / cập nhật panel vào Illustrator
 ├── bat_debug_mode.bat        # Bật PlayerDebugMode (chỉ chạy 1 lần)
 ├── PACKAGEPS.ps1              # Script PowerShell thực thi bởi install.bat
-├── Configure-OnlineUpdate.ps1 # Gắn GitHub Release làm kênh cập nhật
+├── Configure-OnlineUpdate.ps1 # Gắn GitHub raw làm kênh cập nhật
 ├── Publish-OnlineUpdate.ps1   # Tạo ZIP + latest.json để đăng bản mới
 ├── CACH_DUNG.txt              # Hướng dẫn sử dụng nhanh
 ├── updater/                    # Updater cài một lần, nằm ngoài panel
@@ -95,7 +95,7 @@ panel an toàn. Updater chỉ nhận manifest và gói qua HTTPS, kiểm SHA-256
 khi cài, và không thay file nếu Illustrator đang mở.
 
 Kênh phát hành được cấu hình một lần trong
-`updater\update-config.json`, bằng URL `latest.json` của GitHub Release. Sau đó,
+`updater\update-config.json`, bằng URL `latest.json` trong thư mục `online/` trên GitHub. Sau đó,
 một lần trên máy tạo bản phát hành, chạy:
 
 ```powershell
@@ -109,9 +109,9 @@ mỗi phiên bản chỉ cần chạy:
 .\Publish-OnlineUpdate.ps1 -GitHubRepository "tai-khoan/DanCardUpdates"
 ```
 
-Tạo GitHub Release tag `v<version>` rồi tải hai file trong thư mục `release/`
-(`DanCardCEP-<version>.zip` và `latest.json`) làm assets. Máy khách tự tải đúng
-gói và kiểm hash trước khi cập nhật.
+Script tạo hai file trong thư mục `online/` (`DanCardCEP-<version>.zip` và
+`latest.json`). Commit và push hai file này cùng mã nguồn lên nhánh `main`.
+Máy khách tự tải đúng gói và kiểm hash trước khi cập nhật.
 
 ### Đồng bộ thẳng tới AppData máy nhân viên
 
