@@ -17336,74 +17336,65 @@ function dcApMau(multiSourcePerArtboard) {
   function isPositiveSize(value) {
     return typeof value === "number" && isFinite(value) && value > 0;
   }
-  function rebuildPath(path, ring, cx, cy, w, h) {
-    var anchors = [],
-      i;
-    for (i = 0; i < ring.pts.length; i++) {
-      var p = ring.pts[i];
-      anchors.push([cx + p.ax * w, cy + p.ay * h]);
+  // RasterItem/PlacedItem có thể giữ matrix 90 độ bên trong. Khi đó
+  // item.resize(x, y) scale theo trục nội bộ, còn visibleBounds lại đo theo
+  // trục trang. Không được lấy W/H trang rồi đưa thẳng vào resize. Thử tăng
+  // rất nhẹ trục X để biết nó đang tác động lên chiều ngang hay chiều dọc,
+  // sau đó scale đúng theo trục thực tế của object. Không tạo clipping mask
+  // và cũng không raster thêm RasterItem/PlacedItem.
+  function resizeToVisibleSize(item, wantedW, wantedH) {
+    if (!isPositiveSize(wantedW) || !isPositiveSize(wantedH))
+      throw new Error("Kích thước resize không hợp lệ.");
+    var before = bnd(item);
+    if (!before) throw new Error("Không đo được biên dạng trước khi resize.");
+    var beforeW = before[2] - before[0],
+      beforeH = before[1] - before[3];
+    if (!isPositiveSize(beforeW) || !isPositiveSize(beforeH))
+      throw new Error("Kích thước bản sao không hợp lệ.");
+
+    // 101% đủ lớn để phân biệt trục X/Y bằng point, nhưng không làm giảm
+    // chất lượng bitmap: lệnh scale ngay sau đó bù chính xác phần 1% này.
+    try {
+      item.resize(
+        101,
+        100,
+        true,
+        true,
+        true,
+        true,
+        100,
+        Transformation.CENTER,
+      );
+    } catch (probeCenterError) {
+      item.resize(101, 100);
     }
-    path.setEntirePath(anchors);
-    path.closed = ring.closed === true;
+    var probe = bnd(item);
+    if (!probe) throw new Error("Không đo được biên dạng khi xác định trục resize.");
+    var probeW = probe[2] - probe[0],
+      probeH = probe[1] - probe[3];
+    if (!isPositiveSize(probeW) || !isPositiveSize(probeH))
+      throw new Error("Kích thước bản sao sau khi đo trục không hợp lệ.");
+
+    // Nếu X nội bộ làm rộng visibleBounds thì X -> W trang; ngược lại
+    // X -> H trang (đây là trường hợp ảnh đã xoay 90/270 độ từ trước).
+    var xChangesWidth = Math.abs(probeW - beforeW) >= Math.abs(probeH - beforeH);
+    var scaleX = xChangesWidth ? wantedW / probeW : wantedH / probeH;
+    var scaleY = xChangesWidth ? wantedH / probeH : wantedW / probeW;
+    if (!isPositiveSize(scaleX) || !isPositiveSize(scaleY))
+      throw new Error("Không tính được tỉ lệ resize.");
     try {
-      path.filled = true;
-    } catch (e) {}
-    try {
-      path.stroked = false;
-    } catch (e2) {}
-    try {
-      path.evenodd = ring.evenodd === true;
-    } catch (e3) {}
-    for (i = 0; i < ring.pts.length; i++) {
-      p = ring.pts[i];
-      var pp = path.pathPoints[i];
-      try {
-        pp.pointType = p.typ === "S" ? PointType.SMOOTH : PointType.CORNER;
-      } catch (e4) {}
-      pp.anchor = [cx + p.ax * w, cy + p.ay * h];
-      pp.leftDirection = [cx + p.lx * w, cy + p.ly * h];
-      pp.rightDirection = [cx + p.rx * w, cy + p.ry * h];
-    }
-    return path;
-  }
-  function createShapeMask(holder, shape, cx, cy, w, h) {
-    if (!shape || !shape.paths || shape.paths.length === 0) return null;
-    var rings = [],
-      i;
-    for (i = 0; i < shape.paths.length; i++) {
-      if (
-        shape.paths[i] &&
-        shape.paths[i].closed &&
-        shape.paths[i].pts &&
-        shape.paths[i].pts.length >= 3
-      )
-        rings.push(shape.paths[i]);
-    }
-    if (
-      rings.length === 0 ||
-      (shape.expected > 0 && rings.length !== shape.expected)
-    )
-      return null;
-    var root = null;
-    try {
-      if (shape.root === "compound" || rings.length > 1) {
-        root = holder.compoundPathItems.add();
-        for (i = 0; i < rings.length; i++)
-          rebuildPath(root.pathItems.add(), rings[i], cx, cy, w, h);
-        root.move(holder, ElementPlacement.PLACEATBEGINNING);
-        root.pathItems[0].clipping = true;
-      } else {
-        root = rebuildPath(holder.pathItems.add(), rings[0], cx, cy, w, h);
-        root.move(holder, ElementPlacement.PLACEATBEGINNING);
-        root.clipping = true;
-      }
-      holder.clipped = true;
-      return root;
-    } catch (e) {
-      try {
-        if (root) root.remove();
-      } catch (cleanupError) {}
-      return null;
+      item.resize(
+        scaleX * 100,
+        scaleY * 100,
+        true,
+        true,
+        true,
+        true,
+        100,
+        Transformation.CENTER,
+      );
+    } catch (resizeCenterError) {
+      item.resize(scaleX * 100, scaleY * 100);
     }
   }
   function outputLayer(d) {
@@ -17431,14 +17422,49 @@ function dcApMau(multiSourcePerArtboard) {
     return ly;
   }
 
+  function isSourceOrAncestor(item, sources) {
+    for (var si = 0; si < sources.length; si++) {
+      var node = sources[si];
+      while (node) {
+        try {
+          if (node === item) return true;
+          if (node.typename === "Layer") break;
+          node = node.parent;
+        } catch (e) {
+          break;
+        }
+      }
+    }
+    return false;
+  }
+
+  // A previous run may leave artwork at the same coordinates after its
+  // artboards are removed.  Clear only top-level items owned by this result
+  // layer, while preserving any selected source that happens to be there.
+  function clearPreviousOutput(ly, sources) {
+    var stale = [];
+    try {
+      for (var i = 0; i < ly.pageItems.length; i++) {
+        var item = ly.pageItems[i];
+        try {
+          if (item.parent === ly && !isSourceOrAncestor(item, sources))
+            stale.push(item);
+        } catch (e) {}
+      }
+    } catch (e2) {}
+    for (var j = stale.length - 1; j >= 0; j--) {
+      try {
+        stale[j].remove();
+      } catch (e3) {}
+    }
+  }
+
   var sourceItems = [];
   for (var si = 0; si < sel.length; si++) sourceItems.push(sel[si]);
   var outLayer = outputLayer(doc);
+  clearPreviousOutput(outLayer, sourceItems);
   var errors = [];
-  var masksApplied = 0,
-    maskFallbacks = 0,
-    assumedSourceAngles = 0,
-    filledSlotCount = 0,
+  var filledSlotCount = 0,
     outputBatchCount = 0;
   var destName = doc.name;
 
@@ -17564,10 +17590,17 @@ function dcApMau(multiSourcePerArtboard) {
     var batchGroup = outLayer.groupItems.add();
     batchGroup.name = "DAN_THEO_MAU_" + tag;
     var sourceCache = [];
+    function isReadyImage(item) {
+      try {
+        return item.typename === "RasterItem" || item.typename === "PlacedItem";
+      } catch (e) {
+        return false;
+      }
+    }
     function rasterForSource(it, sourceNo) {
       for (var rc = 0; rc < sourceCache.length; rc++)
         if (sourceCache[rc].it === it) return sourceCache[rc];
-      var entry = { it: it, flat: null, srcAngle: null, failed: false };
+      var entry = { it: it, flat: null, failed: false };
       sourceCache.push(entry);
       var workCopy = null;
       try {
@@ -17576,11 +17609,16 @@ function dcApMau(multiSourcePerArtboard) {
         workCopy = it.duplicate(outLayer, ElementPlacement.PLACEATEND);
         var sourceFrame = bnd(workCopy);
         if (!sourceFrame) throw new Error("Không đo được biên dạng object.");
-        entry.flat = doc.rasterize(workCopy, sourceFrame, makeRO());
+        if (isReadyImage(workCopy)) {
+          entry.flat = workCopy;
+          workCopy = null;
+        } else {
+          entry.flat = doc.rasterize(workCopy, sourceFrame, makeRO());
+        }
         if (!entry.flat) throw new Error("Illustrator không trả về RasterItem.");
-        entry.srcAngle = readContentAngle(it);
-        if (entry.srcAngle === null || !isFinite(entry.srcAngle))
-          assumedSourceAngles++;
+        // The raster already contains the source's visible pixels.  Reading
+        // a nested source group's matrix can report an unrelated 90-degree
+        // transform and rotate every learned slot the wrong way.
       } catch (rasterError) {
         entry.failed = true;
         try {
@@ -17596,33 +17634,43 @@ function dcApMau(multiSourcePerArtboard) {
     var made = 0;
     for (var s = 0; s < bSlots.length; s++) {
       var sl = bSlots[s];
-      var holder = null,
-        rasterCopy = null;
+      var rasterCopy = null;
       try {
         var sourceEntry = rasterForSource(slotSources[s], s + 1);
         if (sourceEntry.failed || !sourceEntry.flat)
           throw new Error("không raster được nguồn cho slot này.");
-        holder = outLayer.groupItems.add();
-        rasterCopy = sourceEntry.flat.duplicate(holder, ElementPlacement.PLACEATEND);
-        // Raster/PlacedItem (đặc biệt sticker tròn) thường không trả matrix,
-        // nhưng ảnh đang nhìn thấy vẫn là hướng chuẩn của con nguồn. Coi hướng
-        // đó là 0 độ để vẫn áp góc từng slot đã học; nếu không mọi hình tròn sẽ
-        // bị bỏ qua bước xoay.
+        // Không bọc ảnh trong GroupItem ở đây. Với ảnh đã có matrix xoay nội
+        // bộ, GroupItem.resize có thể scale theo trục local trong khi bounds
+        // lại được đo theo trục trang, làm card dọc thành ngang.
+        rasterCopy = sourceEntry.flat.duplicate(
+          outLayer,
+          ElementPlacement.PLACEATEND,
+        );
+        // W/H này đã được học RIÊNG cho từng slot. Không dùng ternary lồng
+        // nhau ở đây: ExtendScript đã đánh giá biểu thức đó sai và làm mọi ô
+        // rơi về khổ chung 12.2 x 8.2. Ưu tiên tuyệt đối số đo thật của slot;
+        // chỉ dùng khổ cũ khi template rất cũ không có W/H.
+        var useW = Number(sl.w);
+        var useH = Number(sl.h);
+        if (!(useW > 0) || !(useH > 0)) {
+          useW = sl.land ? bHiPt : bLoPt;
+          useH = sl.land ? bLoPt : bHiPt;
+        }
+        if (!(useW > 0) || !(useH > 0))
+          throw new Error("Kích thước slot không hợp lệ.");
+
+        // Góc học được là góc tương đối với artwork đang nhìn thấy. Không đọc
+        // matrix của nguồn vì Raster/PlacedItem hoặc group lồng nhau có thể trả
+        // một góc nội bộ 90 độ dù ảnh thực tế đang đứng thẳng.
         var hasVisualAngle = sl.angle >= 0;
-        var baseVisualAngle =
-          sourceEntry.srcAngle !== null && isFinite(sourceEntry.srcAngle)
-            ? sourceEntry.srcAngle
-            : 0;
+        var rot = 0;
         if (hasVisualAngle) {
-          var rot = (sl.angle - baseVisualAngle) % 360;
+          rot = sl.angle % 360;
           if (rot < 0) rot += 360;
           if (rot > 180) rot -= 360;
-          if (Math.abs(rot) > 0.01) rasterCopy.rotate(rot);
-        }
-        // Chỉ suy rộng/cao khi chưa có góc artwork và cả hai khung thực sự
-        // không vuông. Với sticker tròn, sai số anti-alias vài phần trăm từng
-        // làm tool lật ngẫu nhiên 90 độ giữa các slot.
-        if (!hasVisualAngle) {
+        } else {
+          // Mẫu cũ chưa lưu góc: chỉ suy hướng khi cả nguồn lẫn slot là hình
+          // chữ nhật rõ ràng. Hình tròn sẽ giữ nguyên, không bị lật 90 độ.
           var hbA = bnd(rasterCopy);
           if (!hbA) throw new Error("Không đo được biên dạng bản sao.");
           var sourceW = hbA[2] - hbA[0],
@@ -17631,50 +17679,57 @@ function dcApMau(multiSourcePerArtboard) {
             clearlyHorizontalOrVertical(sourceW, sourceH) &&
             clearlyHorizontalOrVertical(sl.w, sl.h)
           ) {
-            var isLand = sourceW >= sourceH;
-            if (isLand !== sl.land) rasterCopy.rotate(90);
+            if ((sourceW >= sourceH) !== sl.land) rot = 90;
           }
         }
 
+        // Xoay artwork trước, rồi mới resize theo W/H nhìn thấy của slot.
+        // resizeToVisibleSize tự nhận biết trục nội bộ của Raster/PlacedItem,
+        // nên ảnh có matrix xoay sẵn vẫn ra đúng kích thước cuối cùng.
+        if (Math.abs(rot) > 0.01) {
+          try {
+            rasterCopy.rotate(rot, true, true, true, true, Transformation.CENTER);
+          } catch (rotateCenterError) {
+            rasterCopy.rotate(rot);
+          }
+        }
+        resizeToVisibleSize(rasterCopy, useW, useH);
         var hb = bnd(rasterCopy);
-        if (!hb) throw new Error("Không đo được biên dạng bản sao.");
-        var hw = hb[2] - hb[0],
-          hh = hb[1] - hb[3];
-        // Raster được resize đúng khổ từng slot trước khi đặt clipping mask.
-        // Hai chiều scale độc lập theo đúng cách dàn mẫu cũ yêu cầu.
-        var useW = isPositiveSize(sl.w) ? sl.w : sl.land ? bHiPt : bLoPt;
-        var useH = isPositiveSize(sl.h) ? sl.h : sl.land ? bLoPt : bHiPt;
-        if (
-          hw <= 0 ||
-          hh <= 0 ||
-          !isPositiveSize(useW) ||
-          !isPositiveSize(useH)
-        )
-          throw new Error("Kích thước slot không hợp lệ.");
-        var scaleX = useW / hw,
-          scaleY = useH / hh;
-        if (!isPositiveSize(scaleX) || !isPositiveSize(scaleY))
-          throw new Error("Không tính được tỉ lệ resize.");
-        rasterCopy.resize(scaleX * 100, scaleY * 100);
-        hb = bnd(rasterCopy);
         if (!hb) throw new Error("Không đo được biên dạng sau khi scale.");
+        // Xác nhận sau xoay theo đúng W/H slot. Với ảnh Illustrator có matrix
+        // nội bộ khác thường, hiệu chỉnh lần cuối theo visibleBounds để không
+        // còn xảy ra ô dọc thành 12.2 x 8.2 cm.
+        var finalW = hb[2] - hb[0],
+          finalH = hb[1] - hb[3];
+        var SIZE_TOLERANCE = 0.75;
+        if (
+          Math.abs(finalW - useW) > SIZE_TOLERANCE ||
+          Math.abs(finalH - useH) > SIZE_TOLERANCE
+        ) {
+          resizeToVisibleSize(rasterCopy, useW, useH);
+          hb = bnd(rasterCopy);
+          if (!hb) throw new Error("Không đo được biên dạng sau khi hiệu chỉnh.");
+          finalW = hb[2] - hb[0];
+          finalH = hb[1] - hb[3];
+          if (
+            Math.abs(finalW - useW) > SIZE_TOLERANCE ||
+            Math.abs(finalH - useH) > SIZE_TOLERANCE
+          )
+            throw new Error("Resize không đạt kích thước slot yêu cầu.");
+        }
         var hcx = (hb[0] + hb[2]) / 2,
           hcy = (hb[1] + hb[3]) / 2;
         var targetCx = cxBo + sl.dx,
           targetCy = cyBo + sl.dy;
         rasterCopy.translate(targetCx - hcx, targetCy - hcy);
 
-        // Dựng lại contour của slot đã học tại đúng tâm/kích thước mới.
-        // Nếu slot không có contour vector (ví dụ template chỉ là ảnh), giữ
-        // raster như dữ liệu cũ nhưng báo rõ số slot fallback ở cuối.
-        if (createShapeMask(holder, sl.shape, targetCx, targetCy, useW, useH))
-          masksApplied++;
-        else maskFallbacks++;
-        holder.move(batchGroup, ElementPlacement.PLACEATEND);
+        // Đặt bản sao đã resize vào đúng tâm slot; không tạo clipping mask.
+        rasterCopy.move(batchGroup, ElementPlacement.PLACEATEND);
+        rasterCopy = null;
         made++;
       } catch (e) {
         try {
-          if (holder) holder.remove();
+          if (rasterCopy) rasterCopy.remove();
         } catch (e2) {}
         errors.push("Mẫu " + tag + ", vị trí " + (s + 1) + ": " + e);
       }
@@ -18011,19 +18066,6 @@ function dcApMau(multiSourcePerArtboard) {
       "\nĐã bù " +
       filledSlotCount +
       " slot còn thiếu bằng con cuối rồi gần cuối của từng lô nguồn.";
-  if (masksApplied > 0)
-    msg +=
-      "\nĐã raster, resize và cắt theo " + masksApplied + " biên dạng mẫu.";
-  if (maskFallbacks > 0)
-    msg +=
-      "\n" +
-      maskFallbacks +
-      " slot không có contour vector hợp lệ nên dùng khung raster.";
-  if (assumedSourceAngles > 0)
-    msg +=
-      "\n" +
-      assumedSourceAngles +
-      " con nguồn không có matrix: giữ hướng đang thấy làm hướng chuẩn rồi áp góc từng slot.";
   if (errors.length > 0) msg += "\n\nLưu ý:\n- " + errors.join("\n- ");
   alert(msg);
   return (

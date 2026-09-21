@@ -84,7 +84,7 @@ DanCard_Setup_23/
 Xem chi tiết từng phiên bản tại
 [`DanCardCEP/LICH_SU_CAP_NHAT.md`](../DanCardCEP/LICH_SU_CAP_NHAT.md).
 
-Phiên bản hiện tại: **v2.9.6**.
+Phiên bản hiện tại: **v2.9.7**.
 
 ### Cập nhật online
 
