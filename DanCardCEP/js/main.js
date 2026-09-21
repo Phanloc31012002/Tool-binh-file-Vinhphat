@@ -318,6 +318,7 @@
   var tabs = document.querySelectorAll(".tab");
   var panes = {
     danfile: document.getElementById("pane-danfile"),
+    cutmarks: document.getElementById("pane-cutmarks"),
     danmau: document.getElementById("pane-danmau"),
     catalogue: document.getElementById("pane-catalogue"),
     offset: document.getElementById("pane-offset"),
@@ -1370,6 +1371,26 @@
     else if (res.indexOf("OK:") === 0)
       showOkWithWarn(el, res.substring(3).replace(/^\s+/, ""));
     else show(el, res, "ok");
+  }
+
+  // ---- Dấu cắt ----
+  var btnCutMarks = document.getElementById("btnCutMarks");
+  var outCutMarks = document.getElementById("outCutMarks");
+  if (btnCutMarks && outCutMarks) {
+    ["cutMarkLength", "cutMarkEdge"].forEach(attachSelectFirst);
+    btnCutMarks.addEventListener("click", function () {
+      var length = document.getElementById("cutMarkLength").value || "1.4";
+      var edge = document.getElementById("cutMarkEdge").value || "4";
+      show(outCutMarks, "Đang tạo dấu cắt…");
+      btnCutMarks.disabled = true;
+      cs.evalScript(
+        "dcThemDauCatTuDong(" + jsStr(length) + ", " + jsStr(edge) + ")",
+        function (res) {
+          btnCutMarks.disabled = false;
+          handleRes(outCutMarks, res);
+        },
+      );
+    });
   }
 
   // ---- Dàn Card ----

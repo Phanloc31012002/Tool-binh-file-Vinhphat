@@ -1154,9 +1154,15 @@ body {
   display: flex;
   border-bottom: 1px solid var(--line);
   background: var(--bg);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tabbar::-webkit-scrollbar {
+  display: none;
 }
 .tab {
-  flex: 1;
+  flex: 0 0 auto;
+  min-width: 74px;
   appearance: none;
   border: none;
   background: transparent;
@@ -1166,6 +1172,7 @@ body {
   font-size: 12px;
   font-family: inherit;
   font-weight: 600;
+  white-space: nowrap;
   cursor: pointer;
   border-bottom: 2px solid transparent;
   transition: all 0.15s;

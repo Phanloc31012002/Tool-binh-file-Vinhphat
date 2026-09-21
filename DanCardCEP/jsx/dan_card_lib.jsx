@@ -2727,6 +2727,333 @@ function _dcDanCore(SEL_LAYOUT_KEY, VOUCHER_WITH_CARD_ARG) {
 }
 
 // ============================================================
+//  TAB DẤU CẮT: chạy độc lập với các luồng dàn hiện có.
+//  Chọn từng bài, hoặc chọn group dàn mà các bài con là clipping group.
+// ============================================================
+function dcThemDauCatTuDong(lengthText, edgeText) {
+  try {
+    if (app.documents.length === 0) return "ERR: Chưa mở tài liệu nào.";
+
+    var doc = app.activeDocument;
+    var sel = doc.selection;
+    if (!sel || sel.length === 0)
+      return "ERR: Chọn các bài cần tạo dấu cắt trước.";
+
+    function parseMm(value, label) {
+      var n = parseFloat(String(value || "").replace(",", "."));
+      if (!isFinite(n) || n <= 0)
+        throw new Error(label + " phải là số lớn hơn 0 mm.");
+      return n;
+    }
+
+    var MM = 2.834645669;
+    var cutLength = parseMm(lengthText, "Dài nét") * MM;
+    var edgeThreshold = parseMm(edgeText, "Ngưỡng mép") * MM;
+    var cutGap = 0;
+    var edgeEpsilon = 0.05;
+
+    function itemBounds(item) {
+      var isClipped = false;
+      try {
+        isClipped = item.typename === "GroupItem" && item.clipped === true;
+      } catch (e) {}
+      if (isClipped) {
+        try {
+          var children = item.pageItems;
+          for (var ci = 0; ci < children.length; ci++) {
+            if (children[ci].clipping === true)
+              return children[ci].geometricBounds.slice(0);
+          }
+        } catch (e) {}
+      }
+      try {
+        return item.visibleBounds.slice(0);
+      } catch (e) {}
+      try {
+        return item.geometricBounds.slice(0);
+      } catch (e) {}
+      return null;
+    }
+
+    function isCutMarkItem(item) {
+      try {
+        return item.layer && item.layer.name === "Dau cat tu dong";
+      } catch (e) {
+        return false;
+      }
+    }
+
+    // Một group dàn card thường chứa nhiều clipping group, mỗi group là 1 bài.
+    // Chỉ tách kiểu group này để không tách các chi tiết của một artwork đơn lẻ.
+    function collectCards(item, output) {
+      if (!item || isCutMarkItem(item)) return;
+      var isGroup = false,
+        isClipped = false;
+      try {
+        isGroup = item.typename === "GroupItem";
+        isClipped = item.clipped === true;
+      } catch (e) {}
+      if (isGroup && !isClipped) {
+        var directCards = [];
+        try {
+          for (var i = 0; i < item.pageItems.length; i++) {
+            var child = item.pageItems[i];
+            if (isCutMarkItem(child)) continue;
+            if (child.typename === "GroupItem" && child.clipped === true)
+              directCards.push(child);
+          }
+        } catch (e) {}
+        if (directCards.length >= 2) {
+          for (var d = 0; d < directCards.length; d++)
+            output.push(directCards[d]);
+          return;
+        }
+      }
+      output.push(item);
+    }
+
+    function artboardFor(bounds) {
+      var cx = (bounds[0] + bounds[2]) / 2;
+      var cy = (bounds[1] + bounds[3]) / 2;
+      for (var ai = 0; ai < doc.artboards.length; ai++) {
+        var rect = doc.artboards[ai].artboardRect;
+        if (
+          cx >= rect[0] &&
+          cx <= rect[2] &&
+          cy <= rect[1] &&
+          cy >= rect[3]
+        )
+          return ai;
+      }
+      return -1;
+    }
+
+    var rawCards = [];
+    for (var si = 0; si < sel.length; si++) collectCards(sel[si], rawCards);
+
+    var cards = [];
+    var skipped = 0;
+    for (var ri = 0; ri < rawCards.length; ri++) {
+      var bounds = itemBounds(rawCards[ri]);
+      if (!bounds || bounds[2] <= bounds[0] || bounds[1] <= bounds[3]) {
+        skipped++;
+        continue;
+      }
+      var abIndex = artboardFor(bounds);
+      if (abIndex < 0) {
+        skipped++;
+        continue;
+      }
+      cards.push({ bounds: bounds, abIndex: abIndex });
+    }
+    if (cards.length === 0)
+      return "ERR: Không tìm thấy bài hợp lệ nằm trong artboard.";
+
+    var markLayer = null;
+    for (var li = 0; li < doc.layers.length; li++) {
+      if (doc.layers[li].name === "Dau cat tu dong") {
+        markLayer = doc.layers[li];
+        break;
+      }
+    }
+    if (!markLayer) {
+      markLayer = doc.layers.add();
+      markLayer.name = "Dau cat tu dong";
+    }
+    try {
+      markLayer.locked = false;
+      markLayer.visible = true;
+    } catch (e) {}
+
+    var markGroup = markLayer.groupItems.add();
+    markGroup.name = "Dau cat - " + new Date().getTime();
+    var cutColor = new CMYKColor();
+    cutColor.cyan = 0;
+    cutColor.magenta = 0;
+    cutColor.yellow = 0;
+    cutColor.black = 100;
+    var drawn = 0;
+    var drawnLines = {};
+
+    function fitsArtboard(p1, p2, rect) {
+      return (
+        p1[0] >= rect[0] &&
+        p1[0] <= rect[2] &&
+        p2[0] >= rect[0] &&
+        p2[0] <= rect[2] &&
+        p1[1] >= rect[3] &&
+        p1[1] <= rect[1] &&
+        p2[1] >= rect[3] &&
+        p2[1] <= rect[1]
+      );
+    }
+
+    function overlapsCard(p1, p2, owner, allowOwner) {
+      var minX = Math.min(p1[0], p2[0]);
+      var maxX = Math.max(p1[0], p2[0]);
+      var minY = Math.min(p1[1], p2[1]);
+      var maxY = Math.max(p1[1], p2[1]);
+      for (var oi = 0; oi < cards.length; oi++) {
+        if (cards[oi].abIndex !== cards[owner].abIndex) continue;
+        if (oi === owner && allowOwner) continue;
+        var other = cards[oi].bounds;
+
+        // Nếu nét nằm dọc theo cạnh của bài kế bên thì đó là nút cắt
+        // chung. Bỏ nét này để chỉ còn một nét đi ra vùng trống.
+        if (oi !== owner) {
+          var isHorizontal = Math.abs(p1[1] - p2[1]) <= edgeEpsilon;
+          var isVertical = Math.abs(p1[0] - p2[0]) <= edgeEpsilon;
+          if (
+            isHorizontal &&
+            (Math.abs(p1[1] - other[1]) <= edgeEpsilon ||
+              Math.abs(p1[1] - other[3]) <= edgeEpsilon) &&
+            Math.min(maxX, other[2]) - Math.max(minX, other[0]) > edgeEpsilon
+          )
+            return true;
+          if (
+            isVertical &&
+            (Math.abs(p1[0] - other[0]) <= edgeEpsilon ||
+              Math.abs(p1[0] - other[2]) <= edgeEpsilon) &&
+            Math.min(maxY, other[1]) - Math.max(minY, other[3]) > edgeEpsilon
+          )
+            return true;
+        }
+        if (
+          maxX > other[0] &&
+          minX < other[2] &&
+          maxY > other[3] &&
+          minY < other[1]
+        )
+          return true;
+      }
+      return false;
+    }
+
+    function lineKey(p1, p2, abIndex) {
+      var a = p1[0].toFixed(3) + "," + p1[1].toFixed(3);
+      var b = p2[0].toFixed(3) + "," + p2[1].toFixed(3);
+      if (a > b) {
+        var swap = a;
+        a = b;
+        b = swap;
+      }
+      return abIndex + "|" + a + "|" + b;
+    }
+
+    function drawLine(p1, p2, owner, rect, allowOwner) {
+      if (!fitsArtboard(p1, p2, rect)) return;
+      // Nét chỉ nằm trong vùng trống. Trường hợp sát mép giấy mới cho
+      // phép nét đi vào chính bài đó theo quy tắc lật vào trong.
+      if (overlapsCard(p1, p2, owner, allowOwner)) return;
+      var key = lineKey(p1, p2, cards[owner].abIndex);
+      if (drawnLines[key]) return;
+      try {
+        var line = markLayer.pathItems.add();
+        line.setEntirePath([p1, p2]);
+        line.filled = false;
+        line.stroked = true;
+        line.strokeColor = cutColor;
+        line.strokeWidth = 1;
+        line.move(markGroup, ElementPlacement.PLACEATEND);
+        drawnLines[key] = true;
+        drawn++;
+      } catch (e) {}
+    }
+
+    for (var ci = 0; ci < cards.length; ci++) {
+      var card = cards[ci].bounds;
+      var rect = doc.artboards[cards[ci].abIndex].artboardRect;
+      var leftDir = card[0] - rect[0] < edgeThreshold ? 1 : -1;
+      var rightDir = rect[2] - card[2] < edgeThreshold ? -1 : 1;
+      var topDir = rect[1] - card[1] < edgeThreshold ? -1 : 1;
+      var bottomDir = card[3] - rect[3] < edgeThreshold ? 1 : -1;
+      var leftInside = leftDir > 0;
+      var rightInside = rightDir < 0;
+      var topInside = topDir < 0;
+      var bottomInside = bottomDir > 0;
+
+      // Nét ngang tại bốn góc.
+      drawLine(
+        [card[0] + leftDir * cutGap, card[1]],
+        [card[0] + leftDir * (cutGap + cutLength), card[1]],
+        ci,
+        rect,
+        leftInside,
+      );
+      drawLine(
+        [card[2] + rightDir * cutGap, card[1]],
+        [card[2] + rightDir * (cutGap + cutLength), card[1]],
+        ci,
+        rect,
+        rightInside,
+      );
+      drawLine(
+        [card[0] + leftDir * cutGap, card[3]],
+        [card[0] + leftDir * (cutGap + cutLength), card[3]],
+        ci,
+        rect,
+        leftInside,
+      );
+      drawLine(
+        [card[2] + rightDir * cutGap, card[3]],
+        [card[2] + rightDir * (cutGap + cutLength), card[3]],
+        ci,
+        rect,
+        rightInside,
+      );
+
+      // Nét dọc tại bốn góc.
+      drawLine(
+        [card[0], card[1] + topDir * cutGap],
+        [card[0], card[1] + topDir * (cutGap + cutLength)],
+        ci,
+        rect,
+        topInside,
+      );
+      drawLine(
+        [card[2], card[1] + topDir * cutGap],
+        [card[2], card[1] + topDir * (cutGap + cutLength)],
+        ci,
+        rect,
+        topInside,
+      );
+      drawLine(
+        [card[0], card[3] + bottomDir * cutGap],
+        [card[0], card[3] + bottomDir * (cutGap + cutLength)],
+        ci,
+        rect,
+        bottomInside,
+      );
+      drawLine(
+        [card[2], card[3] + bottomDir * cutGap],
+        [card[2], card[3] + bottomDir * (cutGap + cutLength)],
+        ci,
+        rect,
+        bottomInside,
+      );
+    }
+
+    if (drawn === 0) {
+      try {
+        markGroup.remove();
+      } catch (e) {}
+      return "OK: Không có khoảng trống phù hợp để đặt dấu cắt.";
+    }
+
+    try {
+      markLayer.zOrder(ZOrderMethod.BRINGTOFRONT);
+    } catch (e) {}
+    app.redraw();
+    var msg =
+      "OK: Đã thêm " + drawn + " nét dấu cắt cho " + cards.length + " bài.";
+    if (skipped > 0) msg += " Bỏ qua " + skipped + " object ngoài artboard.";
+    return msg;
+  } catch (e) {
+    return "ERR: " + e.toString();
+  }
+}
+
+// ============================================================
 //  HÀM TEST kết nối (Bước 1) — giữ lại để panel kiểm tra.
 // ============================================================
 function dcTestConnection() {

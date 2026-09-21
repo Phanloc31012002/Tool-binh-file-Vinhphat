@@ -143,6 +143,7 @@
 
       <div class="tabbar">
         <button class="tab active" data-tab="danfile">Dàn file</button>
+        <button class="tab" data-tab="cutmarks">Dấu cắt</button>
         <button class="tab" data-tab="danmau">Dàn theo mẫu</button>
         <button class="tab" data-tab="catalogue">Catalogue</button>
         <button class="tab" data-tab="offset">CTL Offset</button>
@@ -302,6 +303,28 @@
             <div id="outDecal" class="out">Chọn object rồi bấm Dàn.</div>
           </div>
         </div>
+      </main>
+
+      <!-- TAB: DẤU CẮT -->
+      <main class="body tabpane" id="pane-cutmarks">
+        <div class="field">
+          <div class="label">Dấu cắt tự động</div>
+          <p class="hint">Chọn các bài, hoặc group bài đã dàn, trong Illustrator.</p>
+        </div>
+        <div class="field-row">
+          <label class="field half" for="cutMarkLength">
+            <span class="label">Dài nét (mm)</span>
+            <input id="cutMarkLength" class="num" type="text" value="1.4" />
+          </label>
+          <label class="field half" for="cutMarkEdge">
+            <span class="label">Ngưỡng mép (mm)</span>
+            <input id="cutMarkEdge" class="num" type="text" value="4" />
+          </label>
+        </div>
+        <button id="btnCutMarks" class="btn btn-primary">
+          <span class="btn-label">Đánh dấu cắt</span>
+        </button>
+        <div id="outCutMarks" class="out">Chọn bài rồi đánh dấu cắt.</div>
       </main>
 
       <!-- TAB: DÀN THEO MẪU (học 1 con mẫu rồi áp cho nhiều con nguồn) -->
@@ -644,7 +667,7 @@
       </main>
 
       <footer class="foot">
-        <span class="ver">v2.9.7</span>
+        <span class="ver">v2.9.8</span>
       </footer>
     </div>
 
