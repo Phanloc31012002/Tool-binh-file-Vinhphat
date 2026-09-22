@@ -2,27 +2,33 @@
 
 _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
+## v2.9.10 — Chỉnh sửa loại Pon cho card cắt
+
+- Các loại card cắt sẽ dùng cùng Pon khổ 33x35.4 vì dupicate pon quá lâu có khi là lỗi nên sẽ mất rất nhiều thời gian. Pon khổ 33x35.4 sẽ dùng chung 1 loại là Pon trăng ko có bất cứ gì trên đó.
+
+---
+
 ## v2.9.9 — thêm chức năng cho tự động đánh Pon
 
-- Phát hành tự động qua PhatHanhCapNhat.bat.
+- Thêm ô nhập Khoảng cách từ Pon đến bài.
 
 ---
 
 ## v2.9.8 — update tu ve Pon cat
 
-- Phát hành tự động qua PhatHanhCapNhat.bat.
+- Phát triển thêm chế độ tự động đánh Pon cắt cho bài cần cắt.
 
 ---
 
 ## v2.9.7 — Ban va dantheomau
 
-- Phát hành tự động qua PhatHanhCapNhat.bat.
+- Chỉnh sửa các vấn đề về dàn hình tròn, hình vuông, cân bằng và đi sâu vào snapShot.
 
 ---
 
 ## v2.9.6 — Khoi phuc 2 che do dan theo mau
 
-- Phát hành tự động qua PhatHanhCapNhat.bat.
+- Khôi phục 2 chế độ dàn theo mẫu mà đã làm từ trước vì lỡ thay thế 2 chế độ với nhau để test.
 
 ---
 

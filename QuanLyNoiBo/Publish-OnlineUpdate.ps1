@@ -6,6 +6,10 @@ param(
 
     [string]$OutputDirectory = '',
 
+    [string]$ReleaseTitle = '',
+
+    [string]$ReleaseDescription = '',
+
     [switch]$AllowSameVersion
 )
 
@@ -57,6 +61,8 @@ try {
     $onlineManifest = [ordered]@{
         product = $product
         version = $version
+        title = $ReleaseTitle.Trim()
+        description = $ReleaseDescription.Trim()
         packageUrl = $packageUrl
         sha256 = $hash
         publishedUtc = [DateTime]::UtcNow.ToString('o')

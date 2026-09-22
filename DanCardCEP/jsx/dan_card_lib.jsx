@@ -1090,6 +1090,14 @@ function _dcDanCore(SEL_LAYOUT_KEY, VOUCHER_WITH_CARD_ARG) {
     return null;
   }
 
+  // Mọi luồng Dàn Card dùng chung artboard của pon 9.2x5.6.
+  // Pon này có thể để trắng: khi đó importPon chỉ lấy artboard, không
+  // nhân bản bất kỳ object pon nào và cách dàn vẫn giữ nguyên.
+  var COMMON_ARTBOARD_LAYOUT = {
+    name: "artboard chung 9.2x5.6",
+    key: "9.2x5.6",
+  };
+
   // ============================================================
   //  XÓA ARTBOARD 2 + NỘI DUNG (dùng khi in 1 mặt)
   //  Xóa mọi object có tâm nằm trong vùng AB index 1 (pon thừa của
@@ -2161,9 +2169,9 @@ function _dcDanCore(SEL_LAYOUT_KEY, VOUCHER_WITH_CARD_ARG) {
   // ============================================================
   //  CHẠY
   // ============================================================
-  // Import artboard + pon từ file pon (sau khi đã clip/duplicate object gốc xong).
-  prog.step("Mở pon + dàn (bước lâu nhất, chờ chút)...");
-  var ponPath = resolvePonPath(LAYOUT);
+  // Import artboard chung 9.2x5.6. Pon trắng sẽ không có object để duplicate.
+  prog.step("Mở artboard chung 9.2x5.6...");
+  var ponPath = resolvePonPath(COMMON_ARTBOARD_LAYOUT);
   if (ponPath) {
     var newDoc = importPon(ponPath);
     if (newDoc && newDoc.typename === "Document") doc = newDoc; // cập nhật tham chiếu
@@ -2518,12 +2526,8 @@ function _dcDanCore(SEL_LAYOUT_KEY, VOUCHER_WITH_CARD_ARG) {
         back: autoClipWH(cRows[i][1].o, CWmm, CHmm),
       });
 
-    // ----- Import pon (file ghép) - key riêng "15.2x7.2_card" -----
-    var ponLayout = {
-      name: "voucher 15.2x7.2 + card 9.2x5.6",
-      key: "15.2x7.2_card",
-    };
-    var ponPath = resolvePonPath(ponLayout);
+    // ----- Import artboard chung 9.2x5.6 (pon trắng, không duplicate pon) -----
+    var ponPath = resolvePonPath(COMMON_ARTBOARD_LAYOUT);
     if (ponPath) {
       var newDoc = importPon(ponPath);
       if (newDoc && newDoc.typename === "Document") doc = newDoc;

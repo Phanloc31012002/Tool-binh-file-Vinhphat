@@ -1,7 +1,9 @@
 {
     "product":  "com.locdev.dancard",
-    "version":  "2.9.9",
-    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.9.9.zip",
-    "sha256":  "E1E5446E6EC553FD360A686608584BF5693131389084E0B76E8BB1F087A712E8",
-    "publishedUtc":  "2026-09-22T01:09:24.0920331Z"
+    "version":  "2.9.10",
+    "title":  "Chỉnh sửa loại Pon cho card cắt",
+    "description":  "Các loại card cắt sẽ dùng cùng Pon khổ 33x35.4 vì dupicate pon quá lâu có khi là lỗi nên sẽ mất rất nhiều thời gian. Pon khổ 33x35.4 sẽ dùng chung 1 loại là Pon trăng ko có bất cứ gì trên đó.",
+    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.9.10.zip",
+    "sha256":  "B14C51BEE3BA0F3F0BDAE3480A13B57CBEAB997288F8D01024E172D77B0420A0",
+    "publishedUtc":  "2026-09-22T02:22:51.4177143Z"
 }
