@@ -2730,7 +2730,7 @@ function _dcDanCore(SEL_LAYOUT_KEY, VOUCHER_WITH_CARD_ARG) {
 //  TAB DẤU CẮT: chạy độc lập với các luồng dàn hiện có.
 //  Chọn từng bài, hoặc chọn group dàn mà các bài con là clipping group.
 // ============================================================
-function dcThemDauCatTuDong(lengthText, edgeText) {
+function dcThemDauCatTuDong(lengthText, edgeText, gapText) {
   try {
     if (app.documents.length === 0) return "ERR: Chưa mở tài liệu nào.";
 
@@ -2739,17 +2739,27 @@ function dcThemDauCatTuDong(lengthText, edgeText) {
     if (!sel || sel.length === 0)
       return "ERR: Chọn các bài cần tạo dấu cắt trước.";
 
-    function parseMm(value, label) {
-      var n = parseFloat(String(value || "").replace(",", "."));
-      if (!isFinite(n) || n <= 0)
-        throw new Error(label + " phải là số lớn hơn 0 mm.");
+    function parseMm(value, label, allowZero) {
+      var n = parseFloat(
+        String(value === undefined || value === null ? "" : value).replace(
+          ",",
+          ".",
+        ),
+      );
+      if (!isFinite(n) || n < 0 || (!allowZero && n === 0))
+        throw new Error(
+          label + (allowZero ? " phải là số từ 0 mm." : " phải lớn hơn 0 mm."),
+        );
       return n;
     }
 
     var MM = 2.834645669;
     var cutLength = parseMm(lengthText, "Dài nét") * MM;
     var edgeThreshold = parseMm(edgeText, "Ngưỡng mép") * MM;
-    var cutGap = 0;
+    var cutGap =
+      (gapText === undefined || gapText === null || gapText === ""
+        ? 0
+        : parseMm(gapText, "Cách bài", true)) * MM;
     var edgeEpsilon = 0.05;
 
     function itemBounds(item) {

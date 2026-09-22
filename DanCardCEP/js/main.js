@@ -1377,14 +1377,21 @@
   var btnCutMarks = document.getElementById("btnCutMarks");
   var outCutMarks = document.getElementById("outCutMarks");
   if (btnCutMarks && outCutMarks) {
-    ["cutMarkLength", "cutMarkEdge"].forEach(attachSelectFirst);
+    ["cutMarkLength", "cutMarkGap", "cutMarkEdge"].forEach(attachSelectFirst);
     btnCutMarks.addEventListener("click", function () {
       var length = document.getElementById("cutMarkLength").value || "1.4";
+      var gap = document.getElementById("cutMarkGap").value || "0";
       var edge = document.getElementById("cutMarkEdge").value || "4";
       show(outCutMarks, "Đang tạo dấu cắt…");
       btnCutMarks.disabled = true;
       cs.evalScript(
-        "dcThemDauCatTuDong(" + jsStr(length) + ", " + jsStr(edge) + ")",
+        "dcThemDauCatTuDong(" +
+          jsStr(length) +
+          ", " +
+          jsStr(edge) +
+          ", " +
+          jsStr(gap) +
+          ")",
         function (res) {
           btnCutMarks.disabled = false;
           handleRes(outCutMarks, res);

@@ -2,6 +2,12 @@
 
 _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
+## v2.9.9 — thêm chức năng cho tự động đánh Pon
+
+- Phát hành tự động qua PhatHanhCapNhat.bat.
+
+---
+
 ## v2.9.8 — update tu ve Pon cat
 
 - Phát hành tự động qua PhatHanhCapNhat.bat.
