@@ -2,9 +2,16 @@
 
 _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
+## v2.9.11 — Bản vá đặt Pon
+
+- Vá lỗi đặt pon khi đánh Pon vượt mép
+
+---
+
 ## v2.9.10 — Chỉnh sửa loại Pon cho card cắt
 
-- Các loại card cắt sẽ dùng cùng Pon khổ 33x35.4 vì dupicate pon quá lâu có khi là lỗi nên sẽ mất rất nhiều thời gian. Pon khổ 33x35.4 sẽ dùng chung 1 loại là Pon trăng ko có bất cứ gì trên đó.
+- Các loại card cắt sẽ dùng cùng Pon khổ 33x35.4 vì dupicate pon quá lâu có khi là lỗi nên sẽ mất rất nhiều thời gian.
+- Pon khổ 33x35.4 sẽ dùng chung 1 loại là Pon trăng ko có bất cứ gì trên đó.
 
 ---
 

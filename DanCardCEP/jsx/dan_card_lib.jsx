@@ -2912,25 +2912,25 @@ function dcThemDauCatTuDong(lengthText, edgeText, gapText) {
         if (oi === owner && allowOwner) continue;
         var other = cards[oi].bounds;
 
-        // Nếu nét nằm dọc theo cạnh của bài kế bên thì đó là nút cắt
-        // chung. Bỏ nét này để chỉ còn một nét đi ra vùng trống.
+        // Với nét hướng ra vùng trống, cạnh bài kế bên là nút cắt chung:
+        // bỏ nét chạy dọc cạnh đó. Khi sát mép giấy, nét được đảo vào trong
+        // thì cho phép nó trùng cạnh chung; lineKey sẽ giữ lại đúng một nét.
         if (oi !== owner) {
           var isHorizontal = Math.abs(p1[1] - p2[1]) <= edgeEpsilon;
           var isVertical = Math.abs(p1[0] - p2[0]) <= edgeEpsilon;
-          if (
-            isHorizontal &&
-            (Math.abs(p1[1] - other[1]) <= edgeEpsilon ||
-              Math.abs(p1[1] - other[3]) <= edgeEpsilon) &&
-            Math.min(maxX, other[2]) - Math.max(minX, other[0]) > edgeEpsilon
-          )
-            return true;
-          if (
-            isVertical &&
-            (Math.abs(p1[0] - other[0]) <= edgeEpsilon ||
-              Math.abs(p1[0] - other[2]) <= edgeEpsilon) &&
-            Math.min(maxY, other[1]) - Math.max(minY, other[3]) > edgeEpsilon
-          )
-            return true;
+          var runsOnOtherEdge =
+            (isHorizontal &&
+              (Math.abs(p1[1] - other[1]) <= edgeEpsilon ||
+                Math.abs(p1[1] - other[3]) <= edgeEpsilon) &&
+              Math.min(maxX, other[2]) - Math.max(minX, other[0]) > edgeEpsilon) ||
+            (isVertical &&
+              (Math.abs(p1[0] - other[0]) <= edgeEpsilon ||
+                Math.abs(p1[0] - other[2]) <= edgeEpsilon) &&
+              Math.min(maxY, other[1]) - Math.max(minY, other[3]) > edgeEpsilon);
+          if (runsOnOtherEdge) {
+            if (!allowOwner) return true;
+            continue;
+          }
         }
         if (
           maxX > other[0] &&

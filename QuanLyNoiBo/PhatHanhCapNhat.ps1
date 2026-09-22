@@ -5,6 +5,8 @@ param(
 
     [string]$UpdateContent = '',
 
+    [string]$ReleaseVersion = '',
+
     [switch]$DryRun
 )
 
@@ -33,6 +35,8 @@ function Get-GitHubRepository {
 }
 
 function Read-ReleaseDetails {
+    param([string]$SuggestedVersion)
+
     try {
         Add-Type -AssemblyName System.Windows.Forms
         Add-Type -AssemblyName System.Drawing
@@ -43,23 +47,35 @@ function Read-ReleaseDetails {
         $form.FormBorderStyle = 'FixedDialog'
         $form.MaximizeBox = $false
         $form.MinimizeBox = $false
-        $form.ClientSize = New-Object System.Drawing.Size(440, 218)
+        $form.ClientSize = New-Object System.Drawing.Size(440, 278)
+
+        $versionLabel = New-Object System.Windows.Forms.Label
+        $versionLabel.Text = 'Phiên bản:'
+        $versionLabel.AutoSize = $true
+        $versionLabel.Location = New-Object System.Drawing.Point(16, 16)
+        $form.Controls.Add($versionLabel)
+
+        $versionInput = New-Object System.Windows.Forms.TextBox
+        $versionInput.Text = $SuggestedVersion
+        $versionInput.Size = New-Object System.Drawing.Size(408, 24)
+        $versionInput.Location = New-Object System.Drawing.Point(16, 38)
+        $form.Controls.Add($versionInput)
 
         $nameLabel = New-Object System.Windows.Forms.Label
         $nameLabel.Text = 'Tên update / commit:'
         $nameLabel.AutoSize = $true
-        $nameLabel.Location = New-Object System.Drawing.Point(16, 16)
+        $nameLabel.Location = New-Object System.Drawing.Point(16, 76)
         $form.Controls.Add($nameLabel)
 
         $nameInput = New-Object System.Windows.Forms.TextBox
         $nameInput.Size = New-Object System.Drawing.Size(408, 24)
-        $nameInput.Location = New-Object System.Drawing.Point(16, 38)
+        $nameInput.Location = New-Object System.Drawing.Point(16, 98)
         $form.Controls.Add($nameInput)
 
         $contentLabel = New-Object System.Windows.Forms.Label
         $contentLabel.Text = 'Nội dung:'
         $contentLabel.AutoSize = $true
-        $contentLabel.Location = New-Object System.Drawing.Point(16, 76)
+        $contentLabel.Location = New-Object System.Drawing.Point(16, 136)
         $form.Controls.Add($contentLabel)
 
         $contentInput = New-Object System.Windows.Forms.TextBox
@@ -67,33 +83,35 @@ function Read-ReleaseDetails {
         $contentInput.AcceptsReturn = $true
         $contentInput.ScrollBars = 'Vertical'
         $contentInput.Size = New-Object System.Drawing.Size(408, 64)
-        $contentInput.Location = New-Object System.Drawing.Point(16, 98)
+        $contentInput.Location = New-Object System.Drawing.Point(16, 158)
         $form.Controls.Add($contentInput)
 
         $cancel = New-Object System.Windows.Forms.Button
         $cancel.Text = 'Hủy'
         $cancel.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
         $cancel.Size = New-Object System.Drawing.Size(86, 28)
-        $cancel.Location = New-Object System.Drawing.Point(246, 176)
+        $cancel.Location = New-Object System.Drawing.Point(246, 236)
         $form.Controls.Add($cancel)
 
         $publish = New-Object System.Windows.Forms.Button
         $publish.Text = 'Phát hành'
         $publish.DialogResult = [System.Windows.Forms.DialogResult]::OK
         $publish.Size = New-Object System.Drawing.Size(92, 28)
-        $publish.Location = New-Object System.Drawing.Point(332, 176)
+        $publish.Location = New-Object System.Drawing.Point(332, 236)
         $form.Controls.Add($publish)
 
         $form.AcceptButton = $publish
         $form.CancelButton = $cancel
-        $form.Add_Shown({ $nameInput.Focus() })
+        $form.Add_Shown({ $versionInput.Focus() })
         if ($form.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) { return $null }
         return [pscustomobject]@{
+            ReleaseVersion = $versionInput.Text.Trim()
             UpdateName = $nameInput.Text.Trim()
             UpdateContent = $contentInput.Text.Trim()
         }
     } catch {
         return [pscustomobject]@{
+            ReleaseVersion = Read-Host "Phiên bản (mặc định $SuggestedVersion)"
             UpdateName = Read-Host 'Tên update / commit'
             UpdateContent = Read-Host 'Nội dung'
         }
@@ -108,18 +126,32 @@ $manifestText = [System.IO.File]::ReadAllText($manifestPath, [System.Text.Encodi
 $match = [regex]::Match($manifestText, 'ExtensionBundleVersion="(\d+)\.(\d+)\.(\d+)"')
 if (-not $match.Success) { throw 'Không đọc được version trong manifest.xml.' }
 $oldVersion = $match.Groups[1].Value + '.' + $match.Groups[2].Value + '.' + $match.Groups[3].Value
-$newVersion = $match.Groups[1].Value + '.' + $match.Groups[2].Value + '.' + (([int]$match.Groups[3].Value) + 1)
+$suggestedVersion = $match.Groups[1].Value + '.' + $match.Groups[2].Value + '.' + (([int]$match.Groups[3].Value) + 1)
 $repository = Get-GitHubRepository
 
-if ([string]::IsNullOrWhiteSpace($UpdateName) -and [string]::IsNullOrWhiteSpace($UpdateContent)) {
-    $releaseDetails = Read-ReleaseDetails
+if ([string]::IsNullOrWhiteSpace($ReleaseVersion) -and [string]::IsNullOrWhiteSpace($UpdateName) -and [string]::IsNullOrWhiteSpace($UpdateContent)) {
+    $releaseDetails = Read-ReleaseDetails -SuggestedVersion $suggestedVersion
     if ($null -eq $releaseDetails) {
         Write-Host 'Đã hủy phát hành.' -ForegroundColor Yellow
         exit 0
     }
+    $ReleaseVersion = $releaseDetails.ReleaseVersion
     $UpdateName = $releaseDetails.UpdateName
     $UpdateContent = $releaseDetails.UpdateContent
 }
+if ([string]::IsNullOrWhiteSpace($ReleaseVersion)) { $ReleaseVersion = $suggestedVersion }
+$ReleaseVersion = $ReleaseVersion.Trim()
+if ($ReleaseVersion -notmatch '^\d+\.\d+\.\d+$') { throw 'Phiên bản phải có dạng X.Y.Z, ví dụ 2.9.10.' }
+
+try {
+    $currentVersionObject = [Version]$oldVersion
+    $newVersionObject = [Version]$ReleaseVersion
+} catch {
+    throw 'Phiên bản không hợp lệ.'
+}
+if ($newVersionObject -le $currentVersionObject) { throw "Phiên bản $ReleaseVersion phải lớn hơn bản hiện tại $oldVersion." }
+$newVersion = $newVersionObject.ToString()
+
 if ([string]::IsNullOrWhiteSpace($UpdateName)) { $UpdateName = 'Cập nhật chức năng' }
 $UpdateName = $UpdateName.Trim()
 if ([string]::IsNullOrWhiteSpace($UpdateContent)) { $UpdateContent = $UpdateName }
