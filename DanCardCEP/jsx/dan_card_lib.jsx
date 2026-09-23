@@ -19135,10 +19135,26 @@ function dcLuuDanTheoMauPDF(saveMode, suffix) {
     var done = 0;
     var saveErrors = [];
     try {
-      workDoc = app.documents.add(colorSpace);
-      workDoc.artboards[0].artboardRect = workArtboardRects[0].slice(0);
-      for (var ab = 1; ab < artboardCount; ab++)
-        workDoc.artboards.add(workArtboardRects[ab].slice(0));
+      // Illustrator có thể báo lỗi 1200 khi gọi artboards.add() liên tiếp
+      // trên document tạm. Tạo đủ artboard ngay khi tạo document, sau đó mới
+      // đặt từng rect; cách này không phụ thuộc artboard đang ở cột nào.
+      var maxWorkWidth = 1;
+      var maxWorkHeight = 1;
+      for (var sizeIndex = 0; sizeIndex < workArtboardRects.length; sizeIndex++) {
+        var sizeRect = workArtboardRects[sizeIndex];
+        maxWorkWidth = Math.max(maxWorkWidth, sizeRect[2] - sizeRect[0]);
+        maxWorkHeight = Math.max(maxWorkHeight, sizeRect[1] - sizeRect[3]);
+      }
+      workDoc = app.documents.add(
+        colorSpace,
+        maxWorkWidth,
+        maxWorkHeight,
+        artboardCount,
+      );
+      if (workDoc.artboards.length !== artboardCount)
+        throw new Error("Không tạo đủ artboard tạm để xuất PDF.");
+      for (var ab = 0; ab < artboardCount; ab++)
+        workDoc.artboards[ab].artboardRect = workArtboardRects[ab].slice(0);
 
       // Layers.add() thêm lên đầu; đi từ layer dưới lên để giữ thứ tự chồng lớp.
       for (var li = 0; li < layerPlans.length; li++) {
