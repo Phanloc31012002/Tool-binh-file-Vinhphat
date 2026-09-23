@@ -368,6 +368,38 @@
           <span class="btn-label">Áp mẫu</span>
         </button>
         <div id="outApMau" class="out">Chọn con nguồn rồi bấm Áp mẫu.</div>
+
+        <div class="acc" style="margin-top: 10px">
+          <button class="acc-head" data-acc="saveDanMau">
+            <span class="acc-arrow">&#9654;</span>
+            <span>Lưu PDF đã dàn</span>
+          </button>
+          <div class="acc-body" id="acc-saveDanMau">
+            <div class="field">
+              <div class="label">Cách lưu</div>
+              <select id="danMauSaveMode" class="select">
+                <option value="each">Từng artboard - 1 PDF / artboard</option>
+                <option value="pair">Mặt trước + mặt sau - 1 PDF / 2 artboard</option>
+              </select>
+            </div>
+            <div class="field">
+              <div class="label">Nội dung sau file 1, file 2...</div>
+              <input
+                id="danMauSaveSuffix"
+                class="inp"
+                type="text"
+                value=""
+                placeholder="vd: thiep sinh nhat"
+              />
+            </div>
+            <button id="btnSaveDanMau" class="btn btn-primary" type="button">
+              <span class="btn-label">Lưu PDF</span>
+            </button>
+            <div id="outSaveDanMau" class="out">
+              Áp mẫu xong rồi bấm Lưu PDF để chọn thư mục.
+            </div>
+          </div>
+        </div>
       </main>
 
       <!-- TAB: CATALOGUE (accordion: A4+nhỏ hơn / A5+nhỏ hơn) -->
@@ -671,7 +703,7 @@
       </main>
 
       <footer class="foot">
-        <span class="ver">v2.9.11</span>
+        <span class="ver">v2.10.0</span>
       </footer>
     </div>
 

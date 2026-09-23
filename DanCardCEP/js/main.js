@@ -1624,6 +1624,32 @@
     });
   }
 
+  // ---- Lưu PDF kết quả Dàn theo mẫu ----
+  var btnSaveDanMau = document.getElementById("btnSaveDanMau");
+  var outSaveDanMau = document.getElementById("outSaveDanMau");
+  var danMauSaveMode = document.getElementById("danMauSaveMode");
+  var danMauSaveSuffix = document.getElementById("danMauSaveSuffix");
+  attachSelectFirst("danMauSaveSuffix");
+  if (btnSaveDanMau && outSaveDanMau) {
+    btnSaveDanMau.addEventListener("click", function () {
+      var mode = danMauSaveMode ? danMauSaveMode.value : "each";
+      var suffix = danMauSaveSuffix ? danMauSaveSuffix.value : "";
+      show(outSaveDanMau, "Chọn thư mục lưu PDF…");
+      btnSaveDanMau.disabled = true;
+      cs.evalScript(
+        "dcLuuDanTheoMauPDF(" +
+          jsStr(mode) +
+          ", " +
+          jsStr(suffix) +
+          ")",
+        function (res) {
+          btnSaveDanMau.disabled = false;
+          handleRes(outSaveDanMau, res);
+        },
+      );
+    });
+  }
+
   // ---- Raster object đang chọn ----
   // Luôn xác nhận khung card, clip một lần ở ngoài rồi mới raster.
   function rasterizeSelectionInHost() {

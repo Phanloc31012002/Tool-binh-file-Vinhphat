@@ -13,6 +13,7 @@ $product = 'com.locdev.dancard'
 $configPath = Join-Path $PSScriptRoot 'update-config.json'
 $statePath = Join-Path $PSScriptRoot 'update-state.json'
 $installRoot = Join-Path $env:APPDATA 'Adobe\CEP\extensions\DanCardCEP'
+$installedManifestPath = Join-Path $installRoot 'CSXS\manifest.xml'
 
 function Write-UpdateLog {
     param([string]$Message, [ConsoleColor]$Color = [ConsoleColor]::Gray)
@@ -183,9 +184,8 @@ function ConvertTo-Version {
 }
 
 function Get-InstalledVersion {
-    $manifestPath = Join-Path $installRoot 'CSXS\manifest.xml'
-    if (-not (Test-Path -LiteralPath $manifestPath)) { return [Version]'0.0.0' }
-    [xml]$manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8
+    if (-not (Test-Path -LiteralPath $installedManifestPath)) { return [Version]'0.0.0' }
+    [xml]$manifest = Get-Content -LiteralPath $installedManifestPath -Raw -Encoding UTF8
     if ($manifest.ExtensionManifest.ExtensionBundleId -ne $product) {
         throw 'Panel đang cài không đúng mã sản phẩm.'
     }
@@ -259,6 +259,7 @@ try {
     $packageUrl = Test-HttpsUrl -Value $remote.packageUrl -Label 'packageUrl'
     $expectedHash = ([string]$remote.sha256).ToUpperInvariant()
     if ($expectedHash -notmatch '^[0-9A-F]{64}$') { throw 'Manifest online thiếu SHA-256 hợp lệ.' }
+    $hadInstalledManifest = Test-Path -LiteralPath $installedManifestPath
     $installedVersion = Get-InstalledVersion
 
     $state | Add-Member -NotePropertyName lastCheckUtc -NotePropertyValue ([DateTime]::UtcNow.ToString('o')) -Force
@@ -327,7 +328,11 @@ try {
         $state | Add-Member -NotePropertyName pendingVersion -NotePropertyValue $null -Force
         $state | Add-Member -NotePropertyName installedVersion -NotePropertyValue $remoteVersion.ToString() -Force
         Write-JsonFile -Path $statePath -Value $state
-        Write-UpdateLog "Đã cập nhật $installedVersion → $remoteVersion. Mở lại Illustrator để dùng bản mới." Green
+        if ($hadInstalledManifest) {
+            Write-UpdateLog "Đã cập nhật $installedVersion → $remoteVersion. Mở lại Illustrator để dùng bản mới." Green
+        } else {
+            Write-UpdateLog "Đã cài v$remoteVersion (không tìm thấy manifest của bản cũ). Mở lại Illustrator để dùng bản mới." Green
+        }
     } finally {
         Remove-Item -LiteralPath $workRoot -Recurse -Force -ErrorAction SilentlyContinue
     }

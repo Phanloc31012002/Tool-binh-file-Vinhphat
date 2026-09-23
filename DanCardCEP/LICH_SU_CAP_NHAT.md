@@ -2,6 +2,15 @@
 
 _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
+## v2.10.0 — Thêm chức năng save PDF từng artboard
+
+- Save PDF từng artboard:
+- Có chọn được save 1 mặt hay 2 mặt
+- Có tự động đánh số File 1, File 2,...
+- Nhập tiêu đề đứng sau File 1, File2,...
+
+---
+
 ## v2.9.11 — Bản vá đặt Pon
 
 - Vá lỗi đặt pon khi đánh Pon vượt mép

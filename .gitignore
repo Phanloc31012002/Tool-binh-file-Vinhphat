@@ -6,7 +6,7 @@ GUI_NHAN_VIEN_CAI_LAN_DAU/
 CongCuBinh_CaiLanDau.zip
 
 # Tài liệu/bản cũ chỉ giữ local trong thư mục quản lý.
-QuanLyNoiBo/legacy/
+QuanLyNoiBo/
 
 # Local logs and temporary files
 *.log

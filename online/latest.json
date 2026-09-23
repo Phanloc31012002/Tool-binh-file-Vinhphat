@@ -1,9 +1,9 @@
 {
     "product":  "com.locdev.dancard",
-    "version":  "2.9.11",
-    "title":  "Bản vá đặt Pon",
-    "description":  "Vá lỗi đặt pon khi đánh Pon vượt mép",
-    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.9.11.zip",
-    "sha256":  "6736B8846E1B0F7E334E1C5B03B71D2E573DB92687DF3BA9E7AC1DD5D72D4690",
-    "publishedUtc":  "2026-09-22T03:00:12.4208983Z"
+    "version":  "2.10.0",
+    "title":  "Thêm chức năng save PDF từng artboard",
+    "description":  "Save PDF từng artboard: \r\n- Có chọn được save 1 mặt hay 2 mặt\r\n- Có tự động đánh số File 1, File 2,...\r\n- Nhập tiêu đề đứng sau File 1, File2,...",
+    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.10.0.zip",
+    "sha256":  "7A6F6D9309F6E181A3EEE2F9BEC0280C1BF92306BFA1F3016F4D677D150131CD",
+    "publishedUtc":  "2026-09-23T03:15:33.3027914Z"
 }

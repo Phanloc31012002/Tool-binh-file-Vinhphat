@@ -17811,7 +17811,15 @@ function dcApMau(multiSourcePerArtboard) {
 
   function loadPon(label) {
     var ponFile = File.openDialog(label, "*.ai");
-    var R = { dup: null, W: 0, H: 0, offX: 0, offY: 0 };
+    var R = {
+      dup: null,
+      W: 0,
+      H: 0,
+      cx: 0,
+      cy: 0,
+      offX: 0,
+      offY: 0,
+    };
     if (!ponFile || !ponFile.exists) return R;
     var pd = app.open(ponFile);
     app.activeDocument = pd;
@@ -17819,6 +17827,8 @@ function dcApMau(multiSourcePerArtboard) {
       var pr = pd.artboards[0].artboardRect.slice(0);
       R.W = pr[2] - pr[0];
       R.H = pr[1] - pr[3];
+      R.cx = (pr[0] + pr[2]) / 2;
+      R.cy = (pr[1] + pr[3]) / 2;
       app.activeDocument = doc;
       var dl = outLayer;
       app.activeDocument = pd;
@@ -17862,7 +17872,8 @@ function dcApMau(multiSourcePerArtboard) {
   }
 
   function hasUsablePon(pon) {
-    return pon && pon.dup && isPositiveSize(pon.W) && isPositiveSize(pon.H);
+    // PON trắng vẫn là PON hợp lệ: chỉ cần artboard có kích thước dương.
+    return pon && isPositiveSize(pon.W) && isPositiveSize(pon.H);
   }
   function removePonCopy(pon) {
     try {
@@ -17889,15 +17900,10 @@ function dcApMau(multiSourcePerArtboard) {
     }
   }
 
-  var startCx, startCy;
-  if (ponF.dup) {
-    var pgb = ponF.dup.geometricBounds;
-    startCx = (pgb[0] + pgb[2]) / 2;
-    startCy = (pgb[1] + pgb[3]) / 2;
-  } else {
-    startCx = 0;
-    startCy = 0;
-  }
+  // Lấy tâm artboard PON, không lấy tâm artwork. Nhờ vậy PON trắng vẫn
+  // tạo được artboard, còn artwork PON giữ đúng offset so với artboard.
+  var startCx = ponF.cx;
+  var startCy = ponF.cy;
 
   var ARTBOARDS_PER_COLUMN = 15;
   var oldAb = doc.artboards.length;
@@ -18236,9 +18242,8 @@ function dcApMau(multiSourcePerArtboard) {
       });
       filledSlotCount += sourceBatches[bi].extra;
     }
-    if (ponF.dup)
-      for (var ji = 0; ji < jobs.length; ji++)
-        addAB(jobs[ji].cx, jobs[ji].cy, ponF.W, ponF.H);
+    for (var ji = 0; ji < jobs.length; ji++)
+      addAB(jobs[ji].cx, jobs[ji].cy, ponF.W, ponF.H);
     for (var jj = 0; jj < jobs.length; jj++)
       danMotCon(
         jobs[jj].block,
@@ -18350,10 +18355,8 @@ function dcApMau(multiSourcePerArtboard) {
       });
       filledSlotCount += pairBatches[pi2].extra * 2;
     }
-    for (var ja = 0; ja < jobs2.length; ja++) {
-      if (jobs2[ja].pon && jobs2[ja].pon.dup)
-        addAB(jobs2[ja].cx, jobs2[ja].cy, jobs2[ja].w, jobs2[ja].h);
-    }
+    for (var ja = 0; ja < jobs2.length; ja++)
+      addAB(jobs2[ja].cx, jobs2[ja].cy, jobs2[ja].w, jobs2[ja].h);
     for (var jb = 0; jb < jobs2.length; jb++)
       danMotCon(
         jobs2[jb].block,
@@ -18459,6 +18462,883 @@ function dcApMau(multiSourcePerArtboard) {
 //    outFolder: thư mục lưu; rỗng -> hỏi chọn thư mục
 //  Trả về "OK: ..." hoặc "ERR: ..."
 // ============================================================
+// ============================================================
+//  Lưu kết quả Dàn theo mẫu ra PDF sạch.
+//  Mỗi lần xuất dựng một document tạm chỉ có object của artboard cần lưu,
+//  rồi đóng không lưu, nên file PDF không mang theo object ngoài artboard.
+// ============================================================
+function dcLuuDanTheoMauPDF_CopyObjectLegacy(saveMode, suffix) {
+  try {
+    if (app.documents.length === 0) return "ERR: Chưa mở tài liệu nào.";
+    var doc = app.activeDocument;
+    var mode = String(saveMode === undefined || saveMode === null ? "each" : saveMode);
+    if (mode !== "each" && mode !== "pair")
+      return "ERR: Kiểu lưu PDF không hợp lệ.";
+
+    suffix = String(suffix === undefined || suffix === null ? "" : suffix).replace(
+      /^\s+|\s+$/g,
+      "",
+    );
+
+    function positiveRect(rect) {
+      return (
+        rect &&
+        rect.length === 4 &&
+        isFinite(rect[0]) &&
+        isFinite(rect[1]) &&
+        isFinite(rect[2]) &&
+        isFinite(rect[3]) &&
+        rect[2] > rect[0] &&
+        rect[1] > rect[3]
+      );
+    }
+    function itemBounds(item) {
+      try {
+        var b = item.visibleBounds;
+        if (positiveRect(b)) return b;
+      } catch (e) {}
+      try {
+        var g = item.geometricBounds;
+        if (positiveRect(g)) return g;
+      } catch (e2) {}
+      return null;
+    }
+    function overlaps(rect, bounds) {
+      return (
+        bounds[2] > rect[0] &&
+        bounds[0] < rect[2] &&
+        bounds[1] > rect[3] &&
+        bounds[3] < rect[1]
+      );
+    }
+    function centerIn(rect, bounds) {
+      var cx = (bounds[0] + bounds[2]) / 2;
+      var cy = (bounds[1] + bounds[3]) / 2;
+      var eps = 0.1;
+      return (
+        cx >= rect[0] - eps &&
+        cx <= rect[2] + eps &&
+        cy >= rect[3] - eps &&
+        cy <= rect[1] + eps
+      );
+    }
+    function directChildren(group) {
+      var result = [];
+      try {
+        for (var i = 0; i < group.pageItems.length; i++) {
+          var child = group.pageItems[i];
+          try {
+            if (child.parent === group) result.push(child);
+          } catch (e) {}
+        }
+      } catch (e2) {}
+      return result;
+    }
+    function addItemForArtboard(item, rect, result) {
+      var bounds = itemBounds(item);
+      if (!bounds || !overlaps(rect, bounds)) return;
+      if (centerIn(rect, bounds)) {
+        result.push(item);
+        return;
+      }
+
+      // Nhóm dấu cắt có thể trải qua nhiều artboard. Tách nhóm không clip
+      // theo object con để mỗi PDF chỉ nhận phần của chính artboard đó.
+      var type = "";
+      var clipped = false;
+      try {
+        type = item.typename;
+        clipped = item.clipped === true;
+      } catch (e) {}
+      if (type === "GroupItem" && !clipped) {
+        var children = directChildren(item);
+        for (var ci = 0; ci < children.length; ci++)
+          addItemForArtboard(children[ci], rect, result);
+        return;
+      }
+      result.push(item);
+    }
+    function collectArtboardItems(rect) {
+      var result = [];
+      for (var li = 0; li < doc.layers.length; li++) {
+        var layer = doc.layers[li];
+        try {
+          if (layer.visible === false || layer.locked === true) continue;
+        } catch (e) {}
+        var topItems = [];
+        try {
+          for (var pi = 0; pi < layer.pageItems.length; pi++) {
+            var item = layer.pageItems[pi];
+            try {
+              if (item.parent === layer) topItems.push(item);
+            } catch (e2) {}
+          }
+        } catch (e3) {}
+        for (var ti = 0; ti < topItems.length; ti++)
+          addItemForArtboard(topItems[ti], rect, result);
+      }
+      return result;
+    }
+    function sanitizeName(value) {
+      return String(value)
+        .replace(/[\\\/:*?"<>|]/g, "-")
+        .replace(/^\s+|\s+$/g, "");
+    }
+    function makePdfOptions(pageCount) {
+      var opt = new PDFSaveOptions();
+      try {
+        opt.compatibility = PDFCompatibility.ACROBAT5;
+      } catch (e) {}
+      try {
+        opt.generateThumbnails = false;
+      } catch (e2) {}
+      try {
+        opt.preserveEditability = false;
+      } catch (e3) {}
+      try {
+        opt.optimization = true;
+      } catch (e4) {}
+      try {
+        opt.viewAfterSaving = false;
+      } catch (e5) {}
+      try {
+        opt.saveMultipleArtboards = true;
+      } catch (e6) {}
+      try {
+        opt.artboardRange = pageCount === 1 ? "1" : "1-" + pageCount;
+      } catch (e7) {}
+      return opt;
+    }
+    function exportPages(pages, filePath) {
+      var tmp = null;
+      var completed = false;
+      try {
+        tmp = app.documents.add(DocumentColorSpace.CMYK);
+        tmp.artboards[0].artboardRect = pages[0].rect.slice(0);
+        for (var ai = 1; ai < pages.length; ai++)
+          tmp.artboards.add(pages[ai].rect.slice(0));
+
+        for (var page = 0; page < pages.length; page++) {
+          var items = collectArtboardItems(pages[page].rect);
+          if (items.length === 0)
+            throw new Error(
+              "Artboard " + (pages[page].index + 1) + " không có object để lưu.",
+            );
+          for (var oi = 0; oi < items.length; oi++) {
+            app.activeDocument = doc;
+            items[oi].duplicate(tmp.layers[0], ElementPlacement.PLACEATEND);
+            app.activeDocument = tmp;
+          }
+        }
+        tmp.saveAs(new File(filePath), makePdfOptions(pages.length));
+        completed = true;
+      } finally {
+        try {
+          if (tmp) tmp.close(SaveOptions.DONOTSAVECHANGES);
+        } catch (e) {}
+        if (!completed) {
+          try {
+            var incomplete = new File(filePath);
+            if (incomplete.exists) incomplete.remove();
+          } catch (e2) {}
+        }
+        try {
+          app.activeDocument = doc;
+        } catch (e3) {}
+      }
+    }
+
+    var artboards = [];
+    for (var i = 0; i < doc.artboards.length; i++) {
+      var rect = doc.artboards[i].artboardRect.slice(0);
+      if (!positiveRect(rect))
+        return "ERR: Artboard " + (i + 1) + " không có kích thước hợp lệ.";
+      artboards.push({ index: i, rect: rect });
+    }
+    if (artboards.length === 0) return "ERR: Không có artboard nào để lưu.";
+    if (mode === "pair" && artboards.length % 2 !== 0)
+      return "ERR: Lưu mặt trước + mặt sau cần số artboard chẵn.";
+
+    var folder = Folder.selectDialog("Chọn thư mục lưu PDF đã dàn theo mẫu");
+    if (!folder) return "ERR: Chưa chọn thư mục lưu PDF - đã huỷ.";
+
+    var suffixPart = sanitizeName(suffix);
+    var jobs = [];
+    for (var ab = 0; ab < artboards.length; ab += mode === "pair" ? 2 : 1) {
+      var pages = [artboards[ab]];
+      if (mode === "pair") pages.push(artboards[ab + 1]);
+      var fileNo = jobs.length + 1;
+      var name = "file " + fileNo + (suffixPart ? " - " + suffixPart : "") + ".pdf";
+      jobs.push({ pages: pages, name: name, path: folder.fsName + "/" + name });
+    }
+
+    var seen = {};
+    for (var ji = 0; ji < jobs.length; ji++) {
+      var key = String(jobs[ji].path).toLowerCase();
+      if (seen[key]) return "ERR: Có hai PDF trùng tên " + jobs[ji].name + ".";
+      if (new File(jobs[ji].path).exists)
+        return "ERR: File đã tồn tại: " + jobs[ji].name + ". Hãy đổi hậu tố hoặc thư mục.";
+      seen[key] = true;
+    }
+
+    var done = 0;
+    var errors = [];
+    for (var jobIndex = 0; jobIndex < jobs.length; jobIndex++) {
+      try {
+        exportPages(jobs[jobIndex].pages, jobs[jobIndex].path);
+        done++;
+      } catch (exportError) {
+        errors.push(
+          jobs[jobIndex].name + ": " +
+            (typeof dcMoTaLoi === "function"
+              ? dcMoTaLoi(exportError)
+              : exportError.toString()),
+        );
+      }
+    }
+    if (done === 0)
+      return "ERR: Không lưu được PDF nào." + (errors.length ? " " + errors.join(" | ") : "");
+    var message =
+      "OK: Đã lưu " +
+      done +
+      " PDF " +
+      (mode === "pair" ? "mặt trước + mặt sau" : "theo từng artboard") +
+      ".";
+    if (errors.length) message += " Lỗi " + errors.length + " file: " + errors.join(" | ");
+    return message;
+  } catch (e) {
+    return "ERR: " + (typeof dcMoTaLoi === "function" ? dcMoTaLoi(e) : e.toString());
+  }
+}
+
+// Xuất trực tiếp artboard từ một bản sao AI, không copy từng object.
+// Bản sao giúp file người dùng đang mở không bị saveAs thành PDF.
+function dcLuuDanTheoMauPDF_SavedAICopyLegacy(saveMode, suffix) {
+  try {
+    if (app.documents.length === 0) return "ERR: Chưa mở tài liệu nào.";
+    var sourceDoc = app.activeDocument;
+    var mode = String(saveMode === undefined || saveMode === null ? "each" : saveMode);
+    if (mode !== "each" && mode !== "pair")
+      return "ERR: Kiểu lưu PDF không hợp lệ.";
+    // Dàn theo mẫu vừa tạo artboard và object mới, nên document có dấu *.
+    // Lưu AI trước khi copy để PDF luôn nhận đúng kết quả vừa dàn.
+    if (!sourceDoc.saved) {
+      try {
+        sourceDoc.save();
+      } catch (saveSourceError) {
+        return "ERR: Không tự lưu được file AI trước khi xuất PDF. " +
+          (typeof dcMoTaLoi === "function"
+            ? dcMoTaLoi(saveSourceError)
+            : saveSourceError.toString());
+      }
+    }
+
+    var sourceFile = null;
+    try {
+      sourceFile = sourceDoc.fullName;
+    } catch (e) {}
+    if (!sourceFile || !sourceFile.exists || !/\.ai$/i.test(sourceFile.name))
+      return "ERR: Chỉ xuất được file dàn đã lưu dưới dạng AI.";
+
+    var artboardCount = sourceDoc.artboards.length;
+    if (artboardCount === 0) return "ERR: Không có artboard nào để lưu.";
+    if (mode === "pair" && artboardCount % 2 !== 0)
+      return "ERR: Lưu mặt trước + mặt sau cần số artboard chẵn.";
+    var artboardRects = [];
+    for (var sourceAb = 0; sourceAb < artboardCount; sourceAb++)
+      artboardRects.push(sourceDoc.artboards[sourceAb].artboardRect.slice(0));
+
+    suffix = String(suffix === undefined || suffix === null ? "" : suffix)
+      .replace(/^\s+|\s+$/g, "")
+      .replace(/[\\\\\/:*?\"<>|]/g, "-");
+    var folder = Folder.selectDialog("Chọn thư mục lưu PDF đã dàn theo mẫu");
+    if (!folder) return "ERR: Chưa chọn thư mục lưu PDF - đã huỷ.";
+
+    var jobs = [];
+    var span = mode === "pair" ? 2 : 1;
+    for (var first = 0; first < artboardCount; first += span) {
+      var startNo = first + 1;
+      var endNo = first + span;
+      var fileNo = jobs.length + 1;
+      var fileName =
+        "file " + fileNo + (suffix ? " - " + suffix : "") + ".pdf";
+      var outputFile = new File(folder.fsName + "/" + fileName);
+      if (outputFile.exists) return "ERR: File đã tồn tại: " + fileName + ".";
+      jobs.push({
+        file: outputFile,
+        name: fileName,
+        range: startNo === endNo ? String(startNo) : startNo + "-" + endNo,
+      });
+    }
+
+    function makePdfOptions(range) {
+      var opt = new PDFSaveOptions();
+      try {
+        opt.compatibility = PDFCompatibility.ACROBAT5;
+      } catch (e) {}
+      try {
+        opt.generateThumbnails = false;
+      } catch (e2) {}
+      try {
+        opt.preserveEditability = false;
+      } catch (e3) {}
+      try {
+        opt.optimization = true;
+      } catch (e4) {}
+      try {
+        opt.viewAfterSaving = false;
+      } catch (e5) {}
+      try {
+        opt.saveMultipleArtboards = true;
+      } catch (e6) {}
+      try {
+        opt.artboardRange = range;
+      } catch (e7) {}
+      return opt;
+    }
+
+    var tempFile = new File(
+      Folder.temp.fsName +
+        "/DanCardPdf-" +
+        new Date().getTime() +
+        "-" +
+        Math.floor(Math.random() * 1000000) +
+        ".ai",
+    );
+    if (!sourceFile.copy(tempFile))
+      return "ERR: Không tạo được bản tạm để xuất PDF.";
+
+    var workDoc = null;
+    var done = 0;
+    var errors = [];
+    try {
+      workDoc = app.open(tempFile);
+      for (var ji = 0; ji < jobs.length; ji++) {
+        try {
+          // Range dùng đúng số thứ tự trong bảng Artboards của Illustrator.
+          workDoc.saveAs(jobs[ji].file, makePdfOptions(jobs[ji].range));
+          done++;
+        } catch (saveError) {
+          errors.push(
+            jobs[ji].name + ": " +
+              (typeof dcMoTaLoi === "function"
+                ? dcMoTaLoi(saveError)
+                : saveError.toString()),
+          );
+        }
+      }
+    } finally {
+      try {
+        if (workDoc) workDoc.close(SaveOptions.DONOTSAVECHANGES);
+      } catch (closeError) {}
+      try {
+        if (tempFile.exists) tempFile.remove();
+      } catch (removeError) {}
+      try {
+        sourceDoc.activate();
+      } catch (activateError) {}
+    }
+
+    if (done === 0)
+      return "ERR: Không lưu được PDF nào." +
+        (errors.length ? " " + errors.join(" | ") : "");
+    var message =
+      "OK: Đã lưu " +
+      done +
+      " PDF theo thứ tự Artboard" +
+      (mode === "pair" ? " (1+2, 3+4...)." : ".");
+    if (errors.length) message += " Lỗi " + errors.length + " file: " + errors.join(" | ");
+    return message;
+  } catch (e) {
+    return "ERR: " + (typeof dcMoTaLoi === "function" ? dcMoTaLoi(e) : e.toString());
+  }
+}
+
+// Xuất từ document tạm: copy artwork một lần, sau đó xuất đúng artboard range.
+// Không save file AI người dùng đang mở và không lặp copy cho từng PDF.
+function dcLuuDanTheoMauPDF(saveMode, suffix) {
+  try {
+    if (app.documents.length === 0) return "ERR: Chưa mở tài liệu nào.";
+    var sourceDoc = app.activeDocument;
+    var mode = String(saveMode === undefined || saveMode === null ? "each" : saveMode);
+    if (mode !== "each" && mode !== "pair")
+      return "ERR: Kiểu lưu PDF không hợp lệ.";
+
+    var artboardCount = sourceDoc.artboards.length;
+    if (artboardCount === 0) return "ERR: Không có artboard nào để lưu.";
+    if (mode === "pair" && artboardCount % 2 !== 0)
+      return "ERR: Lưu mặt trước + mặt sau cần số artboard chẵn.";
+    var artboardRects = [];
+    for (var sourceAb = 0; sourceAb < artboardCount; sourceAb++)
+      artboardRects.push(sourceDoc.artboards[sourceAb].artboardRect.slice(0));
+
+    suffix = String(suffix === undefined || suffix === null ? "" : suffix)
+      .replace(/^\s+|\s+$/g, "")
+      .replace(/[\\\\\/:*?\"<>|]/g, "-");
+    var folder = Folder.selectDialog("Chọn thư mục lưu PDF đã dàn theo mẫu");
+    if (!folder) return "ERR: Chưa chọn thư mục lưu PDF - đã huỷ.";
+
+    var jobs = [];
+    var span = mode === "pair" ? 2 : 1;
+    for (var first = 0; first < artboardCount; first += span) {
+      var startNo = first + 1;
+      var endNo = first + span;
+      var fileNo = jobs.length + 1;
+      var fileName =
+        "file " + fileNo + (suffix ? " - " + suffix : "") + ".pdf";
+      var outputFile = new File(folder.fsName + "/" + fileName);
+      if (outputFile.exists) return "ERR: File đã tồn tại: " + fileName + ".";
+      jobs.push({
+        file: outputFile,
+        name: fileName,
+        range: startNo === endNo ? String(startNo) : startNo + "-" + endNo,
+      });
+    }
+
+    function positiveRect(rect) {
+      return rect && rect.length === 4 && rect[2] > rect[0] && rect[1] > rect[3];
+    }
+    function itemBounds(item) {
+      try {
+        if (positiveRect(item.visibleBounds)) return item.visibleBounds;
+      } catch (e) {}
+      try {
+        if (positiveRect(item.geometricBounds)) return item.geometricBounds;
+      } catch (e2) {}
+      return null;
+    }
+    function overlaps(left, right) {
+      return (
+        left[2] > right[0] &&
+        left[0] < right[2] &&
+        left[1] > right[3] &&
+        left[3] < right[1]
+      );
+    }
+    function touchesAnyArtboard(item) {
+      var bounds = itemBounds(item);
+      if (!bounds) return false;
+      for (var ai = 0; ai < artboardCount; ai++) {
+        if (overlaps(bounds, artboardRects[ai])) return true;
+      }
+      return false;
+    }
+    function makePdfOptions(range) {
+      var opt = new PDFSaveOptions();
+      try {
+        opt.compatibility = PDFCompatibility.ACROBAT5;
+      } catch (e) {}
+      try {
+        opt.generateThumbnails = false;
+      } catch (e2) {}
+      try {
+        opt.preserveEditability = false;
+      } catch (e3) {}
+      try {
+        opt.optimization = true;
+      } catch (e4) {}
+      try {
+        opt.viewAfterSaving = false;
+      } catch (e5) {}
+      try {
+        opt.saveMultipleArtboards = true;
+      } catch (e6) {}
+      try {
+        opt.artboardRange = range;
+      } catch (e7) {}
+      return opt;
+    }
+    function copyLayerItems(layerPlan, targetLayer, copyErrors) {
+      layerPlan.items.sort(function (a, b) {
+        return a.z - b.z;
+      });
+      var copiedItems = [];
+      // Giữ document gốc active cho cả layer, tránh nhảy qua lại từng object.
+      sourceDoc.activate();
+      for (var ii = 0; ii < layerPlan.items.length; ii++) {
+        try {
+          copiedItems.push({
+            source: layerPlan.items[ii],
+            item: layerPlan.items[ii].item.duplicate(
+              targetLayer,
+              ElementPlacement.PLACEATEND,
+            ),
+          });
+        } catch (copyError) {
+          copyErrors.push(
+            "Layer " + layerPlan.name + ": " +
+              (typeof dcMoTaLoi === "function"
+                ? dcMoTaLoi(copyError)
+                : copyError.toString()),
+          );
+        }
+      }
+
+      var copied = 0;
+      workDoc.activate();
+      for (var ci = 0; ci < copiedItems.length; ci++) {
+        try {
+          // Cross-document duplicate đổi ruler origin. Đưa artwork về đúng
+          // tọa độ đã chụp từ document gốc trước khi xuất artboard.
+          var copiedBounds = copiedItems[ci].item.geometricBounds;
+          copiedItems[ci].item.translate(
+            copiedItems[ci].source.bounds[0] - copiedBounds[0],
+            copiedItems[ci].source.bounds[1] - copiedBounds[1],
+          );
+          copied++;
+        } catch (positionError) {
+          copyErrors.push(
+            "Layer " + layerPlan.name + ": " +
+              (typeof dcMoTaLoi === "function"
+                ? dcMoTaLoi(positionError)
+                : positionError.toString()),
+          );
+        }
+      }
+      return copied;
+    }
+
+    // Chụp layer và top-level item trước khi tạo document tạm. Illustrator 2024
+    // có thể làm reference từ document gốc không hợp lệ sau app.documents.add().
+    var layerPlans = [];
+    for (var sourceLi = sourceDoc.layers.length - 1; sourceLi >= 0; sourceLi--) {
+      var snapshotLayer = sourceDoc.layers[sourceLi];
+      try {
+        if (snapshotLayer.visible === false) continue;
+      } catch (snapshotLayerError) {}
+      var plan = { layer: snapshotLayer, name: "Layer", items: [] };
+      try {
+        plan.name = snapshotLayer.name;
+      } catch (snapshotNameError) {}
+      for (var snapshotPi = 0; snapshotPi < snapshotLayer.pageItems.length; snapshotPi++) {
+        var snapshotItem = snapshotLayer.pageItems[snapshotPi];
+        try {
+          var snapshotBounds = snapshotItem.geometricBounds.slice(0);
+          if (
+            snapshotItem.parent === snapshotLayer &&
+            touchesAnyArtboard(snapshotItem)
+          )
+            plan.items.push({
+              item: snapshotItem,
+              z: snapshotItem.zOrderPosition,
+              bounds: snapshotBounds,
+            });
+        } catch (snapshotItemError) {}
+      }
+      if (plan.items.length) layerPlans.push(plan);
+    }
+
+    var colorSpace = DocumentColorSpace.CMYK;
+    try {
+      colorSpace = sourceDoc.documentColorSpace;
+    } catch (e) {}
+    var workDoc = null;
+    var copiedCount = 0;
+    var copyErrors = [];
+    var done = 0;
+    var saveErrors = [];
+    try {
+      workDoc = app.documents.add(colorSpace);
+      workDoc.artboards[0].artboardRect = artboardRects[0].slice(0);
+      for (var ab = 1; ab < artboardCount; ab++)
+        workDoc.artboards.add(artboardRects[ab].slice(0));
+
+      // Layers.add() thêm lên đầu; đi từ layer dưới lên để giữ thứ tự chồng lớp.
+      for (var li = 0; li < layerPlans.length; li++) {
+        var layerPlan = layerPlans[li];
+        var targetLayer = workDoc.layers.add();
+        try {
+          targetLayer.name = layerPlan.name;
+        } catch (e3) {}
+        copiedCount += copyLayerItems(layerPlan, targetLayer, copyErrors);
+      }
+      if (copiedCount === 0)
+        return "ERR: Không tìm thấy object nào nằm trong artboard để xuất.";
+
+      for (var ji = 0; ji < jobs.length; ji++) {
+        try {
+          // Range dùng đúng số thứ tự trong bảng Artboards của Illustrator.
+          workDoc.saveAs(jobs[ji].file, makePdfOptions(jobs[ji].range));
+          done++;
+        } catch (saveError) {
+          saveErrors.push(
+            jobs[ji].name + ": " +
+              (typeof dcMoTaLoi === "function"
+                ? dcMoTaLoi(saveError)
+                : saveError.toString()),
+          );
+        }
+      }
+    } finally {
+      try {
+        if (workDoc) workDoc.close(SaveOptions.DONOTSAVECHANGES);
+      } catch (closeError) {}
+      try {
+        sourceDoc.activate();
+      } catch (activateError) {}
+    }
+
+    if (done === 0)
+      return "ERR: Không lưu được PDF nào." +
+        (saveErrors.length ? " " + saveErrors.join(" | ") : "");
+    var message =
+      "OK: Đã lưu " +
+      done +
+      " PDF theo thứ tự Artboard" +
+      (mode === "pair" ? " (1+2, 3+4...)." : ".");
+    if (copyErrors.length)
+      message += " Bỏ qua " + copyErrors.length + " object lỗi khi copy.";
+    if (saveErrors.length)
+      message += " Lỗi " + saveErrors.length + " file: " + saveErrors.join(" | ");
+    return message;
+  } catch (e) {
+    return "ERR: " + (typeof dcMoTaLoi === "function" ? dcMoTaLoi(e) : e.toString());
+  }
+}
+
+// Xuất từng artboard bằng selection native của Illustrator. Không quét toàn bộ
+// document, không lưu AI gốc và mỗi PDF chỉ chứa artwork của artboard cần xuất.
+function dcLuuDanTheoMauPDF_SelectedLegacy(saveMode, suffix) {
+  try {
+    if (app.documents.length === 0) return "ERR: Chưa mở tài liệu nào.";
+    var sourceDoc = app.activeDocument;
+    var mode = String(saveMode === undefined || saveMode === null ? "each" : saveMode);
+    if (mode !== "each" && mode !== "pair")
+      return "ERR: Kiểu lưu PDF không hợp lệ.";
+    var artboardCount = sourceDoc.artboards.length;
+    if (artboardCount === 0) return "ERR: Không có artboard nào để lưu.";
+    if (mode === "pair" && artboardCount % 2 !== 0)
+      return "ERR: Lưu mặt trước + mặt sau cần số artboard chẵn.";
+
+    suffix = String(suffix === undefined || suffix === null ? "" : suffix)
+      .replace(/^\s+|\s+$/g, "")
+      .replace(/[\\\\\/:*?\"<>|]/g, "-");
+    var folder = Folder.selectDialog("Chọn thư mục lưu PDF đã dàn theo mẫu");
+    if (!folder) return "ERR: Chưa chọn thư mục lưu PDF - đã huỷ.";
+
+    var jobs = [];
+    var span = mode === "pair" ? 2 : 1;
+    for (var first = 0; first < artboardCount; first += span) {
+      var fileNo = jobs.length + 1;
+      var fileName =
+        "file " + fileNo + (suffix ? " - " + suffix : "") + ".pdf";
+      var outputFile = new File(folder.fsName + "/" + fileName);
+      if (outputFile.exists) return "ERR: File đã tồn tại: " + fileName + ".";
+      var indices = [first];
+      if (span === 2) indices.push(first + 1);
+      jobs.push({ file: outputFile, name: fileName, indices: indices });
+    }
+
+    var originalSelection = [];
+    try {
+      for (var os = 0; os < sourceDoc.selection.length; os++)
+        originalSelection.push(sourceDoc.selection[os]);
+    } catch (e) {}
+    var originalArtboard = 0;
+    try {
+      originalArtboard = sourceDoc.artboards.getActiveArtboardIndex();
+    } catch (e2) {}
+
+    var colorSpace = DocumentColorSpace.CMYK;
+    try {
+      colorSpace = sourceDoc.documentColorSpace;
+    } catch (e3) {}
+    var sourceLayers = [];
+    for (var li = 0; li < sourceDoc.layers.length; li++) {
+      var sourceLayer = sourceDoc.layers[li];
+      var sourceLayerName = "Layer";
+      try {
+        sourceLayerName = sourceLayer.name;
+      } catch (layerNameError) {}
+      sourceLayers.push({ layer: sourceLayer, name: sourceLayerName });
+    }
+
+    function sourceLayerIndex(item) {
+      var parent = item;
+      try {
+        while (parent.parent && parent.parent.typename !== "Layer")
+          parent = parent.parent;
+        var layer = parent.parent;
+        for (var layerIndex = 0; layerIndex < sourceLayers.length; layerIndex++)
+          if (sourceLayers[layerIndex].layer === layer) return layerIndex;
+      } catch (e) {}
+      return 0;
+    }
+    function topLevelItem(item) {
+      var top = item;
+      try {
+        while (top.parent && top.parent.typename === "GroupItem") top = top.parent;
+      } catch (e) {}
+      return top;
+    }
+    function containsItem(entries, item) {
+      for (var ci = 0; ci < entries.length; ci++)
+        if (entries[ci].item === item) return true;
+      return false;
+    }
+    function snapshotActiveArtboard(index) {
+      sourceDoc.activate();
+      sourceDoc.artboards.setActiveArtboardIndex(index);
+      sourceDoc.selection = null;
+      sourceDoc.selectObjectsOnActiveArtboard();
+      var entries = [];
+      for (var si = 0; si < sourceDoc.selection.length; si++) {
+        var item = topLevelItem(sourceDoc.selection[si]);
+        try {
+          if (containsItem(entries, item)) continue;
+          entries.push({
+            item: item,
+            bounds: item.geometricBounds.slice(0),
+            layerIndex: sourceLayerIndex(item),
+            z: item.zOrderPosition,
+          });
+        } catch (snapshotError) {}
+      }
+      return {
+        index: index,
+        rect: sourceDoc.artboards[index].artboardRect.slice(0),
+        entries: entries,
+      };
+    }
+    function makePdfOptions(pageCount) {
+      var opt = new PDFSaveOptions();
+      try {
+        opt.compatibility = PDFCompatibility.ACROBAT5;
+      } catch (e) {}
+      try {
+        opt.generateThumbnails = false;
+      } catch (e2) {}
+      try {
+        opt.preserveEditability = false;
+      } catch (e3) {}
+      try {
+        opt.optimization = true;
+      } catch (e4) {}
+      try {
+        opt.viewAfterSaving = false;
+      } catch (e5) {}
+      try {
+        opt.saveMultipleArtboards = true;
+      } catch (e6) {}
+      try {
+        opt.artboardRange = pageCount === 1 ? "1" : "1-" + pageCount;
+      } catch (e7) {}
+      return opt;
+    }
+    function makeTargetLayers(workDoc) {
+      var targetLayers = [];
+      // Layers.add() thêm lên đầu; đi từ dưới lên để giữ thứ tự chồng lớp.
+      for (var layerIndex = sourceLayers.length - 1; layerIndex >= 0; layerIndex--) {
+        var targetLayer = workDoc.layers.add();
+        try {
+          targetLayer.name = sourceLayers[layerIndex].name;
+        } catch (e) {}
+        targetLayers[layerIndex] = targetLayer;
+      }
+      return targetLayers;
+    }
+    function copyPageEntries(page, workDoc, targetLayers, errors) {
+      page.entries.sort(function (a, b) {
+        if (a.layerIndex !== b.layerIndex) return b.layerIndex - a.layerIndex;
+        return a.z - b.z;
+      });
+      var copied = 0;
+      for (var ei = 0; ei < page.entries.length; ei++) {
+        var entry = page.entries[ei];
+        try {
+          sourceDoc.activate();
+          var copiedItem = entry.item.duplicate(
+            targetLayers[entry.layerIndex],
+            ElementPlacement.PLACEATEND,
+          );
+          workDoc.activate();
+          var copiedBounds = copiedItem.geometricBounds;
+          copiedItem.translate(
+            entry.bounds[0] - copiedBounds[0],
+            entry.bounds[1] - copiedBounds[1],
+          );
+          copied++;
+        } catch (copyError) {
+          errors.push(
+            "Artboard " + (page.index + 1) + ": " +
+              (typeof dcMoTaLoi === "function"
+                ? dcMoTaLoi(copyError)
+                : copyError.toString()),
+          );
+        }
+      }
+      return copied;
+    }
+    function exportJob(job, errors) {
+      var pages = [];
+      for (var pi = 0; pi < job.indices.length; pi++) {
+        var page = snapshotActiveArtboard(job.indices[pi]);
+        if (page.entries.length === 0)
+          throw new Error("Artboard " + (page.index + 1) + " không có object để lưu.");
+        pages.push(page);
+      }
+
+      var workDoc = null;
+      try {
+        workDoc = app.documents.add(colorSpace);
+        workDoc.artboards[0].artboardRect = pages[0].rect.slice(0);
+        for (var ai = 1; ai < pages.length; ai++)
+          workDoc.artboards.add(pages[ai].rect.slice(0));
+        var targetLayers = makeTargetLayers(workDoc);
+        var copied = 0;
+        for (var pageIndex = 0; pageIndex < pages.length; pageIndex++)
+          copied += copyPageEntries(pages[pageIndex], workDoc, targetLayers, errors);
+        if (copied === 0) throw new Error("Không copy được object của artboard.");
+        workDoc.saveAs(job.file, makePdfOptions(pages.length));
+      } finally {
+        try {
+          if (workDoc) workDoc.close(SaveOptions.DONOTSAVECHANGES);
+        } catch (closeError) {}
+      }
+    }
+
+    var done = 0;
+    var copyErrors = [];
+    var saveErrors = [];
+    try {
+      for (var ji = 0; ji < jobs.length; ji++) {
+        try {
+          exportJob(jobs[ji], copyErrors);
+          done++;
+        } catch (saveError) {
+          saveErrors.push(
+            jobs[ji].name + ": " +
+              (typeof dcMoTaLoi === "function"
+                ? dcMoTaLoi(saveError)
+                : saveError.toString()),
+          );
+        }
+      }
+    } finally {
+      try {
+        sourceDoc.activate();
+        sourceDoc.artboards.setActiveArtboardIndex(originalArtboard);
+        sourceDoc.selection = null;
+        for (var rs = 0; rs < originalSelection.length; rs++)
+          originalSelection[rs].selected = true;
+      } catch (restoreError) {}
+    }
+
+    if (done === 0)
+      return "ERR: Không lưu được PDF nào." +
+        (saveErrors.length ? " " + saveErrors.join(" | ") : "");
+    var message =
+      "OK: Đã lưu " + done + " PDF theo thứ tự Artboard.";
+    if (copyErrors.length)
+      message += " Bỏ qua " + copyErrors.length + " object lỗi khi copy.";
+    if (saveErrors.length)
+      message += " Lỗi " + saveErrors.length + " file: " + saveErrors.join(" | ");
+    return message;
+  } catch (e) {
+    return "ERR: " + (typeof dcMoTaLoi === "function" ? dcMoTaLoi(e) : e.toString());
+  }
+}
+
 function dcAutoSavePDF(
   prefix,
   startNo,
