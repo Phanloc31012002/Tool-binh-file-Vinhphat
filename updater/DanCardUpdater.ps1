@@ -20,6 +20,35 @@ function Write-UpdateLog {
     if (-not $Quiet) { Write-Host "[Công cụ bình] $Message" -ForegroundColor $Color }
 }
 
+function Register-RecurringCheckTask {
+    # Kiểm tra lại mỗi phút để máy đang mở Illustrator nhận thông báo bản mới
+    # gần như ngay khi bản phát hành xuất hiện trên GitHub.
+    $recurringTaskName = 'CongCuBinh-AutoUpdate-Recurring'
+    $scheduleMarkerPath = Join-Path $PSScriptRoot 'recurring-schedule.txt'
+    $scheduleMarker = 'minute-1'
+    $taskExists = $false
+    try {
+        & schtasks.exe /Query /TN $recurringTaskName *> $null
+        $taskExists = ($LASTEXITCODE -eq 0)
+    } catch {}
+    try {
+        if ($taskExists -and (Test-Path -LiteralPath $scheduleMarkerPath) -and
+            ((Get-Content -LiteralPath $scheduleMarkerPath -Raw -ErrorAction Stop).Trim() -eq $scheduleMarker)) {
+            return
+        }
+    } catch {}
+    try {
+        $selfPath = $PSCommandPath
+        if ([string]::IsNullOrWhiteSpace($selfPath)) { $selfPath = Join-Path $PSScriptRoot 'DanCardUpdater.ps1' }
+        $taskCommand = "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$selfPath`" -Quiet"
+        $taskOutput = & schtasks.exe /Create /TN $recurringTaskName /TR $taskCommand /SC MINUTE /MO 1 /F 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            [System.IO.File]::WriteAllText($scheduleMarkerPath, $scheduleMarker, [System.Text.Encoding]::ASCII)
+            Write-UpdateLog 'Đã bật lịch kiểm tra bản mới mỗi phút.' DarkCyan
+        }
+    } catch {}
+}
+
 function Show-UpdateToast {
     # Hiện thông báo ở khay hệ thống / Notification Center Windows, kể cả khi
     # updater chạy ẩn (-Quiet) qua Scheduled Task lúc đăng nhập. Trên
@@ -154,7 +183,7 @@ function Schedule-UpdaterPayload {
     if (-not (Test-Path -LiteralPath (Join-Path $packageUpdater 'DanCardUpdater.ps1'))) { return }
     $stageRoot = Join-Path $PSScriptRoot ('payload-' + [Guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Path $stageRoot -Force | Out-Null
-    foreach ($name in @('DanCardUpdater.ps1', 'SetupShortcuts.ps1', 'ApplyUpdaterPayload.ps1', 'CongCuBinh.ico')) {
+    foreach ($name in @('DanCardUpdater.ps1', 'SetupShortcuts.ps1', 'ApplyUpdaterPayload.ps1', 'CongCuBinh.ico', 'update-config.json')) {
         $source = Join-Path $packageUpdater $name
         if (Test-Path -LiteralPath $source) { Copy-Item -LiteralPath $source -Destination (Join-Path $stageRoot $name) -Force }
     }
@@ -252,13 +281,19 @@ if ([string]::IsNullOrWhiteSpace([string]$config.manifestUrl)) {
     exit 0
 }
 
-$intervalHours = 6
-try { $intervalHours = [Math]::Max(1, [int]$config.checkIntervalHours) } catch {}
+Register-RecurringCheckTask
+
+$intervalMinutes = 1
+try {
+    if ($null -ne $config.checkIntervalMinutes) {
+        $intervalMinutes = [Math]::Max(1, [int]$config.checkIntervalMinutes)
+    }
+} catch {}
 $state = Read-JsonFile -Path $statePath -Default ([pscustomobject]@{})
 if (-not $Force -and $state.lastCheckUtc) {
     try {
         $lastCheck = [DateTime]::Parse([string]$state.lastCheckUtc).ToUniversalTime()
-        if ((([DateTime]::UtcNow - $lastCheck).TotalHours -lt $intervalHours) -and -not $state.pendingVersion) {
+        if ((([DateTime]::UtcNow - $lastCheck).TotalMinutes -lt $intervalMinutes) -and -not $state.pendingVersion) {
             exit 0
         }
     } catch {}
@@ -269,7 +304,28 @@ try {
     Write-UpdateLog 'Đang kiểm tra bản cập nhật online…'
     # GitHub Raw returns latest.json as text/plain.  Parse it explicitly and
     # remove an optional UTF-8 BOM so Windows PowerShell 5 can read it too.
-    $manifestResponse = Invoke-WebRequest -Uri $manifestUrl -UseBasicParsing -TimeoutSec 20 -Headers @{ 'User-Agent' = 'CongCuBinhUpdater' }
+    $manifestHeaders = @{ 'User-Agent' = 'CongCuBinhUpdater'; 'Accept' = 'application/vnd.github+json' }
+    # Khi chưa có bản đang chờ cài, dùng ETag để GitHub trả 304 cho lần kiểm
+    # tra không có thay đổi. Nhờ vậy kiểm tra mỗi phút không tải lại nội dung
+    # latest.json liên tục.
+    if (-not $state.pendingVersion -and -not [string]::IsNullOrWhiteSpace([string]$state.manifestEtag)) {
+        $manifestHeaders['If-None-Match'] = [string]$state.manifestEtag
+    }
+    try {
+        $manifestResponse = Invoke-WebRequest -Uri $manifestUrl -UseBasicParsing -TimeoutSec 20 -Headers $manifestHeaders
+    } catch {
+        $webResponse = $_.Exception.Response
+        if ($webResponse -and ([int]$webResponse.StatusCode -eq 304)) {
+            $state | Add-Member -NotePropertyName lastCheckUtc -NotePropertyValue ([DateTime]::UtcNow.ToString('o')) -Force
+            Write-JsonFile -Path $statePath -Value $state
+            Write-UpdateLog 'Chưa có bản mới.' DarkGreen
+            exit 0
+        }
+        throw
+    }
+    if ($manifestResponse.Headers['ETag']) {
+        $state | Add-Member -NotePropertyName manifestEtag -NotePropertyValue ([string]$manifestResponse.Headers['ETag']) -Force
+    }
     $manifestText = ([string]$manifestResponse.Content).TrimStart([char]0xFEFF)
     $remote = $manifestText | ConvertFrom-Json
     # GitHub Contents API returns the manifest as base64.  Supporting this
@@ -297,6 +353,8 @@ try {
 
     if ($remoteVersion -le $installedVersion) {
         $state | Add-Member -NotePropertyName pendingVersion -NotePropertyValue $null -Force
+        $state | Add-Member -NotePropertyName notifiedPendingVersion -NotePropertyValue $null -Force
+        $state | Add-Member -NotePropertyName lastPendingNotificationUtc -NotePropertyValue $null -Force
         Write-JsonFile -Path $statePath -Value $state
         Write-UpdateLog "Đã là bản mới nhất ($installedVersion)." DarkGreen
         exit 0
@@ -309,10 +367,20 @@ try {
         $state | Add-Member -NotePropertyName pendingVersion -NotePropertyValue $remoteVersion.ToString() -Force
         Write-JsonFile -Path $statePath -Value $state
         Write-UpdateLog "Có bản $remoteVersion nhưng Illustrator đang mở; sẽ cập nhật ở lần kiểm tra sau." Yellow
-        if ([string]$state.notifiedPendingVersion -ne $remoteVersion.ToString()) {
+        $shouldNotify = ([string]$state.notifiedPendingVersion -ne $remoteVersion.ToString())
+        if (-not $shouldNotify) {
+            try {
+                $lastNotification = [DateTime]::Parse([string]$state.lastPendingNotificationUtc).ToUniversalTime()
+                $shouldNotify = (([DateTime]::UtcNow - $lastNotification).TotalHours -ge 2)
+            } catch {
+                $shouldNotify = $true
+            }
+        }
+        if ($shouldNotify) {
             Show-UpdateToast -Title 'Công cụ bình có bản cập nhật mới' `
                 -Message "Bản $remoteVersion đã sẵn sàng. Đóng Illustrator rồi mở lại (hoặc đăng nhập lại Windows) để cài."
             $state | Add-Member -NotePropertyName notifiedPendingVersion -NotePropertyValue $remoteVersion.ToString() -Force
+            $state | Add-Member -NotePropertyName lastPendingNotificationUtc -NotePropertyValue ([DateTime]::UtcNow.ToString('o')) -Force
             Write-JsonFile -Path $statePath -Value $state
         }
         exit 0
@@ -362,6 +430,7 @@ try {
             Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
         $state | Add-Member -NotePropertyName pendingVersion -NotePropertyValue $null -Force
         $state | Add-Member -NotePropertyName notifiedPendingVersion -NotePropertyValue $null -Force
+        $state | Add-Member -NotePropertyName lastPendingNotificationUtc -NotePropertyValue $null -Force
         $state | Add-Member -NotePropertyName installedVersion -NotePropertyValue $remoteVersion.ToString() -Force
         Write-JsonFile -Path $statePath -Value $state
         if ($hadInstalledManifest) {

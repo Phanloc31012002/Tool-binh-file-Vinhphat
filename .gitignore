@@ -11,3 +11,7 @@ QuanLyNoiBo/
 # Local logs and temporary files
 *.log
 *.tmp
+
+# Generated from online/latest.json immediately before a Worker deployment.
+cloudflare-worker/generated/
+.wrangler/

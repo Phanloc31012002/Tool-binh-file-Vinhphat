@@ -1,9 +1,9 @@
 {
     "product":  "com.locdev.dancard",
-    "version":  "2.10.3",
-    "title":  "Test Thông báo Window",
-    "description":  "Test Thông báo Window",
-    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.10.3.zip",
-    "sha256":  "F975EB101227CF7314DC97C94100C9EFA4C88BB87B712422B5724523D53A2BBA",
-    "publishedUtc":  "2026-09-23T06:27:02.7989015Z"
+    "version":  "2.10.4",
+    "title":  "test thông báo qua cloudflare",
+    "description":  "test thông báo qua cloudflare",
+    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.10.4.zip",
+    "sha256":  "3F35B2479946F4FB6F83F492E40D5671CB45EF75B98CB13A992269069DE2BC0A",
+    "publishedUtc":  "2026-09-23T07:22:12.2185042Z"
 }

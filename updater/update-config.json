@@ -1,5 +1,5 @@
 ﻿{
     "product":  "com.locdev.dancard",
-    "manifestUrl":  "https://api.github.com/repos/Phanloc31012002/Tool-binh-file-Vinhphat/contents/online/latest.json?ref=main",
-    "checkIntervalHours":  6
+    "manifestUrl":  "https://dancard-update.an-ard--etup-23.workers.dev/latest.json",
+    "checkIntervalMinutes":  1
 }
