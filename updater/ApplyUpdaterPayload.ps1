@@ -29,6 +29,8 @@ function Set-MinuteCheckSchedule {
         & schtasks.exe /Create /TN 'CongCuBinh-AutoUpdate-Recurring' /TR $taskCommand /SC MINUTE /MO 1 /F *> $null
         if ($LASTEXITCODE -eq 0) {
             [System.IO.File]::WriteAllText((Join-Path $Home 'recurring-schedule.txt'), 'wscript-minute-1', [System.Text.Encoding]::ASCII)
+            # Dọn task cũ có PowerShell trực tiếp để không còn cửa sổ CMD chớp.
+            & schtasks.exe /Delete /TN 'CongCuBinh-AutoUpdate' /F *> $null
         }
     } catch {}
 }

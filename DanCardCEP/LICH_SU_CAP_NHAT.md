@@ -2,6 +2,12 @@
 
 _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
+## v2.10.9 — Dọn task cập nhật cũ
+
+- Xóa task kiểm tra cũ chạy PowerShell trực tiếp, chỉ giữ task chạy ẩn để không còn cửa sổ CMD chớp mỗi phút.
+
+---
+
 ## v2.10.8 — Ẩn cửa sổ kiểm tra cập nhật
 
 - Sửa tác vụ kiểm tra cập nhật mỗi phút chạy hoàn toàn ẩn, không hiện cửa sổ CMD hoặc PowerShell.

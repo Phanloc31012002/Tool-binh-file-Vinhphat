@@ -32,6 +32,15 @@ function Write-HiddenLauncher {
     return $launcherPath
 }
 
+function Remove-LegacyAutoUpdateTask {
+    # Bộ cài cũ tạo task này với PowerShell trực tiếp và một trigger lặp mỗi
+    # phút. Giữ nó sẽ làm cửa sổ console chớp lên dù task mới đã chạy ẩn.
+    try {
+        & schtasks.exe /Delete /TN 'CongCuBinh-AutoUpdate' /F *> $null
+    }
+    catch {}
+}
+
 function Register-RecurringCheckTask {
     # Kiểm tra lại mỗi phút để máy đang mở Illustrator nhận thông báo bản mới
     # gần như ngay khi bản phát hành xuất hiện trên GitHub.
@@ -47,6 +56,7 @@ function Register-RecurringCheckTask {
     try {
         if ($taskExists -and (Test-Path -LiteralPath $scheduleMarkerPath) -and
             ((Get-Content -LiteralPath $scheduleMarkerPath -Raw -ErrorAction Stop).Trim() -eq $scheduleMarker)) {
+            Remove-LegacyAutoUpdateTask
             return
         }
     }
@@ -59,6 +69,7 @@ function Register-RecurringCheckTask {
         $taskOutput = & schtasks.exe /Create /TN $recurringTaskName /TR $taskCommand /SC MINUTE /MO 1 /F 2>&1
         if ($LASTEXITCODE -eq 0) {
             [System.IO.File]::WriteAllText($scheduleMarkerPath, $scheduleMarker, [System.Text.Encoding]::ASCII)
+            Remove-LegacyAutoUpdateTask
             Write-UpdateLog 'Đã bật lịch kiểm tra bản mới mỗi phút.' DarkCyan
         }
     }
