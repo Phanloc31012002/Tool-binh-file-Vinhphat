@@ -1,9 +1,9 @@
 {
     "product":  "com.locdev.dancard",
-    "version":  "2.10.1",
-    "title":  "vá lỗi hiển thị panel",
-    "description":  "vá lỗi hiển thị panel",
-    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.10.1.zip",
-    "sha256":  "EB9B6E572145C5A45565630AFBFE952A2CE4B4384615732786BE229FA305339F",
-    "publishedUtc":  "2026-09-23T04:36:25.4378037Z"
+    "version":  "2.10.2",
+    "title":  "Thêm chức năng nếu có cập nhật sẽ thông báo tại window",
+    "description":  "Thêm chức năng nếu có cập nhật sẽ thông báo tại window",
+    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.10.2.zip",
+    "sha256":  "D538DC67EEA8A0B2F2F65203E08ECACE8A0F7BD067FA4378E738DFDAE2DB2666",
+    "publishedUtc":  "2026-09-23T06:24:03.2837595Z"
 }

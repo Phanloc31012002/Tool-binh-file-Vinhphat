@@ -2,6 +2,12 @@
 
 _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
+## v2.10.2 — Thêm chức năng nếu có cập nhật sẽ thông báo tại window
+
+- Thêm chức năng nếu có cập nhật sẽ thông báo tại window
+
+---
+
 ## v2.10.1 — vá lỗi hiển thị panel
 
 - vá lỗi hiển thị panel

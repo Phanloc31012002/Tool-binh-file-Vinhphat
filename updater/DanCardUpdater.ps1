@@ -20,6 +20,35 @@ function Write-UpdateLog {
     if (-not $Quiet) { Write-Host "[Công cụ bình] $Message" -ForegroundColor $Color }
 }
 
+function Show-UpdateToast {
+    # Hiện thông báo ở khay hệ thống / Notification Center Windows, kể cả khi
+    # updater chạy ẩn (-Quiet) qua Scheduled Task lúc đăng nhập. Trên
+    # Windows 10/11, balloon tip của NotifyIcon tự được gộp vào Action Center.
+    param([string]$Title, [string]$Message)
+    try {
+        Add-Type -AssemblyName System.Windows.Forms | Out-Null
+        Add-Type -AssemblyName System.Drawing | Out-Null
+        $iconPath = Join-Path $PSScriptRoot 'CongCuBinh.ico'
+        $notifyIcon = New-Object System.Windows.Forms.NotifyIcon
+        if (Test-Path -LiteralPath $iconPath) {
+            $notifyIcon.Icon = New-Object System.Drawing.Icon($iconPath)
+        } else {
+            $notifyIcon.Icon = [System.Drawing.SystemIcons]::Information
+        }
+        $notifyIcon.Visible = $true
+        $notifyIcon.BalloonTipTitle = $Title
+        $notifyIcon.BalloonTipText = $Message
+        $notifyIcon.BalloonTipIcon = [System.Windows.Forms.ToolTipIcon]::Info
+        $notifyIcon.ShowBalloonTip(10000)
+        # Cần giữ tiến trình sống một chút thì Windows mới kịp hiện balloon
+        # trước khi NotifyIcon bị Dispose và biến mất.
+        Start-Sleep -Seconds 6
+        $notifyIcon.Dispose()
+    } catch {
+        Write-UpdateLog "Không hiện được thông báo Windows: $($_.Exception.Message)" DarkYellow
+    }
+}
+
 function Format-ByteSize {
     param([Int64]$Bytes)
     if ($Bytes -ge 1GB) { return ('{0:N2} GB' -f ($Bytes / 1GB)) }
@@ -280,6 +309,12 @@ try {
         $state | Add-Member -NotePropertyName pendingVersion -NotePropertyValue $remoteVersion.ToString() -Force
         Write-JsonFile -Path $statePath -Value $state
         Write-UpdateLog "Có bản $remoteVersion nhưng Illustrator đang mở; sẽ cập nhật ở lần kiểm tra sau." Yellow
+        if ([string]$state.notifiedPendingVersion -ne $remoteVersion.ToString()) {
+            Show-UpdateToast -Title 'Công cụ bình có bản cập nhật mới' `
+                -Message "Bản $remoteVersion đã sẵn sàng. Đóng Illustrator rồi mở lại (hoặc đăng nhập lại Windows) để cài."
+            $state | Add-Member -NotePropertyName notifiedPendingVersion -NotePropertyValue $remoteVersion.ToString() -Force
+            Write-JsonFile -Path $statePath -Value $state
+        }
         exit 0
     }
 
@@ -326,12 +361,17 @@ try {
             Sort-Object LastWriteTime -Descending | Select-Object -Skip 1 |
             Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
         $state | Add-Member -NotePropertyName pendingVersion -NotePropertyValue $null -Force
+        $state | Add-Member -NotePropertyName notifiedPendingVersion -NotePropertyValue $null -Force
         $state | Add-Member -NotePropertyName installedVersion -NotePropertyValue $remoteVersion.ToString() -Force
         Write-JsonFile -Path $statePath -Value $state
         if ($hadInstalledManifest) {
             Write-UpdateLog "Đã cập nhật $installedVersion → $remoteVersion. Mở lại Illustrator để dùng bản mới." Green
+            Show-UpdateToast -Title 'Công cụ bình đã cập nhật' `
+                -Message "Đã lên bản $remoteVersion. Mở lại Illustrator để dùng bản mới."
         } else {
             Write-UpdateLog "Đã cài v$remoteVersion (không tìm thấy manifest của bản cũ). Mở lại Illustrator để dùng bản mới." Green
+            Show-UpdateToast -Title 'Công cụ bình đã cài đặt' `
+                -Message "Đã cài bản $remoteVersion. Mở lại Illustrator để dùng."
         }
     } finally {
         Remove-Item -LiteralPath $workRoot -Recurse -Force -ErrorAction SilentlyContinue
