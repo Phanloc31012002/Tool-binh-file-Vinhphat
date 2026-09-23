@@ -20,12 +20,24 @@ function Write-UpdateLog {
     if (-not $Quiet) { Write-Host "[Công cụ bình] $Message" -ForegroundColor $Color }
 }
 
+function Write-HiddenLauncher {
+    param([string]$UpdaterScript)
+
+    # Task Scheduler đôi khi vẫn chớp cửa sổ PowerShell, dù đã có
+    # -WindowStyle Hidden. WScript chạy launcher này không tạo cửa sổ console.
+    $launcherPath = Join-Path $PSScriptRoot 'CongCuBinh-AutoUpdate.vbs'
+    $command = "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$UpdaterScript`" -Quiet"
+    $vbsLine = 'CreateObject("Wscript.Shell").Run "' + $command.Replace('"', '""') + '", 0, False'
+    [System.IO.File]::WriteAllText($launcherPath, $vbsLine + [Environment]::NewLine, [System.Text.Encoding]::ASCII)
+    return $launcherPath
+}
+
 function Register-RecurringCheckTask {
     # Kiểm tra lại mỗi phút để máy đang mở Illustrator nhận thông báo bản mới
     # gần như ngay khi bản phát hành xuất hiện trên GitHub.
     $recurringTaskName = 'CongCuBinh-AutoUpdate-Recurring'
     $scheduleMarkerPath = Join-Path $PSScriptRoot 'recurring-schedule.txt'
-    $scheduleMarker = 'minute-1'
+    $scheduleMarker = 'wscript-minute-1'
     $taskExists = $false
     try {
         & schtasks.exe /Query /TN $recurringTaskName *> $null
@@ -42,7 +54,8 @@ function Register-RecurringCheckTask {
     try {
         $selfPath = $PSCommandPath
         if ([string]::IsNullOrWhiteSpace($selfPath)) { $selfPath = Join-Path $PSScriptRoot 'DanCardUpdater.ps1' }
-        $taskCommand = "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$selfPath`" -Quiet"
+        $launcherPath = Write-HiddenLauncher -UpdaterScript $selfPath
+        $taskCommand = "wscript.exe `"$launcherPath`""
         $taskOutput = & schtasks.exe /Create /TN $recurringTaskName /TR $taskCommand /SC MINUTE /MO 1 /F 2>&1
         if ($LASTEXITCODE -eq 0) {
             [System.IO.File]::WriteAllText($scheduleMarkerPath, $scheduleMarker, [System.Text.Encoding]::ASCII)

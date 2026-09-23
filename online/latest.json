@@ -1,9 +1,9 @@
 {
     "product":  "com.locdev.dancard",
-    "version":  "2.10.7",
-    "title":  "test tiếp 2",
-    "description":  "test tiếp 2",
-    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.10.7.zip",
-    "sha256":  "0A881EBD255BC85F9097730D51303C1C2260C729CEDCC34E6E8B71D409151DEE",
-    "publishedUtc":  "2026-09-23T07:39:02.7248412Z"
+    "version":  "2.10.8",
+    "title":  "Ẩn cửa sổ kiểm tra cập nhật",
+    "description":  "Sửa tác vụ kiểm tra cập nhật mỗi phút chạy hoàn toàn ẩn, không hiện cửa sổ CMD hoặc PowerShell.",
+    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.10.8.zip",
+    "sha256":  "42A319912AB889DE9F71D50205E491BB8C51686A170CC6C497A54C71124A385E",
+    "publishedUtc":  "2026-09-23T07:51:13.4033277Z"
 }

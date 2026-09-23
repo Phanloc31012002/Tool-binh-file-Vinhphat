@@ -2,6 +2,12 @@
 
 _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
+## v2.10.8 — Ẩn cửa sổ kiểm tra cập nhật
+
+- Sửa tác vụ kiểm tra cập nhật mỗi phút chạy hoàn toàn ẩn, không hiện cửa sổ CMD hoặc PowerShell.
+
+---
+
 ## v2.10.7 — test tiếp 2
 
 - test tiếp 2
