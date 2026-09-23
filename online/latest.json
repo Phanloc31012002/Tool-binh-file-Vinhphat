@@ -1,9 +1,9 @@
 {
     "product":  "com.locdev.dancard",
-    "version":  "2.10.2",
-    "title":  "Thêm chức năng nếu có cập nhật sẽ thông báo tại window",
-    "description":  "Thêm chức năng nếu có cập nhật sẽ thông báo tại window",
-    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.10.2.zip",
-    "sha256":  "D538DC67EEA8A0B2F2F65203E08ECACE8A0F7BD067FA4378E738DFDAE2DB2666",
-    "publishedUtc":  "2026-09-23T06:24:03.2837595Z"
+    "version":  "2.10.3",
+    "title":  "Test Thông báo Window",
+    "description":  "Test Thông báo Window",
+    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.10.3.zip",
+    "sha256":  "F975EB101227CF7314DC97C94100C9EFA4C88BB87B712422B5724523D53A2BBA",
+    "publishedUtc":  "2026-09-23T06:27:02.7989015Z"
 }
