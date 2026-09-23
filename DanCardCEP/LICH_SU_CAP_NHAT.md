@@ -2,6 +2,12 @@
 
 _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
+## v2.10.5 — test thông báo cloudflare
+
+- test thông báo cloudflare
+
+---
+
 ## v2.10.4 — test thông báo qua cloudflare
 
 - test thông báo qua cloudflare

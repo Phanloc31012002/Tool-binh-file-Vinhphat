@@ -30,13 +30,15 @@ function Register-RecurringCheckTask {
     try {
         & schtasks.exe /Query /TN $recurringTaskName *> $null
         $taskExists = ($LASTEXITCODE -eq 0)
-    } catch {}
+    }
+    catch {}
     try {
         if ($taskExists -and (Test-Path -LiteralPath $scheduleMarkerPath) -and
             ((Get-Content -LiteralPath $scheduleMarkerPath -Raw -ErrorAction Stop).Trim() -eq $scheduleMarker)) {
             return
         }
-    } catch {}
+    }
+    catch {}
     try {
         $selfPath = $PSCommandPath
         if ([string]::IsNullOrWhiteSpace($selfPath)) { $selfPath = Join-Path $PSScriptRoot 'DanCardUpdater.ps1' }
@@ -46,7 +48,8 @@ function Register-RecurringCheckTask {
             [System.IO.File]::WriteAllText($scheduleMarkerPath, $scheduleMarker, [System.Text.Encoding]::ASCII)
             Write-UpdateLog 'Đã bật lịch kiểm tra bản mới mỗi phút.' DarkCyan
         }
-    } catch {}
+    }
+    catch {}
 }
 
 function Show-UpdateToast {
@@ -61,7 +64,8 @@ function Show-UpdateToast {
         $notifyIcon = New-Object System.Windows.Forms.NotifyIcon
         if (Test-Path -LiteralPath $iconPath) {
             $notifyIcon.Icon = New-Object System.Drawing.Icon($iconPath)
-        } else {
+        }
+        else {
             $notifyIcon.Icon = [System.Drawing.SystemIcons]::Information
         }
         $notifyIcon.Visible = $true
@@ -73,7 +77,8 @@ function Show-UpdateToast {
         # trước khi NotifyIcon bị Dispose và biến mất.
         Start-Sleep -Seconds 6
         $notifyIcon.Dispose()
-    } catch {
+    }
+    catch {
         Write-UpdateLog "Không hiện được thông báo Windows: $($_.Exception.Message)" DarkYellow
     }
 }
@@ -131,7 +136,8 @@ function Download-FileWithProgress {
         if ($total -le 0 -and -not $Quiet) {
             Write-Host "[Tải DanCardCEP] Hoàn thành — $(Format-ByteSize $completed)" -ForegroundColor Cyan
         }
-    } finally {
+    }
+    finally {
         if ($output) { $output.Dispose() }
         if ($input) { $input.Dispose() }
         if ($response) { $response.Dispose() }
@@ -169,7 +175,8 @@ function Copy-DirectoryWithProgress {
                 $completed += $read
                 $lastPercent = Write-UpdateProgress -Phase 'Chép vào AppData' -Completed $completed -Total $total -LastPercent $lastPercent
             }
-        } finally {
+        }
+        finally {
             if ($output) { $output.Dispose() }
             if ($input) { $input.Dispose() }
         }
@@ -195,7 +202,8 @@ function Schedule-UpdaterPayload {
     $arguments = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$applyScript`" -ParentProcessId $PID -StageRoot `"$stageRoot`" -UpdaterHome `"$PSScriptRoot`""
     try {
         Start-Process -FilePath 'powershell.exe' -ArgumentList $arguments -WindowStyle Hidden
-    } catch {
+    }
+    catch {
         Remove-Item -LiteralPath $stageRoot -Recurse -Force -ErrorAction SilentlyContinue
         throw
     }
@@ -207,7 +215,8 @@ function Schedule-UpdaterPayload {
 $lockPath = Join-Path $PSScriptRoot 'update.lock'
 try {
     $updaterLock = [System.IO.File]::Open($lockPath, [System.IO.FileMode]::OpenOrCreate, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None)
-} catch [System.IO.IOException] {
+}
+catch [System.IO.IOException] {
     Write-UpdateLog 'Đang có một tiến trình cập nhật khác; bỏ qua lần này.' DarkYellow
     exit 0
 }
@@ -219,7 +228,8 @@ function Read-JsonFile {
         $raw = Get-Content -LiteralPath $Path -Raw -Encoding UTF8
         if ([string]::IsNullOrWhiteSpace($raw)) { return $Default }
         return $raw | ConvertFrom-Json
-    } catch {
+    }
+    catch {
         return $Default
     }
 }
@@ -268,7 +278,7 @@ function Get-PackageRoot {
     $direct = Join-Path $ExtractRoot 'DanCardCEP'
     if (Test-Path -LiteralPath (Join-Path $direct 'CSXS\manifest.xml')) { return $direct }
     $matches = Get-ChildItem -LiteralPath $ExtractRoot -Recurse -File -Filter manifest.xml |
-        Where-Object { $_.FullName -match '[\\/]DanCardCEP[\\/]CSXS[\\/]manifest\.xml$' }
+    Where-Object { $_.FullName -match '[\\/]DanCardCEP[\\/]CSXS[\\/]manifest\.xml$' }
     if ($matches.Count -ne 1) { throw 'ZIP cập nhật không có đúng một thư mục DanCardCEP hợp lệ.' }
     return Split-Path -Parent (Split-Path -Parent $matches[0].FullName)
 }
@@ -288,7 +298,8 @@ try {
     if ($null -ne $config.checkIntervalMinutes) {
         $intervalMinutes = [Math]::Max(1, [int]$config.checkIntervalMinutes)
     }
-} catch {}
+}
+catch {}
 $state = Read-JsonFile -Path $statePath -Default ([pscustomobject]@{})
 if (-not $Force -and $state.lastCheckUtc) {
     try {
@@ -296,7 +307,8 @@ if (-not $Force -and $state.lastCheckUtc) {
         if ((([DateTime]::UtcNow - $lastCheck).TotalMinutes -lt $intervalMinutes) -and -not $state.pendingVersion) {
             exit 0
         }
-    } catch {}
+    }
+    catch {}
 }
 
 try {
@@ -313,7 +325,8 @@ try {
     }
     try {
         $manifestResponse = Invoke-WebRequest -Uri $manifestUrl -UseBasicParsing -TimeoutSec 20 -Headers $manifestHeaders
-    } catch {
+    }
+    catch {
         $webResponse = $_.Exception.Response
         if ($webResponse -and ([int]$webResponse.StatusCode -eq 304)) {
             $state | Add-Member -NotePropertyName lastCheckUtc -NotePropertyValue ([DateTime]::UtcNow.ToString('o')) -Force
@@ -335,7 +348,8 @@ try {
             $base64 = ([string]$remote.content) -replace '\s', ''
             $manifestText = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($base64)).TrimStart([char]0xFEFF)
             $remote = $manifestText | ConvertFrom-Json
-        } catch {
+        }
+        catch {
             throw 'Không đọc được nội dung latest.json từ GitHub API.'
         }
     }
@@ -372,7 +386,8 @@ try {
             try {
                 $lastNotification = [DateTime]::Parse([string]$state.lastPendingNotificationUtc).ToUniversalTime()
                 $shouldNotify = (([DateTime]::UtcNow - $lastNotification).TotalHours -ge 2)
-            } catch {
+            }
+            catch {
                 $shouldNotify = $true
             }
         }
@@ -412,7 +427,8 @@ try {
             if (-not (Test-Path -LiteralPath (Join-Path $installRoot 'CSXS\manifest.xml'))) {
                 throw 'Chép gói mới không hoàn tất.'
             }
-        } catch {
+        }
+        catch {
             if (Test-Path -LiteralPath $installRoot) { Remove-Item -LiteralPath $installRoot -Recurse -Force }
             if (Test-Path -LiteralPath $backup) { Move-Item -LiteralPath $backup -Destination $installRoot -Force }
             throw
@@ -422,12 +438,13 @@ try {
         # thoát để không ghi đè script đang chạy.
         try {
             Schedule-UpdaterPayload -PackageBase (Split-Path -Parent $packageRoot)
-        } catch {
+        }
+        catch {
             Write-UpdateLog "Panel đã cập nhật, nhưng chưa làm mới được updater: $($_.Exception.Message)" DarkYellow
         }
         Get-ChildItem -LiteralPath (Split-Path -Parent $installRoot) -Directory -Filter 'DanCardCEP.backup-*' |
-            Sort-Object LastWriteTime -Descending | Select-Object -Skip 1 |
-            Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+        Sort-Object LastWriteTime -Descending | Select-Object -Skip 1 |
+        Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
         $state | Add-Member -NotePropertyName pendingVersion -NotePropertyValue $null -Force
         $state | Add-Member -NotePropertyName notifiedPendingVersion -NotePropertyValue $null -Force
         $state | Add-Member -NotePropertyName lastPendingNotificationUtc -NotePropertyValue $null -Force
@@ -437,20 +454,24 @@ try {
             Write-UpdateLog "Đã cập nhật $installedVersion → $remoteVersion. Mở lại Illustrator để dùng bản mới." Green
             Show-UpdateToast -Title 'Công cụ bình đã cập nhật' `
                 -Message "Đã lên bản $remoteVersion. Mở lại Illustrator để dùng bản mới."
-        } else {
+        }
+        else {
             Write-UpdateLog "Đã cài v$remoteVersion (không tìm thấy manifest của bản cũ). Mở lại Illustrator để dùng bản mới." Green
             Show-UpdateToast -Title 'Công cụ bình đã cài đặt' `
                 -Message "Đã cài bản $remoteVersion. Mở lại Illustrator để dùng."
         }
-    } finally {
+    }
+    finally {
         Remove-Item -LiteralPath $workRoot -Recurse -Force -ErrorAction SilentlyContinue
     }
-} catch {
+}
+catch {
     $message = $_.Exception.Message
     try {
         $state | Add-Member -NotePropertyName lastError -NotePropertyValue $message -Force
         Write-JsonFile -Path $statePath -Value $state
-    } catch {}
+    }
+    catch {}
     Write-UpdateLog "Không cập nhật được: $message" Red
     if (-not $Quiet) { exit 1 }
 }
