@@ -2,6 +2,12 @@
 
 _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
+## v2.10.10 — Sửa bước thay updater
+
+- Sửa tham số PowerShell xung đột với biến hệ thống, bảo đảm updater tự thay file và dọn task cũ ổn định.
+
+---
+
 ## v2.10.9 — Dọn task cập nhật cũ
 
 - Xóa task kiểm tra cũ chạy PowerShell trực tiếp, chỉ giữ task chạy ẩn để không còn cửa sổ CMD chớp mỗi phút.

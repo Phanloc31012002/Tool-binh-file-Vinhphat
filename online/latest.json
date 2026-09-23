@@ -1,9 +1,9 @@
 {
     "product":  "com.locdev.dancard",
-    "version":  "2.10.9",
-    "title":  "Dọn task cập nhật cũ",
-    "description":  "Xóa task kiểm tra cũ chạy PowerShell trực tiếp, chỉ giữ task chạy ẩn để không còn cửa sổ CMD chớp mỗi phút.",
-    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.10.9.zip",
-    "sha256":  "3684EA93927083B129C7D0F6FD45EA4EE4E82A1238A33336F413223E9271D911",
-    "publishedUtc":  "2026-09-23T08:03:29.5138644Z"
+    "version":  "2.10.10",
+    "title":  "Sửa bước thay updater",
+    "description":  "Sửa tham số PowerShell xung đột với biến hệ thống, bảo đảm updater tự thay file và dọn task cũ ổn định.",
+    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.10.10.zip",
+    "sha256":  "6E1B9532AE030A4EA6FC350CF320FD513835F69F5C71042D18C615D5D947B30B",
+    "publishedUtc":  "2026-09-23T08:06:33.1005325Z"
 }

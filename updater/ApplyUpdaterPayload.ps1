@@ -10,9 +10,9 @@ param(
 $ErrorActionPreference = 'Stop'
 
 function Write-HiddenLauncher {
-    param([string]$Home, [string]$UpdaterScript)
+    param([string]$UpdaterHome, [string]$UpdaterScript)
 
-    $launcherPath = Join-Path $Home 'CongCuBinh-AutoUpdate.vbs'
+    $launcherPath = Join-Path $UpdaterHome 'CongCuBinh-AutoUpdate.vbs'
     $command = "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$UpdaterScript`" -Quiet"
     $vbsLine = 'CreateObject("Wscript.Shell").Run "' + $command.Replace('"', '""') + '", 0, False'
     [System.IO.File]::WriteAllText($launcherPath, $vbsLine + [Environment]::NewLine, [System.Text.Encoding]::ASCII)
@@ -20,15 +20,15 @@ function Write-HiddenLauncher {
 }
 
 function Set-MinuteCheckSchedule {
-    param([string]$Home)
+    param([string]$UpdaterHome)
     try {
-        $updaterScript = Join-Path $Home 'DanCardUpdater.ps1'
+        $updaterScript = Join-Path $UpdaterHome 'DanCardUpdater.ps1'
         if (-not (Test-Path -LiteralPath $updaterScript)) { return }
-        $launcherPath = Write-HiddenLauncher -Home $Home -UpdaterScript $updaterScript
+        $launcherPath = Write-HiddenLauncher -UpdaterHome $UpdaterHome -UpdaterScript $updaterScript
         $taskCommand = "wscript.exe `"$launcherPath`""
         & schtasks.exe /Create /TN 'CongCuBinh-AutoUpdate-Recurring' /TR $taskCommand /SC MINUTE /MO 1 /F *> $null
         if ($LASTEXITCODE -eq 0) {
-            [System.IO.File]::WriteAllText((Join-Path $Home 'recurring-schedule.txt'), 'wscript-minute-1', [System.Text.Encoding]::ASCII)
+            [System.IO.File]::WriteAllText((Join-Path $UpdaterHome 'recurring-schedule.txt'), 'wscript-minute-1', [System.Text.Encoding]::ASCII)
             # Dọn task cũ có PowerShell trực tiếp để không còn cửa sổ CMD chớp.
             & schtasks.exe /Delete /TN 'CongCuBinh-AutoUpdate' /F *> $null
         }
@@ -36,9 +36,9 @@ function Set-MinuteCheckSchedule {
 }
 
 function Set-MinuteCheckConfig {
-    param([string]$Home)
+    param([string]$UpdaterHome)
     try {
-        $configPath = Join-Path $Home 'update-config.json'
+        $configPath = Join-Path $UpdaterHome 'update-config.json'
         if (-not (Test-Path -LiteralPath $configPath)) { return }
         $config = Get-Content -LiteralPath $configPath -Raw -Encoding UTF8 | ConvertFrom-Json
         $config | Add-Member -NotePropertyName manifestUrl -NotePropertyValue 'https://dancard-update.an-ard--etup-23.workers.dev/latest.json' -Force
@@ -68,8 +68,8 @@ try {
     if (Test-Path -LiteralPath $shortcutSetup) {
         & $shortcutSetup -UpdaterHome $UpdaterHome -Quiet
     }
-    Set-MinuteCheckConfig -Home $UpdaterHome
-    Set-MinuteCheckSchedule -Home $UpdaterHome
+    Set-MinuteCheckConfig -UpdaterHome $UpdaterHome
+    Set-MinuteCheckSchedule -UpdaterHome $UpdaterHome
 } finally {
     Remove-Item -LiteralPath $StageRoot -Recurse -Force -ErrorAction SilentlyContinue
 }
