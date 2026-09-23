@@ -2,6 +2,12 @@
 
 _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
+## v2.10.1 — vá lỗi hiển thị panel
+
+- vá lỗi hiển thị panel
+
+---
+
 ## v2.10.0 — Thêm chức năng save PDF từng artboard
 
 - Save PDF từng artboard:

@@ -1634,7 +1634,7 @@
     btnSaveDanMau.addEventListener("click", function () {
       var mode = danMauSaveMode ? danMauSaveMode.value : "each";
       var suffix = danMauSaveSuffix ? danMauSaveSuffix.value : "";
-      show(outSaveDanMau, "Chọn thư mục lưu PDF…");
+      show(outSaveDanMau, "Mở cửa sổ chọn nơi lưu PDF…");
       btnSaveDanMau.disabled = true;
       cs.evalScript(
         "dcLuuDanTheoMauPDF(" +

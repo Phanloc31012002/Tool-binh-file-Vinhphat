@@ -18659,7 +18659,7 @@ function dcLuuDanTheoMauPDF_CopyObjectLegacy(saveMode, suffix) {
     if (mode === "pair" && artboards.length % 2 !== 0)
       return "ERR: Lưu mặt trước + mặt sau cần số artboard chẵn.";
 
-    var folder = Folder.selectDialog("Chọn thư mục lưu PDF đã dàn theo mẫu");
+    var folder = dcChonThuMucLuuPDF("Chọn nơi lưu PDF đã dàn theo mẫu");
     if (!folder) return "ERR: Chưa chọn thư mục lưu PDF - đã huỷ.";
 
     var suffixPart = sanitizeName(suffix);
@@ -18744,14 +18744,32 @@ function dcLuuDanTheoMauPDF_SavedAICopyLegacy(saveMode, suffix) {
     if (artboardCount === 0) return "ERR: Không có artboard nào để lưu.";
     if (mode === "pair" && artboardCount % 2 !== 0)
       return "ERR: Lưu mặt trước + mặt sau cần số artboard chẵn.";
+    // PDF dùng point và Illustrator sẽ hạ độ chính xác khi ghi MediaBox. Nới
+    // không quá 0.01 pt theo cả hai phía để khi mở lại PDF, trường W/H vẫn
+    // hiện đúng số cm của artboard gốc (ví dụ 35.4 thay vì 35.399).
+    function pdfStableArtboardRect(rect) {
+      var left = rect[0], top = rect[1], right = rect[2], bottom = rect[3];
+      var width = right - left, height = top - bottom;
+      var stableWidth = Math.ceil(width * 100 - 0.000001) / 100;
+      var stableHeight = Math.ceil(height * 100 - 0.000001) / 100;
+      var centerX = (left + right) / 2, centerY = (top + bottom) / 2;
+      return [
+        centerX - stableWidth / 2,
+        centerY + stableHeight / 2,
+        centerX + stableWidth / 2,
+        centerY - stableHeight / 2,
+      ];
+    }
     var artboardRects = [];
     for (var sourceAb = 0; sourceAb < artboardCount; sourceAb++)
-      artboardRects.push(sourceDoc.artboards[sourceAb].artboardRect.slice(0));
+      artboardRects.push(
+        pdfStableArtboardRect(sourceDoc.artboards[sourceAb].artboardRect),
+      );
 
     suffix = String(suffix === undefined || suffix === null ? "" : suffix)
       .replace(/^\s+|\s+$/g, "")
       .replace(/[\\\\\/:*?\"<>|]/g, "-");
-    var folder = Folder.selectDialog("Chọn thư mục lưu PDF đã dàn theo mẫu");
+    var folder = dcChonThuMucLuuPDF("Chọn nơi lưu PDF đã dàn theo mẫu");
     if (!folder) return "ERR: Chưa chọn thư mục lưu PDF - đã huỷ.";
 
     var jobs = [];
@@ -18872,10 +18890,37 @@ function dcLuuDanTheoMauPDF(saveMode, suffix) {
     for (var sourceAb = 0; sourceAb < artboardCount; sourceAb++)
       artboardRects.push(sourceDoc.artboards[sourceAb].artboardRect.slice(0));
 
+    // Document tạm dùng hệ tọa độ riêng, sắp artboard theo lưới cố định.
+    // Không mang tọa độ toàn trang từ file gốc sang nên artboard ở cột 2, 3...
+    // được xuất giống hệt artboard ở cột đầu.
+    function makeWorkArtboardRects(sourceRects) {
+      var maxWidth = 0, maxHeight = 0;
+      for (var rectIndex = 0; rectIndex < sourceRects.length; rectIndex++) {
+        maxWidth = Math.max(maxWidth, sourceRects[rectIndex][2] - sourceRects[rectIndex][0]);
+        maxHeight = Math.max(maxHeight, sourceRects[rectIndex][1] - sourceRects[rectIndex][3]);
+      }
+      var perColumn = 15, gap = 36, result = [];
+      for (var targetIndex = 0; targetIndex < sourceRects.length; targetIndex++) {
+        var sourceRect = sourceRects[targetIndex];
+        var column = Math.floor(targetIndex / perColumn);
+        var row = targetIndex % perColumn;
+        var left = column * (maxWidth + gap);
+        var top = -row * (maxHeight + gap);
+        result.push([
+          left,
+          top,
+          left + (sourceRect[2] - sourceRect[0]),
+          top - (sourceRect[1] - sourceRect[3]),
+        ]);
+      }
+      return result;
+    }
+    var workArtboardRects = makeWorkArtboardRects(artboardRects);
+
     suffix = String(suffix === undefined || suffix === null ? "" : suffix)
       .replace(/^\s+|\s+$/g, "")
       .replace(/[\\\\\/:*?\"<>|]/g, "-");
-    var folder = Folder.selectDialog("Chọn thư mục lưu PDF đã dàn theo mẫu");
+    var folder = dcChonThuMucLuuPDF("Chọn nơi lưu PDF đã dàn theo mẫu");
     if (!folder) return "ERR: Chưa chọn thư mục lưu PDF - đã huỷ.";
 
     var jobs = [];
@@ -18895,34 +18940,6 @@ function dcLuuDanTheoMauPDF(saveMode, suffix) {
       });
     }
 
-    function positiveRect(rect) {
-      return rect && rect.length === 4 && rect[2] > rect[0] && rect[1] > rect[3];
-    }
-    function itemBounds(item) {
-      try {
-        if (positiveRect(item.visibleBounds)) return item.visibleBounds;
-      } catch (e) {}
-      try {
-        if (positiveRect(item.geometricBounds)) return item.geometricBounds;
-      } catch (e2) {}
-      return null;
-    }
-    function overlaps(left, right) {
-      return (
-        left[2] > right[0] &&
-        left[0] < right[2] &&
-        left[1] > right[3] &&
-        left[3] < right[1]
-      );
-    }
-    function touchesAnyArtboard(item) {
-      var bounds = itemBounds(item);
-      if (!bounds) return false;
-      for (var ai = 0; ai < artboardCount; ai++) {
-        if (overlaps(bounds, artboardRects[ai])) return true;
-      }
-      return false;
-    }
     function makePdfOptions(range) {
       var opt = new PDFSaveOptions();
       try {
@@ -18948,8 +18965,38 @@ function dcLuuDanTheoMauPDF(saveMode, suffix) {
       } catch (e7) {}
       return opt;
     }
+    function placementBounds(item) {
+      var bounds = null;
+      try {
+        bounds = item.visibleBounds;
+      } catch (visibleBoundsError) {}
+      if (
+        bounds &&
+        bounds.length === 4 &&
+        isFinite(bounds[0]) &&
+        isFinite(bounds[1]) &&
+        isFinite(bounds[2]) &&
+        isFinite(bounds[3])
+      )
+        return bounds.slice(0);
+      try {
+        bounds = item.geometricBounds;
+      } catch (geometricBoundsError) {}
+      if (
+        bounds &&
+        bounds.length === 4 &&
+        isFinite(bounds[0]) &&
+        isFinite(bounds[1]) &&
+        isFinite(bounds[2]) &&
+        isFinite(bounds[3])
+      )
+        return bounds.slice(0);
+      return null;
+    }
     function copyLayerItems(layerPlan, targetLayer, copyErrors) {
       layerPlan.items.sort(function (a, b) {
+        if (a.artboardIndex !== b.artboardIndex)
+          return a.artboardIndex - b.artboardIndex;
         return a.z - b.z;
       });
       var copiedItems = [];
@@ -18978,12 +19025,20 @@ function dcLuuDanTheoMauPDF(saveMode, suffix) {
       workDoc.activate();
       for (var ci = 0; ci < copiedItems.length; ci++) {
         try {
-          // Cross-document duplicate đổi ruler origin. Đưa artwork về đúng
-          // tọa độ đã chụp từ document gốc trước khi xuất artboard.
-          var copiedBounds = copiedItems[ci].item.geometricBounds;
+          // Đặt artwork theo tọa độ tương đối trong artboard của nó. Cách này
+          // không phụ thuộc artboard gốc nằm ở cột nào trên canvas.
+          var copiedBounds = placementBounds(copiedItems[ci].item);
+          if (!copiedBounds) throw new Error("Không đo được vùng hiển thị object đã copy.");
+          var sourceEntry = copiedItems[ci].source;
+          var targetLeft =
+            sourceEntry.targetRect[0] +
+            (sourceEntry.bounds[0] - sourceEntry.sourceRect[0]);
+          var targetTop =
+            sourceEntry.targetRect[1] +
+            (sourceEntry.bounds[1] - sourceEntry.sourceRect[1]);
           copiedItems[ci].item.translate(
-            copiedItems[ci].source.bounds[0] - copiedBounds[0],
-            copiedItems[ci].source.bounds[1] - copiedBounds[1],
+            targetLeft - copiedBounds[0],
+            targetTop - copiedBounds[1],
           );
           copied++;
         } catch (positionError) {
@@ -18998,34 +19053,76 @@ function dcLuuDanTheoMauPDF(saveMode, suffix) {
       return copied;
     }
 
-    // Chụp layer và top-level item trước khi tạo document tạm. Illustrator 2024
-    // có thể làm reference từ document gốc không hợp lệ sau app.documents.add().
+    // Dùng chính selection theo artboard của Illustrator, thay vì tự so tọa độ
+    // hay bounds. Group/clipping mask ở artboard nằm ngoài cột dàn vẫn được
+    // Illustrator nhận diện và lấy đủ artwork con.
+    var originalSelection = [];
+    var originalArtboard = 0;
+    try {
+      for (var originalIndex = 0; originalIndex < sourceDoc.selection.length; originalIndex++)
+        originalSelection.push(sourceDoc.selection[originalIndex]);
+    } catch (originalSelectionError) {}
+    try {
+      originalArtboard = sourceDoc.artboards.getActiveArtboardIndex();
+    } catch (originalArtboardError) {}
+
     var layerPlans = [];
-    for (var sourceLi = sourceDoc.layers.length - 1; sourceLi >= 0; sourceLi--) {
-      var snapshotLayer = sourceDoc.layers[sourceLi];
+    function topLevelItem(item) {
+      var top = item;
       try {
-        if (snapshotLayer.visible === false) continue;
-      } catch (snapshotLayerError) {}
-      var plan = { layer: snapshotLayer, name: "Layer", items: [] };
+        while (top.parent && top.parent.typename !== "Layer") top = top.parent;
+      } catch (topLevelError) {}
+      return top;
+    }
+    function sourceLayerFor(item) {
       try {
-        plan.name = snapshotLayer.name;
-      } catch (snapshotNameError) {}
-      for (var snapshotPi = 0; snapshotPi < snapshotLayer.pageItems.length; snapshotPi++) {
-        var snapshotItem = snapshotLayer.pageItems[snapshotPi];
+        return item.parent && item.parent.typename === "Layer" ? item.parent : null;
+      } catch (sourceLayerError) {}
+      return null;
+    }
+    function findLayerPlan(layer) {
+      for (var planIndex = 0; planIndex < layerPlans.length; planIndex++)
+        if (layerPlans[planIndex].layer === layer) return layerPlans[planIndex];
+      var plan = { layer: layer, name: "Layer", items: [] };
+      try {
+        plan.name = layer.name;
+      } catch (layerNameError) {}
+      layerPlans.push(plan);
+      return plan;
+    }
+    function planContainsItem(plan, item, artboardIndex) {
+      for (var itemIndex = 0; itemIndex < plan.items.length; itemIndex++)
+        if (
+          plan.items[itemIndex].item === item &&
+          plan.items[itemIndex].artboardIndex === artboardIndex
+        )
+          return true;
+      return false;
+    }
+    for (var snapshotAb = 0; snapshotAb < artboardCount; snapshotAb++) {
+      sourceDoc.activate();
+      sourceDoc.artboards.setActiveArtboardIndex(snapshotAb);
+      sourceDoc.selection = null;
+      sourceDoc.selectObjectsOnActiveArtboard();
+      for (var snapshotSelection = 0; snapshotSelection < sourceDoc.selection.length; snapshotSelection++) {
         try {
-          var snapshotBounds = snapshotItem.geometricBounds.slice(0);
-          if (
-            snapshotItem.parent === snapshotLayer &&
-            touchesAnyArtboard(snapshotItem)
-          )
-            plan.items.push({
-              item: snapshotItem,
-              z: snapshotItem.zOrderPosition,
-              bounds: snapshotBounds,
-            });
+          var snapshotItem = topLevelItem(sourceDoc.selection[snapshotSelection]);
+          var snapshotLayer = sourceLayerFor(snapshotItem);
+          if (!snapshotLayer || snapshotLayer.visible === false) continue;
+          var targetPlan = findLayerPlan(snapshotLayer);
+          if (planContainsItem(targetPlan, snapshotItem, snapshotAb)) continue;
+          var snapshotBounds = placementBounds(snapshotItem);
+          if (!snapshotBounds) continue;
+          targetPlan.items.push({
+            item: snapshotItem,
+            z: snapshotItem.zOrderPosition,
+            bounds: snapshotBounds,
+            sourceRect: artboardRects[snapshotAb],
+            targetRect: workArtboardRects[snapshotAb],
+            artboardIndex: snapshotAb,
+          });
         } catch (snapshotItemError) {}
       }
-      if (plan.items.length) layerPlans.push(plan);
     }
 
     var colorSpace = DocumentColorSpace.CMYK;
@@ -19039,9 +19136,9 @@ function dcLuuDanTheoMauPDF(saveMode, suffix) {
     var saveErrors = [];
     try {
       workDoc = app.documents.add(colorSpace);
-      workDoc.artboards[0].artboardRect = artboardRects[0].slice(0);
+      workDoc.artboards[0].artboardRect = workArtboardRects[0].slice(0);
       for (var ab = 1; ab < artboardCount; ab++)
-        workDoc.artboards.add(artboardRects[ab].slice(0));
+        workDoc.artboards.add(workArtboardRects[ab].slice(0));
 
       // Layers.add() thêm lên đầu; đi từ layer dưới lên để giữ thứ tự chồng lớp.
       for (var li = 0; li < layerPlans.length; li++) {
@@ -19075,6 +19172,10 @@ function dcLuuDanTheoMauPDF(saveMode, suffix) {
       } catch (closeError) {}
       try {
         sourceDoc.activate();
+        sourceDoc.artboards.setActiveArtboardIndex(originalArtboard);
+        sourceDoc.selection = null;
+        for (var restoreSelection = 0; restoreSelection < originalSelection.length; restoreSelection++)
+          originalSelection[restoreSelection].selected = true;
       } catch (activateError) {}
     }
 
@@ -19113,7 +19214,7 @@ function dcLuuDanTheoMauPDF_SelectedLegacy(saveMode, suffix) {
     suffix = String(suffix === undefined || suffix === null ? "" : suffix)
       .replace(/^\s+|\s+$/g, "")
       .replace(/[\\\\\/:*?\"<>|]/g, "-");
-    var folder = Folder.selectDialog("Chọn thư mục lưu PDF đã dàn theo mẫu");
+    var folder = dcChonThuMucLuuPDF("Chọn nơi lưu PDF đã dàn theo mẫu");
     if (!folder) return "ERR: Chưa chọn thư mục lưu PDF - đã huỷ.";
 
     var jobs = [];
@@ -19461,7 +19562,7 @@ function _dcAutoSavePDFCore(
     folder = resolveFolder(outFolder);
     if (!folder) {
       // Không mở được path đã nhập -> mở hộp chọn thay vì báo lỗi cụt.
-      folder = Folder.selectDialog("Không mở được thư mục đã nhập. Chọn lại:");
+      folder = dcChonThuMucLuuPDF("Không mở được thư mục đã nhập. Chọn lại");
       if (!folder)
         return (
           "ERR: Thư mục lưu không mở được: " +
@@ -19471,7 +19572,7 @@ function _dcAutoSavePDFCore(
     }
   } else {
     // Chưa nhập -> mở hộp thoại cho chọn (không tự tạo, không tự đoán).
-    folder = Folder.selectDialog("Chọn thư mục lưu PDF");
+    folder = dcChonThuMucLuuPDF("Chọn nơi lưu PDF");
     if (!folder) return "ERR: Chưa chọn thư mục lưu — đã huỷ.";
   }
 
@@ -19857,11 +19958,33 @@ function _dcAutoSavePDFCore(
 }
 
 // ============================================================
-//  dcPickFolder — mở hộp thoại chọn thư mục, trả về đường dẫn.
+//  dcChonThuMucLuuPDF — mở Save As Windows đầy đủ và trả thư mục được chọn.
+// ============================================================
+function dcChonThuMucLuuPDF(dialogTitle) {
+  var startFolder = Folder.myDocuments;
+  try {
+    if (Folder.current && Folder.current.exists) startFolder = Folder.current;
+  } catch (currentFolderError) {}
+  // saveDlg của một File có sẵn tên sẽ mở cửa sổ Windows đầy đủ nhưng người
+  // dùng chỉ cần chọn thư mục và bấm Save; tên này không bao giờ được tạo.
+  var defaultFile = new File(startFolder.fsName + "/chon-thu-muc.pdf");
+  var picked = defaultFile.saveDlg(
+    dialogTitle + " - chọn thư mục rồi bấm Save",
+    "*.pdf",
+  );
+  if (!picked) return null;
+  try {
+    return picked.parent && picked.parent.exists ? picked.parent : null;
+  } catch (e) {}
+  return null;
+}
+
+// ============================================================
+//  dcPickFolder — trả đường dẫn cho ô Thư mục lưu của Auto Save.
 // ============================================================
 function dcPickFolder() {
   try {
-    var f = Folder.selectDialog("Chọn thư mục lưu PDF");
+    var f = dcChonThuMucLuuPDF("Chọn nơi lưu PDF");
     if (!f) return "ERR:huỷ";
     return "OK:" + f.fsName;
   } catch (e) {

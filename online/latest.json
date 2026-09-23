@@ -1,9 +1,9 @@
 {
     "product":  "com.locdev.dancard",
-    "version":  "2.10.0",
-    "title":  "Thêm chức năng save PDF từng artboard",
-    "description":  "Save PDF từng artboard: \r\n- Có chọn được save 1 mặt hay 2 mặt\r\n- Có tự động đánh số File 1, File 2,...\r\n- Nhập tiêu đề đứng sau File 1, File2,...",
-    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.10.0.zip",
-    "sha256":  "7A6F6D9309F6E181A3EEE2F9BEC0280C1BF92306BFA1F3016F4D677D150131CD",
-    "publishedUtc":  "2026-09-23T03:15:33.3027914Z"
+    "version":  "2.10.1",
+    "title":  "vá lỗi hiển thị panel",
+    "description":  "vá lỗi hiển thị panel",
+    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.10.1.zip",
+    "sha256":  "EB9B6E572145C5A45565630AFBFE952A2CE4B4384615732786BE229FA305339F",
+    "publishedUtc":  "2026-09-23T04:36:25.4378037Z"
 }

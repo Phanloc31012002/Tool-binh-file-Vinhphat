@@ -1152,23 +1152,19 @@ body {
 /* ---- Tab bar ---- */
 .tabbar {
   display: flex;
+  flex-wrap: wrap;            /* panel hẹp thì tab tự xuống hàng, luôn hiện đủ */
   border-bottom: 1px solid var(--line);
   background: var(--bg);
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.tabbar::-webkit-scrollbar {
-  display: none;
 }
 .tab {
-  flex: 0 0 auto;
-  min-width: 74px;
+  flex: 1 0 auto;            /* chia đều theo bề ngang, không bị cắt mất */
+  min-width: 62px;
   appearance: none;
   border: none;
   background: transparent;
   color: var(--ink-dim);
   -webkit-text-fill-color: var(--ink-dim);
-  padding: 11px 8px;
+  padding: 10px 6px;
   font-size: 12px;
   font-family: inherit;
   font-weight: 600;
@@ -1176,6 +1172,9 @@ body {
   cursor: pointer;
   border-bottom: 2px solid transparent;
   transition: all 0.15s;
+}
+.tab[data-tab="autosave"] {
+  font-size: 15px;
 }
 .tab:hover {
   color: #fff;
