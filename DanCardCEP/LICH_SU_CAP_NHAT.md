@@ -2,6 +2,12 @@
 
 _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
+## v2.10.15 — Ổn định lưu PDF artboard
+
+- Lưu PDF bằng bản sao AI và artboard gốc, bỏ hoàn toàn nhánh tạo hoặc chỉnh artboard tạm gây lỗi 1200.
+
+---
+
 ## v2.10.14 — Sửa lỗi 1200 khi lưu PDF
 
 - Không gán lại artboardRect trong document tạm, tránh lỗi 1200 khi lưu PDF mặt trước và mặt sau.

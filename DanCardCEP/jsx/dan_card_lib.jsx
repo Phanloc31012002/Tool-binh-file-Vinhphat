@@ -18874,7 +18874,7 @@ function dcLuuDanTheoMauPDF_SavedAICopyLegacy(saveMode, suffix) {
 
 // Xuất từ document tạm: copy artwork một lần, sau đó xuất đúng artboard range.
 // Không save file AI người dùng đang mở và không lặp copy cho từng PDF.
-function dcLuuDanTheoMauPDF(saveMode, suffix) {
+function dcLuuDanTheoMauPDF_TempLayoutLegacy(saveMode, suffix) {
   try {
     if (app.documents.length === 0) return "ERR: Chưa mở tài liệu nào.";
     var sourceDoc = app.activeDocument;
@@ -19224,6 +19224,12 @@ function dcLuuDanTheoMauPDF(saveMode, suffix) {
 
 // Xuất từng artboard bằng selection native của Illustrator. Không quét toàn bộ
 // document, không lưu AI gốc và mỗi PDF chỉ chứa artwork của artboard cần xuất.
+// Active exporter: use the existing AI artboards directly from a temporary copy.
+// This avoids creating, moving, or editing artboards in a second document.
+function dcLuuDanTheoMauPDF(saveMode, suffix) {
+  return dcLuuDanTheoMauPDF_SavedAICopyLegacy(saveMode, suffix);
+}
+
 function dcLuuDanTheoMauPDF_SelectedLegacy(saveMode, suffix) {
   try {
     if (app.documents.length === 0) return "ERR: Chưa mở tài liệu nào.";

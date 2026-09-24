@@ -1,9 +1,9 @@
 {
     "product":  "com.locdev.dancard",
-    "version":  "2.10.14",
-    "title":  "Sửa lỗi 1200 khi lưu PDF",
-    "description":  "Không gán lại artboardRect trong document tạm, tránh lỗi 1200 khi lưu PDF mặt trước và mặt sau.",
-    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.10.14.zip",
-    "sha256":  "B178851B5F4B92CD7D23437332AC2A0A99AC8525ADE2A13A10EFB48339FA1D65",
-    "publishedUtc":  "2026-09-24T04:26:49.1843071Z"
+    "version":  "2.10.15",
+    "title":  "Ổn định lưu PDF artboard",
+    "description":  "Lưu PDF bằng bản sao AI và artboard gốc, bỏ hoàn toàn nhánh tạo hoặc chỉnh artboard tạm gây lỗi 1200.",
+    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.10.15.zip",
+    "sha256":  "9991F2D25C46612DCABF60D5F232ABFCF56F250C221B7B9A274AF5FE2631B567",
+    "publishedUtc":  "2026-09-24T04:29:40.2949675Z"
 }
