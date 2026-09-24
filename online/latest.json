@@ -1,9 +1,9 @@
 {
     "product":  "com.locdev.dancard",
-    "version":  "2.10.11",
-    "title":  "Sửa lưu PDF nhiều artboard",
-    "description":  "Tạo sẵn toàn bộ artboard trong document tạm để tránh lỗi 1200 khi lưu PDF mặt trước và mặt sau.",
-    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.10.11.zip",
-    "sha256":  "3ABAD90E8ACCB118F90EB4908F9C36D0876D63B86A1C2F03627CA5F75EE3CBA5",
-    "publishedUtc":  "2026-09-23T08:27:49.1096762Z"
+    "version":  "2.10.12",
+    "title":  "Bỏ viền trắng tab",
+    "description":  "Bỏ viền focus trắng dưới tab đang chọn và khôi phục lệnh dọn task cập nhật cũ.",
+    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.10.12.zip",
+    "sha256":  "4A9AEA65C3D000C940F70D9AB3729495685676BC335DFC0D3BBB3BD5E11B3E67",
+    "publishedUtc":  "2026-09-24T02:22:59.4580151Z"
 }

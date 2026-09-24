@@ -2,6 +2,12 @@
 
 _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
+## v2.10.12 — Bỏ viền trắng tab
+
+- Bỏ viền focus trắng dưới tab đang chọn và khôi phục lệnh dọn task cập nhật cũ.
+
+---
+
 ## v2.10.11 — Sửa lưu PDF nhiều artboard
 
 - Tạo sẵn toàn bộ artboard trong document tạm để tránh lỗi 1200 khi lưu PDF mặt trước và mặt sau.
