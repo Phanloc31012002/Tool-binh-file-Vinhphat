@@ -2879,8 +2879,6 @@ function dcThemDauCatTuDong(lengthText, edgeText, gapText) {
       markLayer.visible = true;
     } catch (e) {}
 
-    var markGroup = markLayer.groupItems.add();
-    markGroup.name = "Dau cat - " + new Date().getTime();
     var cutColor = new CMYKColor();
     cutColor.cyan = 0;
     cutColor.magenta = 0;
@@ -2968,7 +2966,6 @@ function dcThemDauCatTuDong(lengthText, edgeText, gapText) {
         line.stroked = true;
         line.strokeColor = cutColor;
         line.strokeWidth = 1;
-        line.move(markGroup, ElementPlacement.PLACEATEND);
         drawnLines[key] = true;
         drawn++;
       } catch (e) {}
@@ -3048,9 +3045,6 @@ function dcThemDauCatTuDong(lengthText, edgeText, gapText) {
     }
 
     if (drawn === 0) {
-      try {
-        markGroup.remove();
-      } catch (e) {}
       return "OK: Không có khoảng trống phù hợp để đặt dấu cắt.";
     }
 

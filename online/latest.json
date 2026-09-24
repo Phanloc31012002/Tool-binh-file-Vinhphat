@@ -1,9 +1,9 @@
 {
     "product":  "com.locdev.dancard",
-    "version":  "2.10.16",
-    "title":  "Gom object truoc khi luu PDF",
-    "description":  "Moi artboard duoc group tam, copy mot lan vao trang PDF nhe roi Undo ngay tren file goc. Khong luu AI goc, khong tao hoac doi artboard tam, va huy PDF do dang neu copy khong du.",
-    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.10.16.zip",
-    "sha256":  "FB43672DEB6CA931BE1578E2AE7C80B2A47F6D969280F3A2C0A365C6ED71A5F5",
-    "publishedUtc":  "2026-09-24T04:50:47.6881649Z"
+    "version":  "2.10.17",
+    "title":  "Khong group dau cat tu dong",
+    "description":  "Cac net dau cat tu dong duoc ve truc tiep tren layer Dau cat tu dong, khong gom thanh mot group.",
+    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.10.17.zip",
+    "sha256":  "88A07C03F0EAF6EC2BAF718CF6F3F9E30A91ACD5DDFB08AEDB026A21CAC52756",
+    "publishedUtc":  "2026-09-24T05:05:59.1665880Z"
 }
