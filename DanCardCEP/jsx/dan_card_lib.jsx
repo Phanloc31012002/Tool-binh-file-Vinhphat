@@ -19224,10 +19224,10 @@ function dcLuuDanTheoMauPDF_TempLayoutLegacy(saveMode, suffix) {
 
 // Xuất từng artboard bằng selection native của Illustrator. Không quét toàn bộ
 // document, không lưu AI gốc và mỗi PDF chỉ chứa artwork của artboard cần xuất.
-// Active exporter: use the existing AI artboards directly from a temporary copy.
-// This avoids creating, moving, or editing artboards in a second document.
+// Active exporter: copy only artwork selected from each original artboard.
+// The source document is never saved or used as a full temporary copy.
 function dcLuuDanTheoMauPDF(saveMode, suffix) {
-  return dcLuuDanTheoMauPDF_SavedAICopyLegacy(saveMode, suffix);
+  return dcLuuDanTheoMauPDF_SelectedLegacy(saveMode, suffix);
 }
 
 function dcLuuDanTheoMauPDF_SelectedLegacy(saveMode, suffix) {
@@ -19275,27 +19275,6 @@ function dcLuuDanTheoMauPDF_SelectedLegacy(saveMode, suffix) {
     try {
       colorSpace = sourceDoc.documentColorSpace;
     } catch (e3) {}
-    var sourceLayers = [];
-    for (var li = 0; li < sourceDoc.layers.length; li++) {
-      var sourceLayer = sourceDoc.layers[li];
-      var sourceLayerName = "Layer";
-      try {
-        sourceLayerName = sourceLayer.name;
-      } catch (layerNameError) {}
-      sourceLayers.push({ layer: sourceLayer, name: sourceLayerName });
-    }
-
-    function sourceLayerIndex(item) {
-      var parent = item;
-      try {
-        while (parent.parent && parent.parent.typename !== "Layer")
-          parent = parent.parent;
-        var layer = parent.parent;
-        for (var layerIndex = 0; layerIndex < sourceLayers.length; layerIndex++)
-          if (sourceLayers[layerIndex].layer === layer) return layerIndex;
-      } catch (e) {}
-      return 0;
-    }
     function topLevelItem(item) {
       var top = item;
       try {
@@ -19303,34 +19282,20 @@ function dcLuuDanTheoMauPDF_SelectedLegacy(saveMode, suffix) {
       } catch (e) {}
       return top;
     }
-    function containsItem(entries, item) {
-      for (var ci = 0; ci < entries.length; ci++)
-        if (entries[ci].item === item) return true;
-      return false;
-    }
-    function snapshotActiveArtboard(index) {
-      sourceDoc.activate();
-      sourceDoc.artboards.setActiveArtboardIndex(index);
-      sourceDoc.selection = null;
-      sourceDoc.selectObjectsOnActiveArtboard();
-      var entries = [];
-      for (var si = 0; si < sourceDoc.selection.length; si++) {
-        var item = topLevelItem(sourceDoc.selection[si]);
-        try {
-          if (containsItem(entries, item)) continue;
-          entries.push({
-            item: item,
-            bounds: item.geometricBounds.slice(0),
-            layerIndex: sourceLayerIndex(item),
-            z: item.zOrderPosition,
-          });
-        } catch (snapshotError) {}
+    function selectedTopLevelItems() {
+      var items = [];
+      for (var selectedIndex = 0; selectedIndex < sourceDoc.selection.length; selectedIndex++) {
+        var item = topLevelItem(sourceDoc.selection[selectedIndex]);
+        var alreadyAdded = false;
+        for (var itemIndex = 0; itemIndex < items.length; itemIndex++) {
+          if (items[itemIndex] === item) {
+            alreadyAdded = true;
+            break;
+          }
+        }
+        if (!alreadyAdded) items.push(item);
       }
-      return {
-        index: index,
-        rect: sourceDoc.artboards[index].artboardRect.slice(0),
-        entries: entries,
-      };
+      return items;
     }
     function makePdfOptions(pageCount) {
       var opt = new PDFSaveOptions();
@@ -19357,75 +19322,117 @@ function dcLuuDanTheoMauPDF_SelectedLegacy(saveMode, suffix) {
       } catch (e7) {}
       return opt;
     }
-    function makeTargetLayers(workDoc) {
-      var targetLayers = [];
-      // Layers.add() thêm lên đầu; đi từ dưới lên để giữ thứ tự chồng lớp.
-      for (var layerIndex = sourceLayers.length - 1; layerIndex >= 0; layerIndex--) {
-        var targetLayer = workDoc.layers.add();
-        try {
-          targetLayer.name = sourceLayers[layerIndex].name;
-        } catch (e) {}
-        targetLayers[layerIndex] = targetLayer;
-      }
-      return targetLayers;
-    }
-    function copyPageEntries(page, workDoc, targetLayers, errors) {
-      page.entries.sort(function (a, b) {
-        if (a.layerIndex !== b.layerIndex) return b.layerIndex - a.layerIndex;
-        return a.z - b.z;
-      });
-      var copied = 0;
-      for (var ei = 0; ei < page.entries.length; ei++) {
-        var entry = page.entries[ei];
-        try {
-          sourceDoc.activate();
-          var copiedItem = entry.item.duplicate(
-            targetLayers[entry.layerIndex],
-            ElementPlacement.PLACEATEND,
-          );
-          workDoc.activate();
-          var copiedBounds = copiedItem.geometricBounds;
-          copiedItem.translate(
-            entry.bounds[0] - copiedBounds[0],
-            entry.bounds[1] - copiedBounds[1],
-          );
-          copied++;
-        } catch (copyError) {
-          errors.push(
-            "Artboard " + (page.index + 1) + ": " +
-              (typeof dcMoTaLoi === "function"
-                ? dcMoTaLoi(copyError)
-                : copyError.toString()),
-          );
+    // Group on the source only long enough to duplicate it once, then undo.
+    // This keeps the open AI unchanged and avoids one cross-document copy per item.
+    function copyPageAsOneGroup(page, targetRect, workDoc, errors) {
+      var grouped = false;
+      try {
+        sourceDoc.activate();
+        sourceDoc.artboards.setActiveArtboardIndex(page.index);
+        sourceDoc.selection = null;
+        sourceDoc.selectObjectsOnActiveArtboard();
+        var items = selectedTopLevelItems();
+        if (items.length === 0)
+          throw new Error("Artboard " + (page.index + 1) + " khong co object de luu.");
+
+        var sourceItem = items[0];
+        if (items.length > 1) {
+          sourceDoc.selection = null;
+          for (var selectIndex = 0; selectIndex < items.length; selectIndex++)
+            items[selectIndex].selected = true;
+          app.executeMenuCommand("group");
+          grouped = true;
+          var groupedItems = selectedTopLevelItems();
+          if (groupedItems.length !== 1)
+            throw new Error("Khong group duoc object cua artboard.");
+          sourceItem = groupedItems[0];
+        }
+
+        var sourceBounds = sourceItem.geometricBounds.slice(0);
+        var copiedItem = sourceItem.duplicate(
+          workDoc.layers[0],
+          ElementPlacement.PLACEATEND,
+        );
+        workDoc.activate();
+        var copiedBounds = copiedItem.geometricBounds;
+        var targetLeft = targetRect[0] + (sourceBounds[0] - page.rect[0]);
+        var targetTop = targetRect[1] + (sourceBounds[1] - page.rect[1]);
+        copiedItem.translate(
+          targetLeft - copiedBounds[0],
+          targetTop - copiedBounds[1],
+        );
+        return 1;
+      } catch (copyError) {
+        errors.push(
+          "Artboard " + (page.index + 1) + ": " +
+            (typeof dcMoTaLoi === "function"
+              ? dcMoTaLoi(copyError)
+              : copyError.toString()),
+        );
+        return 0;
+      } finally {
+        if (grouped) {
+          try {
+            sourceDoc.activate();
+            app.undo();
+          } catch (undoGroupError) {}
         }
       }
-      return copied;
     }
     function exportJob(job, errors) {
       var pages = [];
       for (var pi = 0; pi < job.indices.length; pi++) {
-        var page = snapshotActiveArtboard(job.indices[pi]);
-        if (page.entries.length === 0)
-          throw new Error("Artboard " + (page.index + 1) + " không có object để lưu.");
-        pages.push(page);
+        var pageIndex = job.indices[pi];
+        pages.push({
+          index: pageIndex,
+          rect: sourceDoc.artboards[pageIndex].artboardRect.slice(0),
+        });
       }
 
       var workDoc = null;
+      var completed = false;
       try {
-        workDoc = app.documents.add(colorSpace);
-        workDoc.artboards[0].artboardRect = pages[0].rect.slice(0);
-        for (var ai = 1; ai < pages.length; ai++)
-          workDoc.artboards.add(pages[ai].rect.slice(0));
-        var targetLayers = makeTargetLayers(workDoc);
+        var maxPageWidth = 1;
+        var maxPageHeight = 1;
+        for (var pageSizeIndex = 0; pageSizeIndex < pages.length; pageSizeIndex++) {
+          var pageRect = pages[pageSizeIndex].rect;
+          maxPageWidth = Math.max(maxPageWidth, pageRect[2] - pageRect[0]);
+          maxPageHeight = Math.max(maxPageHeight, pageRect[1] - pageRect[3]);
+        }
+        // Create every page up front. Do not assign artboardRect or call
+        // artboards.add: both operations cause error 1200 on some files.
+        workDoc = app.documents.add(
+          colorSpace,
+          maxPageWidth,
+          maxPageHeight,
+          pages.length,
+        );
+        if (workDoc.artboards.length !== pages.length)
+          throw new Error("Khong tao du artboard tam de xuat PDF.");
+        var targetRects = [];
+        for (var targetIndex = 0; targetIndex < pages.length; targetIndex++)
+          targetRects.push(workDoc.artboards[targetIndex].artboardRect.slice(0));
         var copied = 0;
         for (var pageIndex = 0; pageIndex < pages.length; pageIndex++)
-          copied += copyPageEntries(pages[pageIndex], workDoc, targetLayers, errors);
-        if (copied === 0) throw new Error("Không copy được object của artboard.");
+          copied += copyPageAsOneGroup(
+            pages[pageIndex],
+            targetRects[pageIndex],
+            workDoc,
+            errors,
+          );
+        if (copied !== pages.length)
+          throw new Error("Không copy đủ object của artboard.");
         workDoc.saveAs(job.file, makePdfOptions(pages.length));
+        completed = true;
       } finally {
         try {
           if (workDoc) workDoc.close(SaveOptions.DONOTSAVECHANGES);
         } catch (closeError) {}
+        if (!completed) {
+          try {
+            if (job.file.exists) job.file.remove();
+          } catch (removeError) {}
+        }
       }
     }
 

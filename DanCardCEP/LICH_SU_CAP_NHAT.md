@@ -2,6 +2,12 @@
 
 _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
+## v2.10.16 — Gom object truoc khi luu PDF
+
+- Moi artboard duoc group tam, copy mot lan vao trang PDF nhe roi Undo ngay tren file goc. Khong luu AI goc, khong tao hoac doi artboard tam, va huy PDF do dang neu copy khong du.
+
+---
+
 ## v2.10.15 — Ổn định lưu PDF artboard
 
 - Lưu PDF bằng bản sao AI và artboard gốc, bỏ hoàn toàn nhánh tạo hoặc chỉnh artboard tạm gây lỗi 1200.
