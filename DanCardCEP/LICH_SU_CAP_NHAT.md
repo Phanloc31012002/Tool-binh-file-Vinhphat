@@ -2,6 +2,12 @@
 
 _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
+## v2.10.18 — vá các vấn đề trong chwusc năng dàn theo mẫu, và thêm chức năng dàn theo hộp linh động trong autsave
+
+- vá các vấn đề trong chwusc năng dàn theo mẫu, và thêm chức năng dàn theo hộp linh động trong autsave
+
+---
+
 ## v2.10.17 — Khong group dau cat tu dong
 
 - Cac net dau cat tu dong duoc ve truc tiep tren layer Dau cat tu dong, khong gom thanh mot group.

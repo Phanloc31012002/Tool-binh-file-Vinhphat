@@ -1,9 +1,9 @@
 {
     "product":  "com.locdev.dancard",
-    "version":  "2.10.17",
-    "title":  "Khong group dau cat tu dong",
-    "description":  "Cac net dau cat tu dong duoc ve truc tiep tren layer Dau cat tu dong, khong gom thanh mot group.",
-    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.10.17.zip",
-    "sha256":  "88A07C03F0EAF6EC2BAF718CF6F3F9E30A91ACD5DDFB08AEDB026A21CAC52756",
-    "publishedUtc":  "2026-09-24T05:05:59.1665880Z"
+    "version":  "2.10.18",
+    "title":  "vá các vấn đề trong chwusc năng dàn theo mẫu, và thêm chức năng dàn theo hộp linh động trong autsave",
+    "description":  "vá các vấn đề trong chwusc năng dàn theo mẫu, và thêm chức năng dàn theo hộp linh động trong autsave",
+    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.10.18.zip",
+    "sha256":  "D131A8B897B2CC197B25DBB9B908B24F176AA3F12A5BAEC0337E513FD582897F",
+    "publishedUtc":  "2026-09-24T09:54:47.7415346Z"
 }

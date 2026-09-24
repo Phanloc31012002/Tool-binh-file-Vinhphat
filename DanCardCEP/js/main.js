@@ -2625,6 +2625,7 @@
   var outAutoSave = document.getElementById("outAutoSave");
   var asPreview = document.getElementById("asPreview");
   var btnPickFolder = document.getElementById("btnPickFolder");
+  var asHopTheoThuTu = document.getElementById("asHopTheoThuTu");
 
   // ---- Clip nhanh 9.2×5.6 (trong tab Auto Save) ----
   var btnClipCard = document.getElementById("btnClipCard");
@@ -2722,6 +2723,7 @@
       el.addEventListener("change", asUpdatePreview);
     }
   });
+  if (asHopTheoThuTu) asHopTheoThuTu.addEventListener("change", asUpdatePreview);
   // Lần ĐẦU focus (Tab tới, hoặc click vào ô chưa focus) -> bôi đen hết
   // để gõ đè nhanh. Click LẦN 2 trong ô đang focus -> đặt con trỏ bình
   // thường để sửa giữa chuỗi.
@@ -2763,6 +2765,7 @@
     var ngay = document.getElementById("asNgay").value || "";
     var folder = document.getElementById("asFolder").value || "";
     var note = document.getElementById("asNote").value || "";
+    var hopTheoThuTu = asHopTheoThuTu && asHopTheoThuTu.checked === true;
     show(outAutoSave, "Đang lưu PDF…");
     btnAutoSave.disabled = true;
     var expr =
@@ -2782,6 +2785,8 @@
       jsStr(folder) +
       ", " +
       jsStr(note) +
+      ", " +
+      (hopTheoThuTu ? "true" : "false") +
       ")";
     cs.evalScript(expr, function (res) {
       btnAutoSave.disabled = false;

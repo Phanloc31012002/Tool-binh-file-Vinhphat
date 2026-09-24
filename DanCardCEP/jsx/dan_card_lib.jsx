@@ -19481,6 +19481,7 @@ function dcAutoSavePDF(
   ngay,
   outFolder,
   note,
+  hopTheoThuTu,
 ) {
   try {
     return _dcAutoSavePDFCore(
@@ -19492,6 +19493,7 @@ function dcAutoSavePDF(
       ngay,
       outFolder,
       note,
+      hopTheoThuTu,
     );
   } catch (e) {
     return (
@@ -19509,6 +19511,7 @@ function _dcAutoSavePDFCore(
   ngay,
   outFolder,
   note,
+  hopTheoThuTu,
 ) {
   if (app.documents.length === 0) return "ERR: Chưa mở tài liệu nào.";
   var doc = app.activeDocument;
@@ -19552,6 +19555,7 @@ function _dcAutoSavePDFCore(
     if (_v !== "") hopList.push(_v);
   }
   if (hopList.length === 0) hopList.push("");
+  hopTheoThuTu = hopTheoThuTu === true || String(hopTheoThuTu) === "true";
   function hopForIndex(idx) {
     return idx < hopList.length ? hopList[idx] : hopList[hopList.length - 1];
   }
@@ -19724,6 +19728,17 @@ function _dcAutoSavePDFCore(
     oneSideCards++;
   }
 
+  // Checkbox "Ghép số hộp theo thứ tự từng con": mỗi hàng đã được sort từ
+  // trên xuống dưới, nên card thứ i nhận đúng số hộp thứ i và chỉ xuất 1 PDF.
+  if (hopTheoThuTu && hopList.length !== cards.length)
+    return (
+      "ERR: Đang bật ghép số hộp theo thứ tự, nhưng có " +
+      cards.length +
+      " con card và " +
+      hopList.length +
+      " số hộp. Hãy nhập đúng một số hộp cho mỗi con."
+    );
+
   // ---------- Tuỳ chọn PDF (nhẹ, giữ vector, không hạ chất lượng) ----------
   function makePdfOptions() {
     var opt = new PDFSaveOptions();
@@ -19882,7 +19897,9 @@ function _dcAutoSavePDFCore(
       seen = {},
       nextStt = startN;
     for (var pi = 0; pi < cards.length; pi++) {
-      for (var ph = 0; ph < hopList.length; ph++) {
+      var firstHop = hopTheoThuTu ? pi : 0;
+      var lastHop = hopTheoThuTu ? pi + 1 : hopList.length;
+      for (var ph = firstHop; ph < lastHop; ph++) {
         var fileName = makePdfName(nextStt, cards[pi], hopList[ph]);
         var filePath = folder.fsName + "/" + fileName;
         var fileKey = String(filePath).toLowerCase();

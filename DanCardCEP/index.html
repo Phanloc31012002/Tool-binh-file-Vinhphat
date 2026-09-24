@@ -659,6 +659,14 @@
           <div class="hint">Mỗi số hộp = 1 file. Nhập nhiều số cách nhau dấu phẩy → mỗi con card xuất 1 file cho mỗi số (vd chọn 1 con, nhập 100, 200, 300 → 3 file 100/200/300 hộp).</div>
         </div>
 
+        <label class="check">
+          <input type="checkbox" id="asHopTheoThuTu" />
+          <span>Ghép số hộp theo thứ tự từng con (thay vì mỗi con × mỗi số)</span>
+        </label>
+        <p class="hint" style="margin-top: 2px">
+          Bật: số hộp thứ mấy gán đúng cho con thứ đó theo thứ tự đã chọn — vd chọn 5 con, nhập "5, 10, 20, 2, 100" → đúng 5 file, con 1 = 5 hộp, con 2 = 10 hộp... Số lượng số hộp phải bằng đúng số con đã chọn, không thì báo lỗi. Không tick: giữ như cũ (nhân chéo mỗi con × mỗi số).
+        </p>
+
         <div class="field">
           <div class="label">Ghi chú (tuỳ chọn)</div>
           <input type="text" id="asNote" class="inp" value="" placeholder="để trống nếu không cần" />
@@ -703,7 +711,7 @@
       </main>
 
       <footer class="foot">
-        <span class="ver">v2.10.17</span>
+        <span class="ver">v2.10.18</span>
       </footer>
     </div>
 
