@@ -19153,8 +19153,17 @@ function dcLuuDanTheoMauPDF(saveMode, suffix) {
       );
       if (workDoc.artboards.length !== artboardCount)
         throw new Error("Không tạo đủ artboard tạm để xuất PDF.");
+      // Some Illustrator files fail with error 1200 when assigning
+      // artboardRect after creation. Use Illustrator's native rects instead.
+      var nativeWorkArtboardRects = [];
       for (var ab = 0; ab < artboardCount; ab++)
-        workDoc.artboards[ab].artboardRect = workArtboardRects[ab].slice(0);
+        nativeWorkArtboardRects.push(workDoc.artboards[ab].artboardRect.slice(0));
+      for (var nativePlanIndex = 0; nativePlanIndex < layerPlans.length; nativePlanIndex++) {
+        var nativePlanItems = layerPlans[nativePlanIndex].items;
+        for (var nativeItemIndex = 0; nativeItemIndex < nativePlanItems.length; nativeItemIndex++)
+          nativePlanItems[nativeItemIndex].targetRect =
+            nativeWorkArtboardRects[nativePlanItems[nativeItemIndex].artboardIndex];
+      }
 
       // Layers.add() thêm lên đầu; đi từ layer dưới lên để giữ thứ tự chồng lớp.
       for (var li = 0; li < layerPlans.length; li++) {

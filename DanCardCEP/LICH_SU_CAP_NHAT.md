@@ -2,6 +2,12 @@
 
 _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
+## v2.10.14 — Sửa lỗi 1200 khi lưu PDF
+
+- Không gán lại artboardRect trong document tạm, tránh lỗi 1200 khi lưu PDF mặt trước và mặt sau.
+
+---
+
 ## v2.10.13 — Tăng thời gian thông báo
 
 - Thông báo cập nhật hiển thị khoảng 15 giây thay vì bị tắt sớm.

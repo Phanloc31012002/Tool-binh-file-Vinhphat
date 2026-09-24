@@ -1,9 +1,9 @@
 {
     "product":  "com.locdev.dancard",
-    "version":  "2.10.13",
-    "title":  "Tăng thời gian thông báo",
-    "description":  "Thông báo cập nhật hiển thị khoảng 15 giây thay vì bị tắt sớm.",
-    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.10.13.zip",
-    "sha256":  "D42FEEDA51A16524EF026C0DB20E34EF2A630CC05777F5D8030F65D85F90C25C",
-    "publishedUtc":  "2026-09-24T02:27:17.0503309Z"
+    "version":  "2.10.14",
+    "title":  "Sửa lỗi 1200 khi lưu PDF",
+    "description":  "Không gán lại artboardRect trong document tạm, tránh lỗi 1200 khi lưu PDF mặt trước và mặt sau.",
+    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.10.14.zip",
+    "sha256":  "B178851B5F4B92CD7D23437332AC2A0A99AC8525ADE2A13A10EFB48339FA1D65",
+    "publishedUtc":  "2026-09-24T04:26:49.1843071Z"
 }
