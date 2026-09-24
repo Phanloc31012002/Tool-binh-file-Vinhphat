@@ -1,9 +1,9 @@
 {
     "product":  "com.locdev.dancard",
-    "version":  "2.10.12",
-    "title":  "Bỏ viền trắng tab",
-    "description":  "Bỏ viền focus trắng dưới tab đang chọn và khôi phục lệnh dọn task cập nhật cũ.",
-    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.10.12.zip",
-    "sha256":  "4A9AEA65C3D000C940F70D9AB3729495685676BC335DFC0D3BBB3BD5E11B3E67",
-    "publishedUtc":  "2026-09-24T02:22:59.4580151Z"
+    "version":  "2.10.13",
+    "title":  "Tăng thời gian thông báo",
+    "description":  "Thông báo cập nhật hiển thị khoảng 15 giây thay vì bị tắt sớm.",
+    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.10.13.zip",
+    "sha256":  "D42FEEDA51A16524EF026C0DB20E34EF2A630CC05777F5D8030F65D85F90C25C",
+    "publishedUtc":  "2026-09-24T02:27:17.0503309Z"
 }

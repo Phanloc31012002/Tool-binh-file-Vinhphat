@@ -96,10 +96,10 @@ function Show-UpdateToast {
         $notifyIcon.BalloonTipTitle = $Title
         $notifyIcon.BalloonTipText = $Message
         $notifyIcon.BalloonTipIcon = [System.Windows.Forms.ToolTipIcon]::Info
-        $notifyIcon.ShowBalloonTip(10000)
-        # Cần giữ tiến trình sống một chút thì Windows mới kịp hiện balloon
-        # trước khi NotifyIcon bị Dispose và biến mất.
-        Start-Sleep -Seconds 6
+        $notifyIcon.ShowBalloonTip(15000)
+        # Giữ tiến trình lâu hơn thời lượng balloon; nếu Dispose sau 6 giây
+        # Windows sẽ đóng thông báo sớm dù đã yêu cầu hiển thị 15 giây.
+        Start-Sleep -Seconds 16
         $notifyIcon.Dispose()
     }
     catch {

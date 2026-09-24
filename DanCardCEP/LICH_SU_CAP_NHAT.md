@@ -2,6 +2,12 @@
 
 _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
+## v2.10.13 — Tăng thời gian thông báo
+
+- Thông báo cập nhật hiển thị khoảng 15 giây thay vì bị tắt sớm.
+
+---
+
 ## v2.10.12 — Bỏ viền trắng tab
 
 - Bỏ viền focus trắng dưới tab đang chọn và khôi phục lệnh dọn task cập nhật cũ.
