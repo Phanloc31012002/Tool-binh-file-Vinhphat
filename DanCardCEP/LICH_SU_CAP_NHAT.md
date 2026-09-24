@@ -2,6 +2,12 @@
 
 _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
+## v2.10.19 — Bản vá cập nhật
+
+- Bản vá cập nhật
+
+---
+
 ## v2.10.18 — vá các vấn đề trong chwusc năng dàn theo mẫu, và thêm chức năng dàn theo hộp linh động trong autsave
 
 - vá các vấn đề trong chwusc năng dàn theo mẫu, và thêm chức năng dàn theo hộp linh động trong autsave

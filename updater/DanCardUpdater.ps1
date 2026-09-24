@@ -236,13 +236,28 @@ function Schedule-UpdaterPayload {
 
 # Chỉ một updater được phép đổi folder extension tại một thời điểm. File lock
 # tự được Windows nhả khi tiến trình kết thúc, kể cả khi updater lỗi giữa chừng.
+# Tác vụ nền cần thoát ngay khi trùng lượt; lệnh chạy tay sẽ chờ tác vụ nền
+# hoàn tất để người dùng không gặp thông báo "bỏ qua lần này" vô ích.
 $lockPath = Join-Path $PSScriptRoot 'update.lock'
-try {
-    $updaterLock = [System.IO.File]::Open($lockPath, [System.IO.FileMode]::OpenOrCreate, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None)
-}
-catch [System.IO.IOException] {
-    Write-UpdateLog 'Đang có một tiến trình cập nhật khác; bỏ qua lần này.' DarkYellow
-    exit 0
+$updaterLock = $null
+$lockDeadline = [DateTime]::UtcNow.AddSeconds(20)
+$hasReportedWait = $false
+while ($null -eq $updaterLock) {
+    try {
+        $updaterLock = [System.IO.File]::Open($lockPath, [System.IO.FileMode]::OpenOrCreate, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None)
+    }
+    catch [System.IO.IOException] {
+        if ($Quiet) { exit 0 }
+        if (-not $hasReportedWait) {
+            Write-UpdateLog 'Đang chờ lượt kiểm tra nền hoàn tất…' DarkCyan
+            $hasReportedWait = $true
+        }
+        if ([DateTime]::UtcNow -ge $lockDeadline) {
+            Write-UpdateLog 'Tiến trình cập nhật khác vẫn đang chạy; hãy thử lại sau.' DarkYellow
+            exit 0
+        }
+        Start-Sleep -Milliseconds 250
+    }
 }
 
 function Read-JsonFile {
@@ -354,6 +369,7 @@ try {
         $webResponse = $_.Exception.Response
         if ($webResponse -and ([int]$webResponse.StatusCode -eq 304)) {
             $state | Add-Member -NotePropertyName lastCheckUtc -NotePropertyValue ([DateTime]::UtcNow.ToString('o')) -Force
+            $state | Add-Member -NotePropertyName lastError -NotePropertyValue $null -Force
             Write-JsonFile -Path $statePath -Value $state
             Write-UpdateLog 'Chưa có bản mới.' DarkGreen
             exit 0
@@ -386,6 +402,7 @@ try {
     $installedVersion = Get-InstalledVersion
 
     $state | Add-Member -NotePropertyName lastCheckUtc -NotePropertyValue ([DateTime]::UtcNow.ToString('o')) -Force
+    $state | Add-Member -NotePropertyName lastError -NotePropertyValue $null -Force
     $state | Add-Member -NotePropertyName lastSeenVersion -NotePropertyValue $remoteVersion.ToString() -Force
     Write-JsonFile -Path $statePath -Value $state
 
