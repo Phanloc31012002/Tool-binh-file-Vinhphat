@@ -2,15 +2,22 @@
 
 _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
+## v2.10.20 — Thayy đổi chức năng cách dùng của dan theo mau cho chuẩn nhất sau khi dàn và nhanh hơn
+
+- Bỏ snapshot từng con khi học mẫu ==> snap cả cụm rồi cắt từng con ra để xem
+- Có thêm chức năng chọn con chuẩn khi học mẫu để đi chiều dàn cho đúng
+
+---
+
 ## v2.10.19 — Bản vá cập nhật
 
 - Bản vá cập nhật
 
 ---
 
-## v2.10.18 — vá các vấn đề trong chwusc năng dàn theo mẫu, và thêm chức năng dàn theo hộp linh động trong autsave
+## v2.10.18 — vá các vấn đề trong chức năng dàn theo mẫu, và thêm chức năng dàn theo hộp linh động trong autosave
 
-- vá các vấn đề trong chwusc năng dàn theo mẫu, và thêm chức năng dàn theo hộp linh động trong autsave
+- vá các vấn đề trong chức năng dàn theo mẫu, và thêm chức năng dàn theo hộp linh động trong autosave
 
 ---
 

@@ -1,9 +1,9 @@
 {
     "product":  "com.locdev.dancard",
-    "version":  "2.10.19",
-    "title":  "Bản vá cập nhật",
-    "description":  "Bản vá cập nhật",
-    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.10.19.zip",
-    "sha256":  "F600080C932D4DE02496FCEE5F9860412A274648FD8C573FE53FC20473890449",
-    "publishedUtc":  "2026-09-24T10:13:46.5592267Z"
+    "version":  "2.10.20",
+    "title":  "Thayy đổi chức năng cách dùng của dan theo mau cho chuẩn nhất sau khi dàn và nhanh hơn",
+    "description":  "Bỏ snapshot từng con khi học mẫu ==\u003e snap cả cụm rồi cắt từng con ra để xem\r\nCó thêm chức năng chọn con chuẩn khi học mẫu để đi chiều dàn cho đúng",
+    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.10.20.zip",
+    "sha256":  "32A5083B43E08BE945D554024BBCFA0B798123ACC0B5473BC3370FFB8E78BD87",
+    "publishedUtc":  "2026-09-25T03:44:12.7874010Z"
 }

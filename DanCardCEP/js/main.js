@@ -1422,6 +1422,8 @@
   // ---- Dàn theo mẫu: Học mẫu / Áp mẫu ----
   var btnHocMau = document.getElementById("btnHocMau");
   var outHocMau = document.getElementById("outHocMau");
+  var btnXacNhanConChuan = document.getElementById("btnXacNhanConChuan");
+  var pendingHocMau = null;
   function localFileUrl(path) {
     // CEP chạy từ file:// nên thumbnail trong %TEMP% có thể được canvas đọc trực tiếp.
     return (
@@ -1458,6 +1460,71 @@
     };
     image.onerror = function () {
       fail("Không mở được thumbnail mẫu: " + path);
+    };
+    image.src = localFileUrl(path);
+  }
+  function sheetSignal(image, sx, sy, sw, sh) {
+    var N = 128,
+      cv = document.createElement("canvas"),
+      ctx = cv.getContext("2d");
+    cv.width = N;
+    cv.height = N;
+    ctx.clearRect(0, 0, N, N);
+    ctx.drawImage(image, sx, sy, sw, sh, 0, 0, N, N);
+    var pixels = ctx.getImageData(0, 0, N, N).data;
+    var signal = new Float32Array(N * N);
+    for (var i = 0, p = 0; i < signal.length; i++, p += 4) {
+      var alpha = pixels[p + 3] / 255;
+      var luminance =
+        pixels[p] * 0.2126 + pixels[p + 1] * 0.7152 + pixels[p + 2] * 0.0722;
+      signal[i] = alpha * Math.max(0, (190 - luminance) / 190);
+    }
+    return signal;
+  }
+  function loadSheetSignals(path, regions, done, fail) {
+    var image = new Image();
+    image.onload = function () {
+      try {
+        var imageW = image.naturalWidth || image.width,
+          imageH = image.naturalHeight || image.height,
+          signals = [],
+          index = 0;
+        if (!(imageW > 0) || !(imageH > 0))
+          throw new Error("preview tong co kich thuoc khong hop le.");
+        function readNextBatch() {
+          try {
+            var end = Math.min(regions.length, index + 24);
+            for (; index < end; index++) {
+              var region = regions[index];
+              if (!region || region.length !== 4)
+                throw new Error("khung preview " + (index + 1) + " khong hop le.");
+              var rx = Number(region[0]),
+                ry = Number(region[1]),
+                rw = Number(region[2]),
+                rh = Number(region[3]);
+              if (!isFinite(rx) || !isFinite(ry) || !(rw > 0) || !(rh > 0))
+                throw new Error("khung preview " + (index + 1) + " khong hop le.");
+              var sx = Math.max(0, Math.floor(rx * imageW)),
+                sy = Math.max(0, Math.floor(ry * imageH)),
+                ex = Math.min(imageW, Math.ceil((rx + rw) * imageW)),
+                ey = Math.min(imageH, Math.ceil((ry + rh) * imageH));
+              if (!(ex > sx) || !(ey > sy))
+                throw new Error("khung preview " + (index + 1) + " nam ngoai anh tong.");
+              signals.push(sheetSignal(image, sx, sy, ex - sx, ey - sy));
+            }
+            if (index < regions.length) setTimeout(readNextBatch, 0);
+            else done(signals);
+          } catch (err) {
+            fail("Khong doc duoc preview tong: " + err);
+          }
+        }
+        readNextBatch();
+      } catch (err) {
+        fail("Khong doc duoc preview tong: " + err);
+      }
+    };
+    image.onerror = function () {
+      fail("Khong mo duoc preview tong: " + path);
     };
     image.src = localFileUrl(path);
   }
@@ -1501,7 +1568,7 @@
       }
     return best;
   }
-  function inferVisualAngles(paths, done, fail) {
+  function inferVisualAngles(paths, referenceIndex, done, fail) {
     var signals = [],
       index = 0;
     function next() {
@@ -1510,9 +1577,16 @@
           fail("Không có thumbnail để học hướng artwork.");
           return;
         }
-        var base = signals[0],
+        if (
+          !isFinite(referenceIndex) ||
+          referenceIndex < 0 ||
+          referenceIndex >= signals.length
+        ) {
+          fail("Con mẫu chuẩn không khớp dữ liệu snapshot.");
+          return;
+        }
+        var base = signals[referenceIndex],
           rotations = [],
-          counts = [0, 0, 0, 0],
           i,
           k;
         var rotatedBase = [
@@ -1532,15 +1606,11 @@
             }
           }
           rotations.push(best);
-          counts[best]++;
         }
-        // Hướng xuất hiện nhiều nhất là hướng chuẩn 0 độ. Không phụ thuộc slot
-        // đầu tiên đang là bản lật 180 hay không.
-        var common = 0;
-        for (k = 1; k < 4; k++) if (counts[k] > counts[common]) common = k;
+        // The user-selected reference slot is the only 0-degree baseline.
         var angles = [];
         for (i = 0; i < rotations.length; i++) {
-          var visualTurns = (rotations[i] - common + 4) % 4;
+          var visualTurns = rotations[i];
           // Canvas quay dương theo chiều kim đồng hồ; Illustrator rotate dương
           // theo hệ trục trang, nên đổi chiều cho các góc 90/270.
           angles.push(((4 - visualTurns) % 4) * 90);
@@ -1560,46 +1630,213 @@
     }
     next();
   }
+  function inferSheetVisualAngles(path, regions, referenceIndex, done, fail) {
+    loadSheetSignals(
+      path,
+      regions,
+      function (signals) {
+        if (!signals.length) {
+          fail("Khong co preview tong de hoc huong artwork.");
+          return;
+        }
+        if (
+          !isFinite(referenceIndex) ||
+          referenceIndex < 0 ||
+          referenceIndex >= signals.length
+        ) {
+          fail("Con mau chuan khong khop du lieu preview tong.");
+          return;
+        }
+        var base = signals[referenceIndex],
+          rotations = [],
+          i,
+          k;
+        var rotatedBase = [
+          rotateSignal(base, 0),
+          rotateSignal(base, 1),
+          rotateSignal(base, 2),
+          rotateSignal(base, 3),
+        ];
+        for (i = 0; i < signals.length; i++) {
+          var best = 0,
+            bestScore = Infinity;
+          for (k = 0; k < 4; k++) {
+            var score = signalDistance(signals[i], rotatedBase[k]);
+            if (score < bestScore) {
+              bestScore = score;
+              best = k;
+            }
+          }
+          rotations.push(best);
+        }
+        var angles = [];
+        for (i = 0; i < rotations.length; i++)
+          angles.push(((4 - rotations[i]) % 4) * 90);
+        done(angles);
+      },
+      fail,
+    );
+  }
   function cleanupVisualThumbs(paths) {
     try {
       cs.evalScript("dcXoaPreviewMau(" + jsStr(paths.join("|")) + ")");
     } catch (e) {}
   }
+  function parseSheetRegions(encoded) {
+    if (!encoded) return null;
+    var pieces = encoded.split(";"),
+      regions = [];
+    for (var i = 0; i < pieces.length; i++) {
+      var values = pieces[i].split(",");
+      if (values.length !== 4) return null;
+      var region = [
+        parseFloat(values[0]),
+        parseFloat(values[1]),
+        parseFloat(values[2]),
+        parseFloat(values[3]),
+      ];
+      if (
+        !isFinite(region[0]) ||
+        !isFinite(region[1]) ||
+        !(region[2] > 0) ||
+        !(region[3] > 0)
+      )
+        return null;
+      regions.push(region);
+    }
+    return regions.length ? regions : null;
+  }
+  function clearPendingHocMau(removeFiles) {
+    if (removeFiles && pendingHocMau && pendingHocMau.paths)
+      cleanupVisualThumbs(pendingHocMau.paths);
+    pendingHocMau = null;
+    if (btnXacNhanConChuan) {
+      btnXacNhanConChuan.disabled = true;
+      btnXacNhanConChuan.style.display = "none";
+    }
+  }
   if (btnHocMau) {
     btnHocMau.addEventListener("click", function () {
+      clearPendingHocMau(true);
       show(outHocMau, "Đang học mẫu…");
       btnHocMau.disabled = true;
       cs.evalScript("dcHocMau()", function (res) {
+        if (res && res.indexOf("PENDING_SHEET:") === 0) {
+          var sheetData = res.substring(14).split("|");
+          var sheetTag = sheetData.shift();
+          var sheetPath = sheetData.shift();
+          var regions = parseSheetRegions(sheetData.join("|"));
+          if (!sheetTag || !sheetPath || !regions) {
+            btnHocMau.disabled = false;
+            show(outHocMau, "Preview tổng không hợp lệ. Hãy thử Học mẫu lại.", "warn");
+            return;
+          }
+          pendingHocMau = {
+            tag: sheetTag,
+            paths: [sheetPath],
+            sheetPath: sheetPath,
+            regions: regions,
+          };
+          if (btnXacNhanConChuan) {
+            btnXacNhanConChuan.style.display = "";
+            btnXacNhanConChuan.disabled = false;
+          }
+          btnHocMau.disabled = false;
+          show(
+            outHocMau,
+            "Chọn đúng 1 con mẫu cùng chiều với con nguồn trong Illustrator, rồi bấm Xác nhận con chuẩn.",
+          );
+          return;
+        }
         if (res && res.indexOf("PENDING:") === 0) {
           var data = res.substring(8).split("|");
           var tag = data.shift();
-          show(outHocMau, "Đang đọc hướng artwork từ ảnh mẫu…");
-          inferVisualAngles(
-            data,
-            function (angles) {
-              var expr =
-                "dcHocMauCapNhatGoc(" +
-                jsStr(tag) +
-                ", " +
-                jsStr(angles.join(",")) +
-                ")";
-              cs.evalScript(expr, function (finalRes) {
-                cleanupVisualThumbs(data);
-                btnHocMau.disabled = false;
-                handleRes(outHocMau, finalRes);
-              });
-            },
-            function (message) {
-              cleanupVisualThumbs(data);
-              btnHocMau.disabled = false;
-              show(outHocMau, message + " Hãy thử Học mẫu lại.", "warn");
-            },
+          pendingHocMau = { tag: tag, paths: data };
+          if (btnXacNhanConChuan) {
+            btnXacNhanConChuan.style.display = "";
+            btnXacNhanConChuan.disabled = false;
+          }
+          btnHocMau.disabled = false;
+          show(
+            outHocMau,
+            "Chọn đúng 1 con mẫu cùng chiều với con nguồn trong Illustrator, rồi bấm Xác nhận con chuẩn.",
           );
+          return;
         } else {
           btnHocMau.disabled = false;
           handleRes(outHocMau, res);
         }
       });
+    });
+  }
+  if (btnXacNhanConChuan) {
+    btnXacNhanConChuan.addEventListener("click", function () {
+      if (!pendingHocMau) {
+        show(outHocMau, "Hãy bấm Học mẫu trước.", "warn");
+        return;
+      }
+      var pending = pendingHocMau;
+      btnXacNhanConChuan.disabled = true;
+      if (btnHocMau) btnHocMau.disabled = true;
+      show(outHocMau, "Đang đọc hướng artwork từ con chuẩn…");
+      cs.evalScript(
+        "dcHocMauXacNhanConChuan(" + jsStr(pending.tag) + ")",
+        function (referenceRes) {
+          if (!referenceRes || referenceRes.indexOf("OK:") !== 0) {
+            btnXacNhanConChuan.disabled = false;
+            if (btnHocMau) btnHocMau.disabled = false;
+            handleRes(outHocMau, referenceRes);
+            return;
+          }
+          var referenceIndex = parseInt(referenceRes.substring(3), 10);
+          if (
+            !isFinite(referenceIndex) ||
+            referenceIndex < 0 ||
+            referenceIndex >=
+              (pending.regions ? pending.regions.length : pending.paths.length)
+          ) {
+            btnXacNhanConChuan.disabled = false;
+            if (btnHocMau) btnHocMau.disabled = false;
+            show(outHocMau, "Không xác định được con chuẩn. Hãy chọn lại.", "warn");
+            return;
+          }
+          var readAngles = pending.sheetPath
+            ? function (done, fail) {
+                inferSheetVisualAngles(
+                  pending.sheetPath,
+                  pending.regions,
+                  referenceIndex,
+                  done,
+                  fail,
+                );
+              }
+            : function (done, fail) {
+                inferVisualAngles(pending.paths, referenceIndex, done, fail);
+              };
+          readAngles(
+            function (angles) {
+              var expr =
+                "dcHocMauCapNhatGoc(" +
+                jsStr(pending.tag) +
+                ", " +
+                jsStr(angles.join(",")) +
+                ")";
+              cs.evalScript(expr, function (finalRes) {
+                cleanupVisualThumbs(pending.paths);
+                if (pendingHocMau === pending) clearPendingHocMau(false);
+                if (btnHocMau) btnHocMau.disabled = false;
+                handleRes(outHocMau, finalRes);
+              });
+            },
+            function (message) {
+              cleanupVisualThumbs(pending.paths);
+              if (pendingHocMau === pending) clearPendingHocMau(false);
+              if (btnHocMau) btnHocMau.disabled = false;
+              show(outHocMau, message + " Hãy thử Học mẫu lại.", "warn");
+            },
+          );
+        },
+      );
     });
   }
   var btnApMau = document.getElementById("btnApMau");

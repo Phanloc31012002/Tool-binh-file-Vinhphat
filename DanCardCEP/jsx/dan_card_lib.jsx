@@ -16625,7 +16625,7 @@ function dcHocMau() {
     return "ERR: Chưa chọn bản mẫu.";
   }
 
-  // ---------- Hỏi kiểu: 1 mặt / mặt trước / mặt sau ----------
+  // ---------- Hỏi kiểu: 1 mặt / 2 mặt đối xứng ----------
   // Dùng nút riêng cho từng lựa chọn để tránh ScriptUI giữ sai trạng thái
   // radiobutton, khiến mẫu 1 mặt bị lưu nhầm thành "Mặt trước".
   var w = new Window("dialog", "Học mẫu - chọn loại bố cục");
@@ -16636,8 +16636,11 @@ function dcHocMau() {
   w.add("statictext", undefined, "Bấm đúng loại bố cục đang chọn:");
   var which = "";
   var btnOne = w.add("button", undefined, "Học 1 mặt");
-  var btnFront = w.add("button", undefined, "Học Mặt TRƯỚC (bố cục 2 mặt)");
-  var btnBack = w.add("button", undefined, "Học Mặt SAU (bố cục 2 mặt)");
+  var btnMirror = w.add(
+    "button",
+    undefined,
+    "Học 2 mặt - Mặt SAU đối xứng",
+  );
   var gg = w.add("group");
   gg.alignment = "right";
   gg.add("button", undefined, "Hủy", { name: "cancel" });
@@ -16645,12 +16648,8 @@ function dcHocMau() {
     which = "one";
     w.close(1);
   };
-  btnFront.onClick = function () {
-    which = "front";
-    w.close(1);
-  };
-  btnBack.onClick = function () {
-    which = "back";
+  btnMirror.onClick = function () {
+    which = "mirror";
     w.close(1);
   };
   if (w.show() !== 1 || which === "") return "ERR: Đã hủy.";
@@ -17011,6 +17010,7 @@ function dcHocMau() {
       hI = b[1] - b[3];
     var ang = readContentAngle(sel[i]);
     items.push({
+      sourceIndex: i,
       cx: cx,
       cy: cy,
       w: wI,
@@ -17019,6 +17019,10 @@ function dcHocMau() {
       angle: ang === null ? -1 : ang,
       kind: shapeKind(sel[i]),
       shape: shape,
+      refCx: cx,
+      refCy: cy,
+      refW: wI,
+      refH: hI,
     });
     if (X0 === null) {
       X0 = b[0];
@@ -17053,6 +17057,10 @@ function dcHocMau() {
       h: items[k].h,
       kind: items[k].kind,
       shape: items[k].shape,
+      refCx: items[k].refCx,
+      refCy: items[k].refCy,
+      refW: items[k].refW,
+      refH: items[k].refH,
     });
   }
 
@@ -17080,6 +17088,23 @@ function dcHocMau() {
           slots[s].h.toFixed(4) +
           "\t" +
           slots[s].kind +
+          "\n",
+      );
+    }
+    // Store the original positions only while learning is pending.  The panel
+    // uses them to identify the one user-selected upright reference slot.
+    for (s = 0; s < slots.length; s++) {
+      fh.write(
+        "learnref\t" +
+          s +
+          "\t" +
+          slots[s].refCx.toFixed(4) +
+          "\t" +
+          slots[s].refCy.toFixed(4) +
+          "\t" +
+          slots[s].refW.toFixed(4) +
+          "\t" +
+          slots[s].refH.toFixed(4) +
           "\n",
       );
     }
@@ -17171,7 +17196,112 @@ function dcHocMau() {
     } catch (restoreError) {}
     return result;
   }
+  function exportLayoutPreview() {
+    var result = { file: "", regions: [], error: "" },
+      previewDoc = null,
+      originalDoc = doc;
+    var stamp = new Date().getTime();
+    try {
+      previewDoc = app.documents.add(DocumentColorSpace.RGB, 100, 100);
+      var opt = new ExportOptionsPNG24();
+      try {
+        opt.transparency = true;
+      } catch (e) {}
+      try {
+        opt.artBoardClipping = true;
+      } catch (e2) {}
+      try {
+        opt.horizontalScale = 100;
+        opt.verticalScale = 100;
+      } catch (e3) {}
+
+      var copiedItems = [],
+        copiedBounds = [];
+      for (var pi = 0; pi < items.length; pi++) {
+        app.activeDocument = originalDoc;
+        var sourceIndex = items[pi].sourceIndex;
+        if (sourceIndex < 0 || sourceIndex >= sel.length)
+          throw new Error("Khong tim thay object mau " + (pi + 1) + ".");
+        copiedItems.push(
+          sel[sourceIndex].duplicate(
+            previewDoc.layers[0],
+            ElementPlacement.PLACEATEND,
+          ),
+        );
+      }
+
+      app.activeDocument = previewDoc;
+      var left = null,
+        top = null,
+        right = null,
+        bottom = null;
+      for (pi = 0; pi < copiedItems.length; pi++) {
+        var pb = bnd(copiedItems[pi]);
+        if (!pb)
+          throw new Error("Khong do duoc preview vi tri " + (pi + 1) + ".");
+        copiedBounds.push(pb);
+        if (left === null) {
+          left = pb[0];
+          top = pb[1];
+          right = pb[2];
+          bottom = pb[3];
+        } else {
+          if (pb[0] < left) left = pb[0];
+          if (pb[1] > top) top = pb[1];
+          if (pb[2] > right) right = pb[2];
+          if (pb[3] < bottom) bottom = pb[3];
+        }
+      }
+      if (left === null || !(right > left) || !(top > bottom))
+        throw new Error("Khong do duoc khung preview tong.");
+
+      previewDoc.artboards[0].artboardRect = [left, top, right, bottom];
+      var png = new File(Folder.temp + "/dan_theo_mau_sheet_" + stamp + ".png");
+      previewDoc.exportFile(png, ExportType.PNG24, opt);
+      if (!png.exists) throw new Error("Khong xuat duoc preview tong.");
+
+      var sheetW = right - left,
+        sheetH = top - bottom;
+      for (pi = 0; pi < copiedBounds.length; pi++) {
+        pb = copiedBounds[pi];
+        result.regions.push([
+          (pb[0] - left) / sheetW,
+          (top - pb[1]) / sheetH,
+          (pb[2] - pb[0]) / sheetW,
+          (pb[1] - pb[3]) / sheetH,
+        ]);
+      }
+      result.file = png.fsName;
+    } catch (err) {
+      result.error = String(err);
+    }
+    try {
+      if (previewDoc) previewDoc.close(SaveOptions.DONOTSAVECHANGES);
+    } catch (closeError) {}
+    try {
+      app.activeDocument = originalDoc;
+    } catch (restoreError) {}
+    return result;
+  }
   function pendingVisualAngles(tag) {
+    var sheet = exportLayoutPreview();
+    if (!sheet.error && sheet.file && sheet.regions.length === slots.length) {
+      var encoded = [];
+      for (var ri = 0; ri < sheet.regions.length; ri++) {
+        var region = sheet.regions[ri];
+        encoded.push(
+          region[0].toFixed(8) +
+            "," +
+            region[1].toFixed(8) +
+            "," +
+            region[2].toFixed(8) +
+            "," +
+            region[3].toFixed(8),
+        );
+      }
+      return "PENDING_SHEET:" + tag + "|" + sheet.file + "|" + encoded.join(";");
+    }
+
     // Raster/Placed có thể đã chứa artwork quay sẵn nên matrix = 0. Export
     // thumbnail để panel so pixel và học đúng 0/90/180/270 của ảnh nhìn thấy.
     var previews = exportSlotPreviews();
@@ -17191,42 +17321,101 @@ function dcHocMau() {
     writeBlock(f, "F");
     f.close();
     return pendingVisualAngles("F");
-  } else if (which === "front") {
+  } else {
     f.encoding = "UTF-8";
     f.open("w");
     f.write(
       "# dan theo mau v5 - raster mask va huong artwork\nMODE\ttwo\nSTATE\tpending\n",
     );
+    f.write("BACK_MIRROR\tHORIZONTAL\n");
     writeBlock(f, "F");
     f.close();
     return pendingVisualAngles("F");
-  } else {
-    if (!f.exists) {
-      alert("Chưa học mặt trước. Hãy học 'Mặt TRƯỚC' trước.");
-      return "ERR: Chưa học MẶT TRƯỚC.";
-    }
-    f.encoding = "UTF-8";
-    f.open("r");
-    var old = f.read();
-    f.close();
-    if (old.indexOf("MODE\ttwo") < 0)
-      old = old.replace(/MODE\tone/, "MODE\ttwo");
-    if (old.indexOf("STATE\t") >= 0)
-      old = old.replace(/STATE\t[^\r\n]*/, "STATE\tpending");
-    else old = old.replace(/(MODE\ttwo\r?\n?)/, "$1STATE\tpending\n");
-    var cut = old.indexOf("BLOCK\tB");
-    if (cut >= 0) old = old.substring(0, cut);
-    if (old.length > 0 && old.charAt(old.length - 1) !== "\n") old += "\n";
-    f.encoding = "UTF-8";
-    f.open("w");
-    f.write(old);
-    writeBlock(f, "B");
-    f.close();
-    return pendingVisualAngles("B");
   }
 }
 
 // Panel gọi sau khi đã so pixel các thumbnail do dcHocMau xuất ra.
+function dcHocMauXacNhanConChuan(tag) {
+  try {
+    tag = String(tag || "");
+    if (tag !== "F" && tag !== "B") return "ERR: Mat mau khong hop le.";
+    if (app.documents.length === 0) return "ERR: Chua mo tai lieu.";
+    var doc = app.activeDocument;
+    if (!doc.selection || doc.selection.length !== 1)
+      return "ERR: Hay chon dung 1 con mau cung chieu voi con nguon.";
+
+    var f = new File(Folder.temp + "/dan_theo_mau_tmp.txt");
+    if (!f.exists) return "ERR: Khong tim thay du lieu mau dang cho.";
+    f.encoding = "UTF-8";
+    f.open("r");
+    var all = f.read();
+    f.close();
+    if (all.indexOf("STATE\tpending") < 0)
+      return "ERR: Mau nay khong con o buoc chon con chuan. Hay Hoc mau lai.";
+
+    var chosen = doc.selection[0];
+    var gb = null;
+    try {
+      gb = chosen.geometricBounds;
+    } catch (boundsError) {}
+    if (!gb || gb.length !== 4 || !(gb[2] > gb[0]) || !(gb[1] > gb[3])) {
+      try {
+        gb = chosen.visibleBounds;
+      } catch (visibleBoundsError) {}
+    }
+    if (!gb || gb.length !== 4 || !(gb[2] > gb[0]) || !(gb[1] > gb[3]))
+      return "ERR: Khong do duoc con mau dang chon.";
+    var cx = (gb[0] + gb[2]) / 2,
+      cy = (gb[1] + gb[3]) / 2;
+
+    var lines = all.split(/\r\n|\r|\n/),
+      current = "",
+      refs = [],
+      i;
+    for (i = 0; i < lines.length; i++) {
+      var p = lines[i].split("\t");
+      if (p[0] === "BLOCK") current = p[1];
+      else if (p[0] === "learnref" && current === tag && p.length >= 6) {
+        var ref = {
+          index: parseInt(p[1], 10),
+          cx: parseFloat(p[2]),
+          cy: parseFloat(p[3]),
+          w: parseFloat(p[4]),
+          h: parseFloat(p[5]),
+        };
+        if (
+          isFinite(ref.index) &&
+          isFinite(ref.cx) &&
+          isFinite(ref.cy) &&
+          ref.w > 0 &&
+          ref.h > 0
+        )
+          refs.push(ref);
+      }
+    }
+    if (refs.length === 0)
+      return "ERR: Mau khong co du lieu con chuan. Hay Hoc mau lai.";
+
+    var best = null,
+      bestDistance = Number.MAX_VALUE;
+    for (i = 0; i < refs.length; i++) {
+      var dx = cx - refs[i].cx,
+        dy = cy - refs[i].cy,
+        distance = Math.sqrt(dx * dx + dy * dy);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        best = refs[i];
+      }
+    }
+    var tolerance = Math.max(best.w, best.h) * 0.35 + 1;
+    if (!best || bestDistance > tolerance)
+      return "ERR: Con dang chon khong nam trong bo cuc vua hoc. Hay chon lai 1 con mau.";
+    return "OK:" + best.index;
+  } catch (e) {
+    return "ERR: Khong xac nhan duoc con chuan: " + e.toString();
+  }
+}
+
 function dcHocMauCapNhatGoc(tag, csvAngles) {
   var f = new File(Folder.temp + "/dan_theo_mau_tmp.txt");
   if (!f.exists) return "ERR: Không tìm thấy dữ liệu mẫu đang chờ hoàn tất.";
@@ -17238,6 +17427,13 @@ function dcHocMauCapNhatGoc(tag, csvAngles) {
     return "ERR: Dữ liệu mẫu không đúng phiên bản học hướng.";
   var values = String(csvAngles || "").split(","),
     lines = all.split(/\r\n|\r|\n/);
+  var autoMirrorBack = false;
+  for (var markerIndex = 0; markerIndex < lines.length; markerIndex++) {
+    if (lines[markerIndex] === "BACK_MIRROR\tHORIZONTAL") {
+      autoMirrorBack = true;
+      break;
+    }
+  }
   var current = "",
     used = 0,
     mode = "one",
@@ -17272,6 +17468,11 @@ function dcHocMauCapNhatGoc(tag, csvAngles) {
       "Đã HỌC MẶT SAU (" +
       used +
       " vị trí) và nhận diện hướng artwork từ ảnh mẫu.\nGiờ bấm Áp mẫu, chọn nguồn mặt trước rồi mặt sau.";
+  else if (mode === "two" && autoMirrorBack)
+    msg =
+      "Đã HỌC 2 MẶT từ MẶT TRƯỚC (" +
+      used +
+      " vị trí). Mặt SAU đã tự đối xứng ngang; slot 0°/180° giữ nguyên, 90°/270° đổi chiều.\nGiờ chọn nguồn mặt trước rồi mặt sau, sau đó bấm Áp mẫu.";
   else if (mode === "two")
     msg =
       "Đã HỌC MẶT TRƯỚC (" +
@@ -17339,6 +17540,7 @@ function dcApMau(multiSourcePerArtboard) {
   var lines = all.split(/\r\n|\r|\n/);
 
   var MODE = "one";
+  var autoMirrorBack = false;
   var blocks = { F: null, B: null };
   var cur = null;
   function decodeRing(data, closed, evenodd) {
@@ -17373,6 +17575,8 @@ function dcApMau(multiSourcePerArtboard) {
     var p = ln.split("\t");
     if (p[0] == "MODE") {
       MODE = p[1];
+    } else if (p[0] == "BACK_MIRROR") {
+      autoMirrorBack = p[1] === "HORIZONTAL";
     } else if (p[0] == "BLOCK") {
       cur = { sideHi: 0, sideLo: 0, slots: [] };
       blocks[p[1]] = cur;
@@ -17414,6 +17618,62 @@ function dcApMau(multiSourcePerArtboard) {
       cur = blocks.F;
     }
   }
+  function mirrorShapeHorizontally(shape) {
+    if (!shape || !shape.paths) return null;
+    var mirrored = {
+      root: shape.root,
+      expected: shape.expected,
+      paths: [],
+    };
+    for (var mpi = 0; mpi < shape.paths.length; mpi++) {
+      var path = shape.paths[mpi];
+      if (!path || !path.pts) continue;
+      var mirroredPath = {
+        closed: path.closed,
+        evenodd: path.evenodd,
+        pts: [],
+      };
+      for (var mpt = 0; mpt < path.pts.length; mpt++) {
+        var point = path.pts[mpt];
+        mirroredPath.pts.push({
+          ax: -point.ax,
+          ay: point.ay,
+          lx: -point.lx,
+          ly: point.ly,
+          rx: -point.rx,
+          ry: point.ry,
+          typ: point.typ,
+        });
+      }
+      mirrored.paths.push(mirroredPath);
+    }
+    return mirrored;
+  }
+  function mirroredBackBlock(front) {
+    var back = { sideHi: front.sideHi, sideLo: front.sideLo, slots: [] };
+    for (var msi = 0; msi < front.slots.length; msi++) {
+      var frontSlot = front.slots[msi];
+      // Mirror across the vertical layout axis: upright/upside-down artwork
+      // keeps its direction, while 90 and 270 degrees swap direction.
+      var backAngle = -frontSlot.angle;
+      backAngle = backAngle % 360;
+      if (backAngle < 0) backAngle += 360;
+      back.slots.push({
+        dx: -frontSlot.dx,
+        dy: frontSlot.dy,
+        land: frontSlot.land,
+        angle: backAngle,
+        w: frontSlot.w,
+        h: frontSlot.h,
+        kind: frontSlot.kind,
+        shape: mirrorShapeHorizontally(frontSlot.shape),
+      });
+    }
+    return back;
+  }
+  if (autoMirrorBack && MODE === "two" && blocks.F && !blocks.B)
+    blocks.B = mirroredBackBlock(blocks.F);
+
   if (!blocks.F || blocks.F.slots.length === 0) {
     alert("Bố cục mẫu rỗng. Học mẫu lại.");
     return "ERR: Bố cục mẫu rỗng.";
@@ -17801,6 +18061,7 @@ function dcApMau(multiSourcePerArtboard) {
   var errors = [];
   var filledSlotCount = 0,
     outputBatchCount = 0;
+  var outputItems = [];
   var destName = doc.name;
 
   function loadPon(label) {
@@ -17928,8 +18189,6 @@ function dcApMau(multiSourcePerArtboard) {
       return;
     }
 
-    var batchGroup = outLayer.groupItems.add();
-    batchGroup.name = "DAN_THEO_MAU_" + tag;
     var sourceCache = [];
     function isReadyImage(item) {
       try {
@@ -18064,8 +18323,8 @@ function dcApMau(multiSourcePerArtboard) {
           targetCy = cyBo + sl.dy;
         rasterCopy.translate(targetCx - hcx, targetCy - hcy);
 
-        // Đặt bản sao đã resize vào đúng tâm slot; không tạo clipping mask.
-        rasterCopy.move(batchGroup, ElementPlacement.PLACEATEND);
+        // Bản sao đã nằm trực tiếp trong output layer; không tạo group.
+        outputItems.push(rasterCopy);
         rasterCopy = null;
         made++;
       } catch (e) {
@@ -18080,12 +18339,7 @@ function dcApMau(multiSourcePerArtboard) {
         if (sourceCache[removeIndex].flat) sourceCache[removeIndex].flat.remove();
       } catch (removeFlatError) {}
     }
-    if (made === 0) {
-      try {
-        batchGroup.remove();
-      } catch (emptyGroupError) {}
-      return;
-    }
+    if (made === 0) return;
 
     if (ponDup) {
       try {
@@ -18375,6 +18629,16 @@ function dcApMau(multiSourcePerArtboard) {
       } catch (e) {}
     }
   }
+
+  // Giữ toàn bộ artwork vừa dàn ở trạng thái chọn để chạy Đặt pon ngay.
+  try {
+    doc.selection = null;
+    for (var selectedIndex = 0; selectedIndex < outputItems.length; selectedIndex++) {
+      try {
+        outputItems[selectedIndex].selected = true;
+      } catch (selectOutputError) {}
+    }
+  } catch (selectOutputsError) {}
 
   app.redraw();
   var msg =
