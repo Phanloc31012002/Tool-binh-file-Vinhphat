@@ -318,6 +318,7 @@
   var tabs = document.querySelectorAll(".tab");
   var panes = {
     danfile: document.getElementById("pane-danfile"),
+    toiuu: document.getElementById("pane-toiuu"),
     cutmarks: document.getElementById("pane-cutmarks"),
     danmau: document.getElementById("pane-danmau"),
     catalogue: document.getElementById("pane-catalogue"),
@@ -1363,6 +1364,38 @@
     // ExtendScript hiểu \U \A... là escape rồi nuốt mất dấu \).
     return "'" + String(s).replace(/\\/g, "\\\\").replace(/'/g, "\\'") + "'";
   }
+  function loadDanToiUuJsx() {
+    // CEP co the giu ExtendScript engine cu sau khi cai thu panel. Nạp lại khi
+    // chưa có, hoặc khi engine vẫn giữ bộ tính Dàn tối ưu phiên bản cũ.
+    try {
+      var extensionRoot = cs
+        .getSystemPath(SystemPath.EXTENSION)
+        .replace(/\\/g, "/");
+      var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
+      return (
+        "if (typeof dcDanToiUu !== 'function' || typeof dcDanToiUuVersion === 'undefined' || dcDanToiUuVersion < 9) { $.evalFile(" +
+        jsStr(jsxPath) +
+        "); } "
+      );
+    } catch (e) {
+      return "";
+    }
+  }
+  function loadResizeJsx() {
+    try {
+      var extensionRoot = cs
+        .getSystemPath(SystemPath.EXTENSION)
+        .replace(/\\/g, "/");
+      var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
+      return (
+        "if (typeof dcResizeSelectionToSize !== 'function') { $.evalFile(" +
+        jsStr(jsxPath) +
+        "); } "
+      );
+    } catch (e) {
+      return "";
+    }
+  }
   function handleRes(el, res) {
     if (res === "EvalScript error." || res === undefined || res === "")
       show(el, "Lỗi gọi ExtendScript.", "warn");
@@ -1371,6 +1404,39 @@
     else if (res.indexOf("OK:") === 0)
       showOkWithWarn(el, res.substring(3).replace(/^\s+/, ""));
     else show(el, res, "ok");
+  }
+  function showDanToiUuResult(res) {
+    if (res === "EvalScript error." || res === undefined || res === "") {
+      show(outDanToiUu, "Lỗi gọi ExtendScript.", "warn");
+      return;
+    }
+    if (res.indexOf("ERR:") === 0) {
+      show(outDanToiUu, res.substring(4).replace(/^\s+/, ""), "warn");
+      return;
+    }
+    if (res.indexOf("OK:") !== 0) {
+      show(outDanToiUu, res, "ok");
+      return;
+    }
+
+    var message = res.substring(3).replace(/^\s+/, "");
+    var match = /^\[\[COUNT:(\d+)\]\]\s*/.exec(message);
+    if (!match) {
+      showOkWithWarn(outDanToiUu, message);
+      return;
+    }
+    var safe = message
+      .substring(match[0].length)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+    outDanToiUu.className = "out ok";
+    outDanToiUu.innerHTML =
+      '<strong class="optimal-capacity">' +
+      match[1] +
+      " con / tờ</strong><br>" +
+      safe;
+    fitOut(outDanToiUu);
   }
 
   // ---- Dấu cắt ----
@@ -1418,6 +1484,39 @@
       handleRes(out, res);
     });
   });
+
+  // ---- Dàn tối ưu không pon ----
+  var btnDanToiUu = document.getElementById("btnDanToiUu");
+  var outDanToiUu = document.getElementById("outDanToiUu");
+  if (btnDanToiUu && outDanToiUu) {
+    ["autoSheetWidth", "autoSheetHeight"].forEach(attachSelectFirst);
+    btnDanToiUu.addEventListener("click", function () {
+      var width = document.getElementById("autoSheetWidth").value || "";
+      var height = document.getElementById("autoSheetHeight").value || "";
+      var twoSided = document.getElementById("autoSheetTwoSided").checked;
+      var multiPerArtboard = document.getElementById(
+        "autoSheetMultiPerArtboard",
+      ).checked;
+      show(outDanToiUu, "Đang tính bố cục và tạo tờ giấy…");
+      btnDanToiUu.disabled = true;
+      cs.evalScript(
+        loadDanToiUuJsx() +
+          "dcDanToiUu(" +
+          jsStr(width) +
+          ", " +
+          jsStr(height) +
+          ", " +
+          (twoSided ? "true" : "false") +
+          ", " +
+          (multiPerArtboard ? "true" : "false") +
+          ")",
+        function (res) {
+          btnDanToiUu.disabled = false;
+          showDanToiUuResult(res);
+        },
+      );
+    });
+  }
 
   // ---- Dàn theo mẫu: Học mẫu / Áp mẫu ----
   var btnHocMau = document.getElementById("btnHocMau");
@@ -2610,6 +2709,64 @@
     );
   });
 
+  // ---- Resize theo KT (nut Resize canh Raster) ----
+  var btnResize = document.getElementById("btnResize");
+  var resizePopover = document.getElementById("resizePopover");
+  var resizeOk = document.getElementById("resizeOk");
+  var resizeCancel = document.getElementById("resizeCancel");
+  var resizeMsg = document.getElementById("resizeMsg");
+  if (btnResize && resizePopover) {
+    ["resizeW", "resizeH"].forEach(attachSelectFirst);
+    btnResize.addEventListener("click", function () {
+      if (clipPopover) clipPopover.classList.add("hidden");
+      resizePopover.classList.toggle("hidden");
+      if (!resizePopover.classList.contains("hidden")) {
+        if (resizeMsg) resizeMsg.textContent = "";
+        var w = document.getElementById("resizeW");
+        if (w) {
+          w.focus();
+          w.select();
+        }
+      }
+    });
+    if (resizeCancel)
+      resizeCancel.addEventListener("click", function () {
+        resizePopover.classList.add("hidden");
+      });
+    if (resizeOk)
+      resizeOk.addEventListener("click", function () {
+        var wv = document.getElementById("resizeW").value || "";
+        var hv = document.getElementById("resizeH").value || "";
+        var uv = document.getElementById("resizeUnit").value || "cm";
+        if (resizeMsg) resizeMsg.textContent = "Đang resize…";
+        resizeOk.disabled = true;
+        var expr =
+          "(function(){try{" +
+          loadResizeJsx() +
+          "return dcResizeSelectionToSize(" +
+          jsStr(wv) +
+          ", " +
+          jsStr(hv) +
+          ", " +
+          jsStr(uv) +
+          ");}catch(e){return 'ERR: ' + e.toString();}})()";
+        cs.evalScript(expr, function (res) {
+          resizeOk.disabled = false;
+          if (!resizeMsg) return;
+          if (res && res.indexOf("OK:") === 0) {
+            resizeMsg.textContent = res.substring(3).replace(/^\s+/, "");
+            setTimeout(function () {
+              resizePopover.classList.add("hidden");
+            }, 900);
+          } else if (res && res.indexOf("ERR:") === 0) {
+            resizeMsg.textContent = res.substring(4).replace(/^\s+/, "");
+          } else {
+            resizeMsg.textContent = "Lỗi gọi ExtendScript.";
+          }
+        });
+      });
+  }
+
   // ---- Clip theo KT (nút Clip cạnh Raster) ----
   var btnClip = document.getElementById("btnClip");
   var clipPopover = document.getElementById("clipPopover");
@@ -2619,6 +2776,7 @@
   if (btnClip && clipPopover) {
     ["clipW", "clipH"].forEach(attachSelectFirst);
     btnClip.addEventListener("click", function () {
+      if (resizePopover) resizePopover.classList.add("hidden");
       clipPopover.classList.toggle("hidden");
       if (!clipPopover.classList.contains("hidden")) {
         if (clipMsg) clipMsg.textContent = "";

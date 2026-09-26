@@ -282,6 +282,10 @@ body {
   color: var(--warn);
   border-color: #5c4630;
 }
+.optimal-capacity {
+  color: #ec008c;
+  font-weight: 800;
+}
 
 /* ---- Footer ---- */
 .foot {
@@ -1742,8 +1746,9 @@ body {
   height: 61px;
 }
 
-/* ===== Nút Clip + bảng nhập KT (header) ===== */
-.header-clip {
+/* ===== Nút Clip / Resize + bảng nhập KT (header) ===== */
+.header-clip,
+.header-resize {
   margin-left: 6px;
 }
 .head {

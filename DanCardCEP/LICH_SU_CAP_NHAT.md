@@ -2,6 +2,12 @@
 
 _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
+## v2.12.0 — beta thêm chức năng tự động dàn tối ưu
+
+- Dàn tối ưu nhất trên 1 tờ giấy với kích thước tùy chỉnh
+
+---
+
 ## v2.10.20 — Thayy đổi chức năng cách dùng của dan theo mau cho chuẩn nhất sau khi dàn và nhanh hơn
 
 - Bỏ snapshot từng con khi học mẫu ==> snap cả cụm rồi cắt từng con ra để xem

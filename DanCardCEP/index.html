@@ -23,6 +23,14 @@
             Raster
           </button>
           <button
+            id="btnResize"
+            class="header-raster header-resize"
+            type="button"
+            title="Resize object đang chọn theo kích thước nhập vào"
+          >
+            Resize
+          </button>
+          <button
             id="btnClip"
             class="header-raster header-clip"
             type="button"
@@ -52,6 +60,27 @@
             </button>
           </div>
           <div id="clipMsg" class="hint"></div>
+        </div>
+
+        <div id="resizePopover" class="clip-pop hidden">
+          <div class="clip-pop-title">Resize kích thước (giữ tâm)</div>
+          <div class="clip-pop-row">
+            <input type="text" id="resizeW" class="clip-inp" value="5" />
+            <span class="times">×</span>
+            <input type="text" id="resizeH" class="clip-inp" value="5" />
+            <select id="resizeUnit" class="clip-unit">
+              <option value="cm">cm</option>
+              <option value="mm">mm</option>
+              <option value="in">in</option>
+            </select>
+          </div>
+          <div class="clip-pop-btns">
+            <button id="resizeCancel" class="btn" type="button">Huỷ</button>
+            <button id="resizeOk" class="btn btn-primary" type="button">
+              <span class="btn-label">Resize</span>
+            </button>
+          </div>
+          <div id="resizeMsg" class="hint"></div>
         </div>
         <div class="credits">
           <div class="credit">
@@ -143,6 +172,7 @@
 
       <div class="tabbar">
         <button class="tab active" data-tab="danfile">Dàn file</button>
+        <button class="tab" data-tab="toiuu">Dàn tối ưu</button>
         <button class="tab" data-tab="cutmarks">Dấu cắt</button>
         <button class="tab" data-tab="danmau">Dàn theo mẫu</button>
         <button class="tab" data-tab="catalogue">Catalogue</button>
@@ -303,6 +333,55 @@
             <div id="outDecal" class="out">Chọn object rồi bấm Dàn.</div>
           </div>
         </div>
+      </main>
+
+      <!-- TAB: DÀN TỐI ƯU (không pon) -->
+      <main class="body tabpane" id="pane-toiuu">
+        <div class="field">
+          <div class="label">Dàn tối ưu không pon</div>
+          <p class="hint">
+            Chọn một hoặc nhiều bài (mỗi bài nên là một group), nhập khổ giấy rồi dàn.
+            Tool tự thử xoay 90° và chọn bố cục có nhiều con nhất.
+          </p>
+        </div>
+        <div class="field-row">
+          <label class="field half" for="autoSheetWidth">
+            <span class="label">Ngang giấy (cm)</span>
+            <input id="autoSheetWidth" class="num" type="text" value="33" inputmode="decimal" />
+          </label>
+          <label class="field half" for="autoSheetHeight">
+            <span class="label">Dọc giấy (cm)</span>
+            <input id="autoSheetHeight" class="num" type="text" value="35.4" inputmode="decimal" />
+          </label>
+        </div>
+        <label class="check">
+          <input type="checkbox" id="autoSheetTwoSided" />
+          <span>Dàn 2 mặt đối xứng</span>
+        </label>
+        <p class="hint">
+          Khi bật: chọn từng cặp theo hàng, object bên trái là mặt trước và bên phải
+          là mặt sau. Mặt sau được dàn đối xứng theo mặt trước.
+        </p>
+        <label class="check">
+          <input type="checkbox" id="autoSheetMultiPerArtboard" />
+          <span>Dàn nhiều mẫu vào một tờ</span>
+        </label>
+        <p class="hint">
+          Mặc định: mỗi mẫu tạo một tờ riêng và được dàn đầy. Tick: các mẫu cùng
+          kích thước được dàn luân phiên trên một tờ; nếu số chỗ không chia đều,
+          tool sẽ hỏi trước khi dàn.
+        </p>
+        <div class="field">
+          <p class="hint">
+            Lề an toàn cố định: 3 mm mỗi cạnh. Khe giữa bài: 0 mm. Tool tạo
+            artboard mới, không đặt pon; bài dàn xong được canh giữa và chọn sẵn.
+            Các tờ mới được xếp từ trái sang phải, hết chỗ sẽ tự xuống hàng.
+          </p>
+        </div>
+        <button id="btnDanToiUu" class="btn btn-primary" type="button">
+          <span class="btn-label">Dàn tối ưu</span>
+        </button>
+        <div id="outDanToiUu" class="out">Chọn một bài rồi bấm Dàn tối ưu.</div>
       </main>
 
       <!-- TAB: DẤU CẮT -->
@@ -714,7 +793,7 @@
       </main>
 
       <footer class="foot">
-        <span class="ver">v2.10.20</span>
+        <span class="ver">v2.12.0</span>
       </footer>
     </div>
 

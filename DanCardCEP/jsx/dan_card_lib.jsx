@@ -3062,6 +3062,1331 @@ function dcThemDauCatTuDong(lengthText, edgeText, gapText) {
 }
 
 // ============================================================
+//  TAB DAN TOI UU: 1 mau -> 1 to giay, khong dat pon.
+//  Chi dung cac day/hang hinh chu nhat de co the cat bang dao thang.
+//  Moi lan chay tao artboard va layer moi, khong sua bai nguon.
+// ============================================================
+var dcDanToiUuVersion = 2;
+function dcDanToiUuV2(pageWidthText, pageHeightText) {
+  try {
+    if (app.documents.length === 0) return "ERR: Chua mo tai lieu nao.";
+
+    var doc = app.activeDocument;
+    var selection = doc.selection;
+    if (!selection || selection.length === 0)
+      return "ERR: Chon mot bai mau truoc khi dan.";
+
+    var MM = 2.834645669;
+    var MARGIN = 3 * MM;
+    var EPS = 0.01;
+
+    function parseCentimeters(value, label) {
+      var n = parseFloat(String(value === undefined || value === null ? "" : value).replace(",", "."));
+      if (!isFinite(n) || n <= 0)
+        throw new Error(label + " phai la so cm lon hon 0.");
+      return n * 10 * MM;
+    }
+
+    function boundsOf(item) {
+      try {
+        return item.visibleBounds.slice(0);
+      } catch (e) {}
+      try {
+        return item.geometricBounds.slice(0);
+      } catch (e2) {}
+      return null;
+    }
+
+    // Luu lai selection truoc khi tao layer/artboard de source khong bi doi.
+    var sources = [];
+    var sourceBounds = null;
+    for (var si = 0; si < selection.length; si++) {
+      var source = selection[si];
+      var sb = boundsOf(source);
+      if (!sb || sb[2] - sb[0] <= EPS || sb[1] - sb[3] <= EPS) continue;
+      sources.push(source);
+      if (!sourceBounds) sourceBounds = sb.slice(0);
+      else {
+        sourceBounds[0] = Math.min(sourceBounds[0], sb[0]);
+        sourceBounds[1] = Math.max(sourceBounds[1], sb[1]);
+        sourceBounds[2] = Math.max(sourceBounds[2], sb[2]);
+        sourceBounds[3] = Math.min(sourceBounds[3], sb[3]);
+      }
+    }
+    if (sources.length === 0 || !sourceBounds)
+      return "ERR: Selection hien tai khong co artwork hop le de dan.";
+
+    var paperW = parseCentimeters(pageWidthText, "Ngang giay");
+    var paperH = parseCentimeters(pageHeightText, "Doc giay");
+    var usableW = paperW - 2 * MARGIN;
+    var usableH = paperH - 2 * MARGIN;
+    if (usableW <= EPS || usableH <= EPS)
+      return "ERR: Kho giay phai lon hon le an toan 3 mm moi canh.";
+
+    var sourceW = sourceBounds[2] - sourceBounds[0];
+    var sourceH = sourceBounds[1] - sourceBounds[3];
+    if (sourceW <= EPS || sourceH <= EPS)
+      return "ERR: Khong do duoc kich thuoc bai mau.";
+
+    function floorFit(space, size) {
+      if (size <= EPS) return 0;
+      return Math.floor((space + EPS) / size);
+    }
+
+    // Mot day la hinh chu nhat co the cat bang dao thang. Khac voi ban dau,
+    // day nay co the nam trong mot nhanh cua bo cuc: tool tach giay thanh cac
+    // vung chu nhat (guillotine) de tan dung khoang trong hinh chu L.
+    function makeStripPlan(direction, normalBands, rotatedBands, regionW, regionH) {
+      var normalCells = direction === "row" ? floorFit(regionW, sourceW) : floorFit(regionH, sourceH);
+      var rotatedCells = direction === "row" ? floorFit(regionW, sourceH) : floorFit(regionH, sourceW);
+      if ((normalBands > 0 && normalCells <= 0) || (rotatedBands > 0 && rotatedCells <= 0))
+        return null;
+
+      var count = normalBands * normalCells + rotatedBands * rotatedCells;
+      if (count <= 0) return null;
+      var plan = {
+        kind: "strips",
+        direction: direction,
+        count: count,
+        normalCount: normalBands * normalCells,
+        rotatedCount: rotatedBands * rotatedCells,
+        bands: [],
+      };
+      if (normalBands > 0)
+        plan.bands.push({
+          angle: 0,
+          repeat: normalBands,
+          cells: normalCells,
+          cellW: sourceW,
+          cellH: sourceH,
+        });
+      if (rotatedBands > 0)
+        plan.bands.push({
+          angle: 90,
+          repeat: rotatedBands,
+          cells: rotatedCells,
+          cellW: sourceH,
+          cellH: sourceW,
+        });
+      return plan;
+    }
+
+    function planComplexity(plan) {
+      if (!plan) return 999999;
+      if (plan.kind === "empty") return 0;
+      if (plan.kind === "strips") return plan.bands.length;
+      return 1 + planComplexity(plan.first) + planComplexity(plan.second);
+    }
+
+    function isBetter(candidate, best) {
+      if (!candidate) return false;
+      if (!best) return true;
+      if (candidate.count !== best.count) return candidate.count > best.count;
+      // Cung so luong thi uu tien giu nguyen chieu doc va it nhanh cat hon.
+      if (candidate.normalCount !== best.normalCount)
+        return candidate.normalCount > best.normalCount;
+      return planComplexity(candidate) < planComplexity(best);
+    }
+
+    function bestStripPlan(regionW, regionH) {
+      var best = null;
+      var normalRowMax = floorFit(regionH, sourceH);
+      for (var normalRows = 0; normalRows <= normalRowMax; normalRows++) {
+        var rowRemain = regionH - normalRows * sourceH;
+        var rotatedRows = floorFit(rowRemain, sourceW);
+        var rowPlan = makeStripPlan("row", normalRows, rotatedRows, regionW, regionH);
+        if (isBetter(rowPlan, best)) best = rowPlan;
+      }
+
+      var normalColumnMax = floorFit(regionW, sourceW);
+      for (var normalColumns = 0; normalColumns <= normalColumnMax; normalColumns++) {
+        var columnRemain = regionW - normalColumns * sourceW;
+        var rotatedColumns = floorFit(columnRemain, sourceH);
+        var columnPlan = makeStripPlan("column", normalColumns, rotatedColumns, regionW, regionH);
+        if (isBetter(columnPlan, best)) best = columnPlan;
+      }
+      return best;
+    }
+
+    function addCutValue(values, seen, value, total) {
+      if (value <= EPS || total - value <= EPS) return;
+      var key = Math.round(value * 1000);
+      if (seen[key]) return;
+      seen[key] = true;
+      values.push(value);
+    }
+
+    function cutValues(total) {
+      var values = [],
+        seen = {},
+        i;
+      for (i = 1; i <= floorFit(total, sourceW); i++) {
+        addCutValue(values, seen, i * sourceW, total);
+        addCutValue(values, seen, total - i * sourceW, total);
+      }
+      for (i = 1; i <= floorFit(total, sourceH); i++) {
+        addCutValue(values, seen, i * sourceH, total);
+        addCutValue(values, seen, total - i * sourceH, total);
+      }
+      return values;
+    }
+
+    // Hai cap tach la du de lay duoc bo cuc hinh chu L nhu 4 dung + 5 xoay,
+    // nhung van giu thoi gian tinh nhanh voi cac bai nho.
+    var planMemo = {};
+    function solveRegion(regionW, regionH, depth) {
+      var memoKey =
+        Math.round(regionW * 1000) + "x" + Math.round(regionH * 1000) + "x" + depth;
+      if (planMemo[memoKey]) return planMemo[memoKey];
+
+      var best = bestStripPlan(regionW, regionH);
+      if (!best || depth <= 0) {
+        if (!best)
+          best = { kind: "empty", count: 0, normalCount: 0, rotatedCount: 0 };
+        planMemo[memoKey] = best;
+        return best;
+      }
+
+      var cuts = cutValues(regionW);
+      for (var vi = 0; vi < cuts.length; vi++) {
+        var leftPlan = solveRegion(cuts[vi], regionH, depth - 1);
+        var rightPlan = solveRegion(regionW - cuts[vi], regionH, depth - 1);
+        var verticalPlan = {
+          kind: "splitV",
+          cut: cuts[vi],
+          first: leftPlan,
+          second: rightPlan,
+          count: leftPlan.count + rightPlan.count,
+          normalCount: leftPlan.normalCount + rightPlan.normalCount,
+          rotatedCount: leftPlan.rotatedCount + rightPlan.rotatedCount,
+        };
+        if (isBetter(verticalPlan, best)) best = verticalPlan;
+      }
+
+      cuts = cutValues(regionH);
+      for (var hi = 0; hi < cuts.length; hi++) {
+        var topPlan = solveRegion(regionW, cuts[hi], depth - 1);
+        var bottomPlan = solveRegion(regionW, regionH - cuts[hi], depth - 1);
+        var horizontalPlan = {
+          kind: "splitH",
+          cut: cuts[hi],
+          first: topPlan,
+          second: bottomPlan,
+          count: topPlan.count + bottomPlan.count,
+          normalCount: topPlan.normalCount + bottomPlan.normalCount,
+          rotatedCount: topPlan.rotatedCount + bottomPlan.rotatedCount,
+        };
+        if (isBetter(horizontalPlan, best)) best = horizontalPlan;
+      }
+      planMemo[memoKey] = best;
+      return best;
+    }
+
+    var bestPlan = solveRegion(usableW, usableH, 2);
+    if (!bestPlan || bestPlan.count <= 0)
+      return "ERR: Bai mau khong nam vua trong vung in sau khi tru le 3 mm.";
+
+    function uniqueLayerName(base) {
+      var candidate = base;
+      var suffix = 2;
+      var found = true;
+      while (found) {
+        found = false;
+        for (var li = 0; li < doc.layers.length; li++) {
+          try {
+            if (doc.layers[li].name === candidate) {
+              found = true;
+              candidate = base + " " + suffix;
+              suffix++;
+              break;
+            }
+          } catch (e) {}
+        }
+      }
+      return candidate;
+    }
+
+    // Tao artboard moi ben phai artboard/artwork hien co de tuyet doi khong
+    // de len bai dang lam. Khoang cach giua cac to la 10 mm.
+    var farRight = sourceBounds[2];
+    var topMost = sourceBounds[1];
+    for (var ai = 0; ai < doc.artboards.length; ai++) {
+      var oldRect = doc.artboards[ai].artboardRect;
+      farRight = Math.max(farRight, oldRect[2]);
+      topMost = Math.max(topMost, oldRect[1]);
+    }
+    var sheetLeft = farRight + 10 * MM;
+    var sheetTop = topMost;
+    var sheetRect = [sheetLeft, sheetTop, sheetLeft + paperW, sheetTop - paperH];
+    var sheetIndex = doc.artboards.length;
+    var sheet = doc.artboards.add(sheetRect);
+    try {
+      sheet.name = "Dan toi uu " + (sheetIndex + 1);
+      doc.artboards.setActiveArtboardIndex(sheetIndex);
+    } catch (e) {}
+
+    var contentLayer = doc.layers.add();
+    contentLayer.name = uniqueLayerName("Dan toi uu");
+    try {
+      contentLayer.locked = false;
+      contentLayer.visible = true;
+      doc.activeLayer = contentLayer;
+    } catch (e) {}
+
+    var cutLayer = doc.layers.add();
+    cutLayer.name = uniqueLayerName("Duong dao - Dan toi uu");
+    try {
+      cutLayer.locked = false;
+      cutLayer.visible = true;
+      cutLayer.printable = true;
+    } catch (e) {}
+
+    function duplicateSourceSet() {
+      // Trường hợp thông thường: người dùng chọn đúng 1 artwork/group. Giữ
+      // nguyên kiểu object của bản sao, không bọc thêm group để có thể đặt pon
+      // ngay trên toàn bộ selection sau khi dàn.
+      if (sources.length === 1)
+        return sources[0].duplicate(contentLayer, ElementPlacement.PLACEATEND);
+
+      // Nhiều object cùng được chọn vẫn được coi là một bài phức hợp; chỉ khi
+      // đó mới gom riêng từng bản sao để các chi tiết không bị tách rời nhau.
+      var group = contentLayer.groupItems.add();
+      for (var di = 0; di < sources.length; di++) {
+        sources[di].duplicate(group, ElementPlacement.PLACEATEND);
+      }
+      return group;
+    }
+
+    function placeCopy(left, top, angle) {
+      var copy = duplicateSourceSet();
+      if (angle === 90) copy.rotate(90);
+      var cb = boundsOf(copy);
+      if (!cb) throw new Error("Khong do duoc ban sao de dat vao to giay.");
+      copy.translate(left - cb[0], top - cb[1]);
+      return copy;
+    }
+
+    var safeLeft = sheetLeft + MARGIN;
+    var safeTop = sheetTop - MARGIN;
+    var safeRight = sheetRect[2] - MARGIN;
+    var safeBottom = sheetRect[3] + MARGIN;
+    var outputItems = [];
+    var placedBands = [];
+    var bandIndex = 0;
+
+    function placeStripPlan(plan, left, top, regionW, regionH) {
+      var x, y, band, repeat, cell;
+      if (plan.direction === "row") {
+        y = top;
+        for (var rb = 0; rb < plan.bands.length; rb++) {
+          band = plan.bands[rb];
+          for (repeat = 0; repeat < band.repeat; repeat++) {
+            x = left;
+            for (cell = 0; cell < band.cells; cell++) {
+              outputItems.push(placeCopy(x, y, band.angle));
+              x += band.cellW;
+            }
+            placedBands.push({
+              index: bandIndex++,
+              direction: "row",
+              left: left,
+              right: x,
+              top: y,
+              bottom: y - band.cellH,
+              cellW: band.cellW,
+              cellH: band.cellH,
+              cells: band.cells,
+              regionLeft: left,
+              regionRight: left + regionW,
+              regionTop: top,
+              regionBottom: top - regionH,
+            });
+            y -= band.cellH;
+          }
+        }
+      } else {
+        x = left;
+        for (var cb = 0; cb < plan.bands.length; cb++) {
+          band = plan.bands[cb];
+          for (repeat = 0; repeat < band.repeat; repeat++) {
+            y = top;
+            for (cell = 0; cell < band.cells; cell++) {
+              outputItems.push(placeCopy(x, y, band.angle));
+              y -= band.cellH;
+            }
+            placedBands.push({
+              index: bandIndex++,
+              direction: "column",
+              left: x,
+              right: x + band.cellW,
+              top: top,
+              bottom: y,
+              cellW: band.cellW,
+              cellH: band.cellH,
+              cells: band.cells,
+              regionLeft: left,
+              regionRight: left + regionW,
+              regionTop: top,
+              regionBottom: top - regionH,
+            });
+            x += band.cellW;
+          }
+        }
+      }
+    }
+
+    function placePlan(plan, left, top, regionW, regionH) {
+      if (!plan || plan.count <= 0) return;
+      if (plan.kind === "strips") {
+        placeStripPlan(plan, left, top, regionW, regionH);
+        return;
+      }
+      if (plan.kind === "splitV") {
+        placePlan(plan.first, left, top, plan.cut, regionH);
+        placePlan(plan.second, left + plan.cut, top, regionW - plan.cut, regionH);
+        return;
+      }
+      if (plan.kind === "splitH") {
+        placePlan(plan.first, left, top, regionW, plan.cut);
+        placePlan(plan.second, left, top - plan.cut, regionW, regionH - plan.cut);
+      }
+    }
+
+    placePlan(bestPlan, safeLeft, safeTop, usableW, usableH);
+
+    // Layer rieng mau hong: cac duong nay cho phep cat theo thu tu day truoc,
+    // roi ha dao tach cac o trong tung day. Khong group chung voi artwork.
+    var cutColor = new CMYKColor();
+    cutColor.cyan = 0;
+    cutColor.magenta = 100;
+    cutColor.yellow = 0;
+    cutColor.black = 0;
+    var lineKeys = {};
+    var drawnLines = 0;
+
+    function addCutLine(x1, y1, x2, y2) {
+      var a = x1.toFixed(3) + "," + y1.toFixed(3);
+      var b = x2.toFixed(3) + "," + y2.toFixed(3);
+      var key = a < b ? a + "|" + b : b + "|" + a;
+      if (lineKeys[key]) return;
+      var line = cutLayer.pathItems.add();
+      line.setEntirePath([[x1, y1], [x2, y2]]);
+      line.filled = false;
+      line.stroked = true;
+      line.strokeWidth = 0.25;
+      line.strokeColor = cutColor;
+      lineKeys[key] = true;
+      drawnLines++;
+    }
+
+    for (var pi = 0; pi < placedBands.length; pi++) {
+      var placed = placedBands[pi];
+      if (placed.direction === "row") {
+        // Cat ngang truoc de tach day; cac net doc sau do tach tung con.
+        addCutLine(placed.regionLeft, placed.top, placed.regionRight, placed.top);
+        addCutLine(placed.regionLeft, placed.bottom, placed.regionRight, placed.bottom);
+        for (var vx = 0; vx <= placed.cells; vx++) {
+          addCutLine(
+            placed.left + vx * placed.cellW,
+            placed.top,
+            placed.left + vx * placed.cellW,
+            placed.bottom,
+          );
+        }
+      } else {
+        // Cat doc truoc de tach day; cac net ngang sau do tach tung con.
+        addCutLine(placed.left, placed.regionTop, placed.left, placed.regionBottom);
+        addCutLine(placed.right, placed.regionTop, placed.right, placed.regionBottom);
+        for (var hy = 0; hy <= placed.cells; hy++) {
+          addCutLine(
+            placed.left,
+            placed.top - hy * placed.cellH,
+            placed.right,
+            placed.top - hy * placed.cellH,
+          );
+        }
+      }
+    }
+
+    try {
+      cutLayer.zOrder(ZOrderMethod.BRINGTOFRONT);
+      doc.selection = null;
+      for (var oi = 0; oi < outputItems.length; oi++) outputItems[oi].selected = true;
+      doc.activeLayer = contentLayer;
+      app.redraw();
+    } catch (e) {}
+
+    var orientationText = "giu nguyen chieu";
+    if (bestPlan.rotatedCount > 0) {
+      if (bestPlan.normalCount > 0) orientationText = "co ket hop xoay 90 do";
+      else orientationText = "xoay 90 do";
+    }
+    return (
+      "OK: Da tao 1 artboard " +
+      (paperW / (10 * MM)).toFixed(2) +
+      " x " +
+      (paperH / (10 * MM)).toFixed(2) +
+      " cm, dan duoc " +
+      outputItems.length +
+      " con (" +
+      orientationText +
+      "). Le 3 mm da duoc giu; da ve " +
+      drawnLines +
+      " duong dao."
+    );
+  } catch (e) {
+    return "ERR: " + dcMoTaLoi(e);
+  }
+}
+
+// ============================================================
+//  TAB DAN TOI UU v4
+//  - Mac dinh: moi mau (hoac cap truoc/sau) ra mot to rieng.
+//  - Tick gop mau: nhieu mau chung mot to, duoc chia lan luot vao slot.
+//  - Artboard moi tu xep theo luoi canvas, trai sang phai roi xuong hang.
+//  - Tach hinh chu nhat de tan dung khoang trong chu L, van cat dao duoc.
+// ============================================================
+var dcDanToiUuVersion = 9;
+function dcDanToiUu(pageWidthText, pageHeightText, twoSidedArg, multiPerArtboardArg) {
+  try {
+    if (app.documents.length === 0) return "ERR: Chua mo tai lieu nao.";
+
+    var doc = app.activeDocument;
+    var selection = doc.selection;
+    if (!selection || selection.length === 0)
+      return "ERR: Chon it nhat mot artwork truoc khi dan.";
+
+    var MM = 2.834645669;
+    var MARGIN = 3 * MM;
+    var EPS = 0.01;
+    var twoSided = twoSidedArg === true;
+    // Mac dinh: moi mau la mot to rieng. Chi khi tick tren panel moi gop
+    // nhieu mau vao chung mot to va chia lan luot cac vi tri.
+    var multiPerArtboard = multiPerArtboardArg === true;
+
+    function parseCentimeters(value, label) {
+      var n = parseFloat(
+        String(value === undefined || value === null ? "" : value).replace(",", "."),
+      );
+      if (!isFinite(n) || n <= 0)
+        throw new Error(label + " phai la so cm lon hon 0.");
+      return n * 10 * MM;
+    }
+
+    function boundsOf(item) {
+      try {
+        return item.visibleBounds.slice(0);
+      } catch (e) {}
+      try {
+        return item.geometricBounds.slice(0);
+      } catch (e2) {}
+      return null;
+    }
+
+    function itemRecord(item) {
+      var bounds = boundsOf(item);
+      if (!bounds || bounds[2] - bounds[0] <= EPS || bounds[1] - bounds[3] <= EPS)
+        return null;
+      return {
+        item: item,
+        bounds: bounds,
+        cx: (bounds[0] + bounds[2]) / 2,
+        cy: (bounds[1] + bounds[3]) / 2,
+      };
+    }
+
+    var raw = [];
+    var sourceBounds = null;
+    for (var si = 0; si < selection.length; si++) {
+      var record = itemRecord(selection[si]);
+      if (!record) continue;
+      raw.push(record);
+      if (!sourceBounds) sourceBounds = record.bounds.slice(0);
+      else {
+        sourceBounds[0] = Math.min(sourceBounds[0], record.bounds[0]);
+        sourceBounds[1] = Math.max(sourceBounds[1], record.bounds[1]);
+        sourceBounds[2] = Math.max(sourceBounds[2], record.bounds[2]);
+        sourceBounds[3] = Math.min(sourceBounds[3], record.bounds[3]);
+      }
+    }
+    if (raw.length === 0 || !sourceBounds)
+      return "ERR: Selection hien tai khong co artwork hop le de dan.";
+
+    // Thu tu on dinh: theo tung hang tu tren xuong, trong hang tu trai qua.
+    // Khi dan 2 mat, moi cap lien nhau la [mat truoc, mat sau].
+    raw.sort(function (a, b) {
+      if (Math.abs(a.cy - b.cy) > EPS) return b.cy - a.cy;
+      return a.cx - b.cx;
+    });
+
+    if (twoSided && (raw.length < 2 || raw.length % 2 !== 0))
+      return "ERR: Dan 2 mat can chon so object chan: tung cap trai = truoc, phai = sau.";
+
+    var models = [];
+    var mi;
+    if (twoSided) {
+      for (mi = 0; mi < raw.length; mi += 2)
+        models.push({ front: raw[mi].item, back: raw[mi + 1].item });
+    } else {
+      for (mi = 0; mi < raw.length; mi++) models.push({ front: raw[mi].item, back: null });
+    }
+
+    var referenceBounds = boundsOf(models[0].front);
+    if (!referenceBounds) return "ERR: Khong do duoc kich thuoc bai mau.";
+    var sourceW = referenceBounds[2] - referenceBounds[0];
+    var sourceH = referenceBounds[1] - referenceBounds[3];
+
+    function checkSameSize(item, sideLabel) {
+      var b = boundsOf(item);
+      if (!b) throw new Error("Khong do duoc " + sideLabel + " cua mau.");
+      var w = b[2] - b[0];
+      var h = b[1] - b[3];
+      if (Math.abs(w - sourceW) > 0.2 || Math.abs(h - sourceH) > 0.2)
+        throw new Error(
+          "Cac mau can cung kich thuoc. Hay group/clip moi mau ve cung mot khung truoc khi dan.",
+        );
+    }
+    for (mi = 0; mi < models.length; mi++) {
+      checkSameSize(models[mi].front, "mat truoc");
+      if (twoSided) checkSameSize(models[mi].back, "mat sau");
+    }
+
+    var paperW = parseCentimeters(pageWidthText, "Ngang giay");
+    var paperH = parseCentimeters(pageHeightText, "Doc giay");
+    var usableW = paperW - 2 * MARGIN;
+    var usableH = paperH - 2 * MARGIN;
+    if (usableW <= EPS || usableH <= EPS)
+      return "ERR: Kho giay phai lon hon le an toan 3 mm moi canh.";
+
+    function floorFit(space, size) {
+      if (size <= EPS) return 0;
+      return Math.floor((space + EPS) / size);
+    }
+
+    function makeStripPlan(direction, normalBands, rotatedBands, regionW, regionH) {
+      var normalCells =
+        direction === "row" ? floorFit(regionW, sourceW) : floorFit(regionH, sourceH);
+      var rotatedCells =
+        direction === "row" ? floorFit(regionW, sourceH) : floorFit(regionH, sourceW);
+      if (
+        (normalBands > 0 && normalCells <= 0) ||
+        (rotatedBands > 0 && rotatedCells <= 0)
+      )
+        return null;
+      var count = normalBands * normalCells + rotatedBands * rotatedCells;
+      if (count <= 0) return null;
+      var plan = {
+        kind: "strips",
+        direction: direction,
+        count: count,
+        normalCount: normalBands * normalCells,
+        rotatedCount: rotatedBands * rotatedCells,
+        bands: [],
+      };
+      if (normalBands > 0)
+        plan.bands.push({
+          angle: 0,
+          repeat: normalBands,
+          cells: normalCells,
+          cellW: sourceW,
+          cellH: sourceH,
+        });
+      if (rotatedBands > 0)
+        plan.bands.push({
+          angle: 90,
+          repeat: rotatedBands,
+          cells: rotatedCells,
+          cellW: sourceH,
+          cellH: sourceW,
+        });
+      return plan;
+    }
+
+    function planComplexity(plan) {
+      if (!plan) return 999999;
+      if (plan.kind === "empty") return 0;
+      if (plan.kind === "strips") return plan.bands.length;
+      return 1 + planComplexity(plan.first) + planComplexity(plan.second);
+    }
+
+    function isBetter(candidate, best) {
+      if (!candidate) return false;
+      if (!best) return true;
+      if (candidate.count !== best.count) return candidate.count > best.count;
+      if (candidate.normalCount !== best.normalCount)
+        return candidate.normalCount > best.normalCount;
+      return planComplexity(candidate) < planComplexity(best);
+    }
+
+    function bestStripPlan(regionW, regionH) {
+      var best = null;
+      var normalRowMax = floorFit(regionH, sourceH);
+      var normalRows, rowRemain, rotatedRows, rowPlan;
+      for (normalRows = 0; normalRows <= normalRowMax; normalRows++) {
+        rowRemain = regionH - normalRows * sourceH;
+        rotatedRows = floorFit(rowRemain, sourceW);
+        rowPlan = makeStripPlan(
+          "row",
+          normalRows,
+          rotatedRows,
+          regionW,
+          regionH,
+        );
+        if (isBetter(rowPlan, best)) best = rowPlan;
+      }
+
+      var normalColumnMax = floorFit(regionW, sourceW);
+      var normalColumns, columnRemain, rotatedColumns, columnPlan;
+      for (normalColumns = 0; normalColumns <= normalColumnMax; normalColumns++) {
+        columnRemain = regionW - normalColumns * sourceW;
+        rotatedColumns = floorFit(columnRemain, sourceH);
+        columnPlan = makeStripPlan(
+          "column",
+          normalColumns,
+          rotatedColumns,
+          regionW,
+          regionH,
+        );
+        if (isBetter(columnPlan, best)) best = columnPlan;
+      }
+      return best;
+    }
+
+    function addCutValue(values, seen, value, total) {
+      if (value <= EPS || total - value <= EPS) return;
+      var key = Math.round(value * 1000);
+      if (seen[key]) return;
+      seen[key] = true;
+      values.push(value);
+    }
+
+    function cutValues(total) {
+      var values = [],
+        seen = {},
+        i;
+      for (i = 1; i <= floorFit(total, sourceW); i++) {
+        addCutValue(values, seen, i * sourceW, total);
+        addCutValue(values, seen, total - i * sourceW, total);
+      }
+      for (i = 1; i <= floorFit(total, sourceH); i++) {
+        addCutValue(values, seen, i * sourceH, total);
+        addCutValue(values, seen, total - i * sourceH, total);
+      }
+      return values;
+    }
+
+    var planMemo = {};
+    function solveRegion(regionW, regionH, depth) {
+      var memoKey =
+        Math.round(regionW * 1000) +
+        "x" +
+        Math.round(regionH * 1000) +
+        "x" +
+        depth;
+      if (planMemo[memoKey]) return planMemo[memoKey];
+
+      var best = bestStripPlan(regionW, regionH);
+      if (!best || depth <= 0) {
+        if (!best)
+          best = { kind: "empty", count: 0, normalCount: 0, rotatedCount: 0 };
+        planMemo[memoKey] = best;
+        return best;
+      }
+
+      var cuts = cutValues(regionW);
+      var vi, leftPlan, rightPlan, verticalPlan;
+      for (vi = 0; vi < cuts.length; vi++) {
+        leftPlan = solveRegion(cuts[vi], regionH, depth - 1);
+        rightPlan = solveRegion(regionW - cuts[vi], regionH, depth - 1);
+        verticalPlan = {
+          kind: "splitV",
+          cut: cuts[vi],
+          first: leftPlan,
+          second: rightPlan,
+          count: leftPlan.count + rightPlan.count,
+          normalCount: leftPlan.normalCount + rightPlan.normalCount,
+          rotatedCount: leftPlan.rotatedCount + rightPlan.rotatedCount,
+        };
+        if (isBetter(verticalPlan, best)) best = verticalPlan;
+      }
+
+      cuts = cutValues(regionH);
+      var hi, topPlan, bottomPlan, horizontalPlan;
+      for (hi = 0; hi < cuts.length; hi++) {
+        topPlan = solveRegion(regionW, cuts[hi], depth - 1);
+        bottomPlan = solveRegion(regionW, regionH - cuts[hi], depth - 1);
+        horizontalPlan = {
+          kind: "splitH",
+          cut: cuts[hi],
+          first: topPlan,
+          second: bottomPlan,
+          count: topPlan.count + bottomPlan.count,
+          normalCount: topPlan.normalCount + bottomPlan.normalCount,
+          rotatedCount: topPlan.rotatedCount + bottomPlan.rotatedCount,
+        };
+        if (isBetter(horizontalPlan, best)) best = horizontalPlan;
+      }
+      planMemo[memoKey] = best;
+      return best;
+    }
+
+    var bestPlan = solveRegion(usableW, usableH, 2);
+    if (!bestPlan || bestPlan.count <= 0)
+      return "ERR: Bai mau khong nam vua trong vung in sau khi tru le 3 mm.";
+
+    function askContinueUneven(modelCount, slotCount, sheetCount) {
+      var dialog = new Window("dialog", "Dàn nhiều loại");
+      dialog.orientation = "column";
+      dialog.alignChildren = "fill";
+      dialog.margins = 18;
+      dialog.spacing = 12;
+      var message = dialog.add(
+        "statictext",
+        undefined,
+        slotCount +
+          " vi tri tren " +
+          sheetCount +
+          " to khong chia deu cho " +
+          modelCount +
+          " mau. Neu tiep tuc, tool se giu cac con cung mau gan nhau; mot vai mau se duoc lap them 1 con.",
+        { multiline: true },
+      );
+      message.preferredSize.width = 340;
+      var actions = dialog.add("group");
+      actions.alignment = "right";
+      var stopped = actions.add("button", undefined, "Dừng lại");
+      var continued = actions.add("button", undefined, "Tiếp tục");
+      var accepted = false;
+      stopped.onClick = function () {
+        accepted = false;
+        dialog.close();
+      };
+      continued.onClick = function () {
+        accepted = true;
+        dialog.close();
+      };
+      dialog.show();
+      return accepted;
+    }
+
+    var multiSheetCount = 1;
+    var multiTotalSlots = bestPlan.count;
+    var multiExtraSlots = 0;
+    if (multiPerArtboard) {
+      // Mot to co the khong chua het cac mau. Tao du so to de moi mau xuat
+      // hien it nhat mot lan, sau do moi lap cac mau dau cho cac slot con du.
+      multiSheetCount = Math.ceil(models.length / bestPlan.count);
+      multiTotalSlots = multiSheetCount * bestPlan.count;
+      multiExtraSlots = multiTotalSlots % models.length;
+      if (models.length > 1 && multiExtraSlots !== 0) {
+        if (!askContinueUneven(models.length, multiTotalSlots, multiSheetCount))
+          return "ERR: Da dung dan vi so mau khong chia deu cho so vi tri tren cac to.";
+      }
+    }
+
+    // Mac dinh giu moi mau tren mot to rieng. Khi tick gop mau, xep cac ban
+    // sao cung mau lien nhau trong cac slot de cat va phan loai de hon.
+    var outputBatches = [];
+    if (multiPerArtboard) {
+      var groupedModels = [];
+      var copiesPerModel = Math.floor(multiTotalSlots / models.length);
+      var remainderCopies = multiTotalSlots % models.length;
+      for (mi = 0; mi < models.length; mi++) {
+        var copiesForThisModel = copiesPerModel + (mi < remainderCopies ? 1 : 0);
+        for (var copyIndex = 0; copyIndex < copiesForThisModel; copyIndex++)
+          groupedModels.push(models[mi]);
+      }
+      for (var multiSheetIndex = 0; multiSheetIndex < multiSheetCount; multiSheetIndex++) {
+        var batch = [];
+        for (var batchSlot = 0; batchSlot < bestPlan.count; batchSlot++)
+          batch.push(groupedModels[multiSheetIndex * bestPlan.count + batchSlot]);
+        outputBatches.push(batch);
+      }
+    } else if (models.length === 1) {
+      outputBatches.push(models);
+    } else {
+      for (mi = 0; mi < models.length; mi++) outputBatches.push([models[mi]]);
+    }
+
+    function uniqueLayerName(base) {
+      var candidate = base;
+      var suffix = 2;
+      var found = true;
+      while (found) {
+        found = false;
+        for (var li = 0; li < doc.layers.length; li++) {
+          try {
+            if (doc.layers[li].name === candidate) {
+              found = true;
+              candidate = base + " " + suffix;
+              suffix++;
+              break;
+            }
+          } catch (e) {}
+        }
+      }
+      return candidate;
+    }
+
+    function addOutputLayer(name) {
+      var layer = doc.layers.add();
+      layer.name = uniqueLayerName(name);
+      try {
+        layer.locked = false;
+        layer.visible = true;
+      } catch (e) {}
+      return layer;
+    }
+
+    function prepareOutputLayer(layer) {
+      if (!layer) return;
+      // Khong phu thuoc layer dang active cua file nguon (co the dang khoa/
+      // template), vi duplicate vao layer do se gay Error 8705.
+      try {
+        layer.locked = false;
+        layer.visible = true;
+        doc.activeLayer = layer;
+      } catch (e) {}
+    }
+
+    var pageGap = 10 * MM;
+    var frontLayer = addOutputLayer(
+      twoSided ? "Dan toi uu - Mat truoc" : "Dan toi uu",
+    );
+    var backLayer = twoSided ? addOutputLayer("Dan toi uu - Mat sau") : null;
+
+    function rectsOverlap(a, b) {
+      return (
+        a[0] < b[2] - EPS &&
+        a[2] > b[0] + EPS &&
+        a[3] < b[1] - EPS &&
+        a[1] > b[3] + EPS
+      );
+    }
+
+    function rectContains(outer, inner) {
+      return (
+        outer[0] <= inner[0] + EPS &&
+        outer[1] >= inner[1] - EPS &&
+        outer[2] >= inner[2] - EPS &&
+        outer[3] <= inner[3] + EPS
+      );
+    }
+
+    function readCanvasBounds() {
+      // Khong doc toan bo file AI tai day: file nang co the lam Illustrator treo.
+      // Canvas thuong la 14400 pt; Large Canvas co scaleFactor nho hon 1.
+      var halfSize = 7200;
+      try {
+        if (doc.scaleFactor && doc.scaleFactor < 1) halfSize = halfSize / doc.scaleFactor;
+      } catch (e) {}
+      return [-halfSize, halfSize, halfSize, -halfSize];
+    }
+
+    // Giữ các artboard sẵn có làm vùng bận. Các tờ mới tìm ô trống theo thứ tự
+    // từ trái sang phải, hết bề ngang canvas thì tự xuống hàng tiếp theo.
+    var canvasRect = readCanvasBounds();
+    var canvasWidth = canvasRect[2] - canvasRect[0];
+    var canvasHeight = canvasRect[1] - canvasRect[3];
+    var occupiedRects = [];
+    for (var ai = 0; ai < doc.artboards.length; ai++) {
+      try {
+        var existingRect = doc.artboards[ai].artboardRect.slice(0);
+        var existingWidth = existingRect[2] - existingRect[0];
+        var existingHeight = existingRect[1] - existingRect[3];
+        // Artboard lon phu gan het canvas la nen lam viec, khong phai mot to
+        // can tranh. Bo qua no de cac to moi co the xep vao ben trong.
+        if (
+          existingWidth >= canvasWidth * 0.92 &&
+          existingHeight >= canvasHeight * 0.92
+        )
+          continue;
+        occupiedRects.push(existingRect);
+      } catch (e) {}
+    }
+    var sourceAlreadyCovered = false;
+    for (var oi = 0; oi < occupiedRects.length; oi++) {
+      if (rectContains(occupiedRects[oi], sourceBounds)) {
+        sourceAlreadyCovered = true;
+        break;
+      }
+    }
+    if (!sourceAlreadyCovered) occupiedRects.push(sourceBounds.slice(0));
+
+    var layoutLeft = canvasRect[0] + pageGap;
+    var layoutTop = canvasRect[1] - pageGap;
+    var layoutRight = canvasRect[2] - pageGap;
+    var layoutBottom = canvasRect[3] + pageGap;
+    var layoutCursorLeft = layoutLeft;
+    var layoutCursorTop = layoutTop;
+
+    function reserveOutputPosition() {
+      var bundleW = twoSided ? paperW * 2 + pageGap : paperW;
+      var bundleH = paperH;
+      var candidateLeft = layoutCursorLeft;
+      var candidateTop = layoutCursorTop;
+      var attempts = 0;
+      while (attempts++ < 5000) {
+        if (candidateLeft + bundleW > layoutRight + EPS) {
+          candidateLeft = layoutLeft;
+          candidateTop -= bundleH + pageGap;
+          continue;
+        }
+        if (candidateTop - bundleH < layoutBottom - EPS)
+          throw new Error(
+            "Khong con cho trong canvas de tao to moi. Hay xoa/bot artboard cu hoac mo tai lieu Large Canvas.",
+          );
+
+        var bundleRect = [
+          candidateLeft,
+          candidateTop,
+          candidateLeft + bundleW,
+          candidateTop - bundleH,
+        ];
+        var blocker = null;
+        for (var ri = 0; ri < occupiedRects.length; ri++) {
+          if (rectsOverlap(bundleRect, occupiedRects[ri])) {
+            blocker = occupiedRects[ri];
+            break;
+          }
+        }
+        if (blocker) {
+          candidateLeft = blocker[2] + pageGap;
+          continue;
+        }
+
+        occupiedRects.push(bundleRect);
+        layoutCursorLeft = candidateLeft + bundleW + pageGap;
+        layoutCursorTop = candidateTop;
+        var frontRect = [
+          candidateLeft,
+          candidateTop,
+          candidateLeft + paperW,
+          candidateTop - paperH,
+        ];
+        var backRect = null;
+        if (twoSided)
+          backRect = [
+            frontRect[2] + pageGap,
+            candidateTop,
+            frontRect[2] + pageGap + paperW,
+            candidateTop - paperH,
+          ];
+        return { frontRect: frontRect, backRect: backRect };
+      }
+      throw new Error("Khong tim duoc vi tri trong canvas de dat artboard moi.");
+    }
+
+    function addOutputArtboard(rect, name) {
+      var index = doc.artboards.length;
+      try {
+        var board = doc.artboards.add(rect);
+        try {
+          board.name = name + " " + (index + 1);
+        } catch (e) {}
+        return index;
+      } catch (e) {
+        throw new Error(
+          "Khong tao duoc artboard trong vi tri da tinh. Hay thu dong va mo lai tai lieu, sau do chay lai.",
+        );
+      }
+    }
+
+    function collectSlots(plan, left, top, regionW, regionH, output) {
+      if (!plan || plan.count <= 0) return;
+      if (plan.kind === "splitV") {
+        collectSlots(plan.first, left, top, plan.cut, regionH, output);
+        collectSlots(
+          plan.second,
+          left + plan.cut,
+          top,
+          regionW - plan.cut,
+          regionH,
+          output,
+        );
+        return;
+      }
+      if (plan.kind === "splitH") {
+        collectSlots(plan.first, left, top, regionW, plan.cut, output);
+        collectSlots(
+          plan.second,
+          left,
+          top - plan.cut,
+          regionW,
+          regionH - plan.cut,
+          output,
+        );
+        return;
+      }
+      if (plan.kind !== "strips") return;
+
+      var x, y, band, repeat, cell;
+      if (plan.direction === "row") {
+        y = top;
+        for (var rb = 0; rb < plan.bands.length; rb++) {
+          band = plan.bands[rb];
+          for (repeat = 0; repeat < band.repeat; repeat++) {
+            x = left;
+            for (cell = 0; cell < band.cells; cell++) {
+              output.push({ x: x, y: y, angle: band.angle, w: band.cellW, h: band.cellH });
+              x += band.cellW;
+            }
+            y -= band.cellH;
+          }
+        }
+      } else {
+        x = left;
+        for (var cb = 0; cb < plan.bands.length; cb++) {
+          band = plan.bands[cb];
+          for (repeat = 0; repeat < band.repeat; repeat++) {
+            y = top;
+            for (cell = 0; cell < band.cells; cell++) {
+              output.push({ x: x, y: y, angle: band.angle, w: band.cellW, h: band.cellH });
+              y -= band.cellH;
+            }
+            x += band.cellW;
+          }
+        }
+      }
+    }
+
+    function slotEdgeDistance(a, b) {
+      var aRight = a.x + a.w;
+      var aBottom = a.y - a.h;
+      var bRight = b.x + b.w;
+      var bBottom = b.y - b.h;
+      var dx = 0;
+      var dy = 0;
+      if (aRight < b.x) dx = b.x - aRight;
+      else if (bRight < a.x) dx = a.x - bRight;
+      if (aBottom > b.y) dy = aBottom - b.y;
+      else if (bBottom > a.y) dy = bBottom - a.y;
+      return dx * dx + dy * dy;
+    }
+
+    function isBeforeOnSheet(a, b) {
+      if (Math.abs(a.y - b.y) > EPS) return a.y > b.y;
+      return a.x < b.x;
+    }
+
+    // Batch gop mau co the chua nhieu ban sao cua mot mau. Gan tung cum mau
+    // vao cac slot ke nhau, va giu cung chieu truoc (dung/nam) de sau khi
+    // cat de phan loai hon. Chi khi het slot cung chieu moi qua cum xoay 90 do.
+    function orderSlotsForBatch(sourceSlots, batch) {
+      if (!multiPerArtboard || batch.length !== sourceSlots.length)
+        return sourceSlots;
+      var remaining = sourceSlots.slice(0);
+      var ordered = [];
+      var batchIndex = 0;
+      while (batchIndex < batch.length && remaining.length > 0) {
+        var model = batch[batchIndex];
+        var runLength = 1;
+        while (
+          batchIndex + runLength < batch.length &&
+          batch[batchIndex + runLength] === model
+        )
+          runLength++;
+
+        var cluster = [];
+        var preferredAngle = null;
+        for (var clusterIndex = 0; clusterIndex < runLength; clusterIndex++) {
+          var picked = -1;
+          if (cluster.length === 0) {
+            for (var firstIndex = 0; firstIndex < remaining.length; firstIndex++) {
+              if (
+                picked < 0 ||
+                isBeforeOnSheet(remaining[firstIndex], remaining[picked])
+              )
+                picked = firstIndex;
+            }
+            if (picked >= 0) preferredAngle = remaining[picked].angle;
+          } else {
+            var bestDistance = -1;
+            var hasPreferredAngle = false;
+            for (var preferredIndex = 0; preferredIndex < remaining.length; preferredIndex++) {
+              if (remaining[preferredIndex].angle === preferredAngle) {
+                hasPreferredAngle = true;
+                break;
+              }
+            }
+            for (var candidateIndex = 0; candidateIndex < remaining.length; candidateIndex++) {
+              // Con cung mau da dat dung (hoac nam) thi uu tien no nam trong
+              // cum cung chieu. Khi khong con slot do moi chuyen qua chieu kia.
+              if (
+                hasPreferredAngle &&
+                remaining[candidateIndex].angle !== preferredAngle
+              )
+                continue;
+              var nearestDistance = -1;
+              for (var neighborIndex = 0; neighborIndex < cluster.length; neighborIndex++) {
+                var distance = slotEdgeDistance(
+                  remaining[candidateIndex],
+                  cluster[neighborIndex],
+                );
+                if (nearestDistance < 0 || distance < nearestDistance)
+                  nearestDistance = distance;
+              }
+              if (
+                picked < 0 ||
+                nearestDistance < bestDistance - EPS ||
+                (Math.abs(nearestDistance - bestDistance) <= EPS &&
+                  isBeforeOnSheet(remaining[candidateIndex], remaining[picked]))
+              ) {
+                picked = candidateIndex;
+                bestDistance = nearestDistance;
+              }
+            }
+          }
+          cluster.push(remaining[picked]);
+          remaining.splice(picked, 1);
+        }
+        for (var appendIndex = 0; appendIndex < cluster.length; appendIndex++)
+          ordered.push(cluster[appendIndex]);
+        batchIndex += runLength;
+      }
+      return ordered;
+    }
+
+    function copyAt(source, layer, left, top, angle) {
+      var copy = source.duplicate(layer, ElementPlacement.PLACEATEND);
+      if (angle !== 0) copy.rotate(angle);
+      var bounds = boundsOf(copy);
+      if (!bounds) throw new Error("Khong do duoc ban sao de dat vao to giay.");
+      copy.translate(left - bounds[0], top - bounds[1]);
+      return copy;
+    }
+
+    function allBounds(items) {
+      var merged = null;
+      for (var bi = 0; bi < items.length; bi++) {
+        var b = boundsOf(items[bi]);
+        if (!b) continue;
+        if (!merged) merged = b.slice(0);
+        else {
+          merged[0] = Math.min(merged[0], b[0]);
+          merged[1] = Math.max(merged[1], b[1]);
+          merged[2] = Math.max(merged[2], b[2]);
+          merged[3] = Math.min(merged[3], b[3]);
+        }
+      }
+      return merged;
+    }
+
+    function centerItems(items, artboardRect) {
+      var bounds = allBounds(items);
+      if (!bounds) return;
+      var targetX = (artboardRect[0] + artboardRect[2]) / 2;
+      var targetY = (artboardRect[1] + artboardRect[3]) / 2;
+      var currentX = (bounds[0] + bounds[2]) / 2;
+      var currentY = (bounds[1] + bounds[3]) / 2;
+      var dx = targetX - currentX;
+      var dy = targetY - currentY;
+      for (var ci = 0; ci < items.length; ci++) items[ci].translate(dx, dy);
+    }
+
+    var firstFrontIndex = -1;
+    for (var batchIndex = 0; batchIndex < outputBatches.length; batchIndex++) {
+      var batch = outputBatches[batchIndex];
+      var outputPosition = reserveOutputPosition();
+      var frontRect = outputPosition.frontRect;
+      var frontIndex = addOutputArtboard(
+        frontRect,
+        twoSided ? "Dan toi uu - Mat truoc" : "Dan toi uu",
+      );
+      if (firstFrontIndex < 0) firstFrontIndex = frontIndex;
+
+      var backRect = outputPosition.backRect;
+      if (twoSided)
+        addOutputArtboard(backRect, "Dan toi uu - Mat sau");
+
+      var frontSafeLeft = frontRect[0] + MARGIN;
+      var frontSafeTop = frontRect[1] - MARGIN;
+      var slots = [];
+      collectSlots(bestPlan, frontSafeLeft, frontSafeTop, usableW, usableH, slots);
+      if (slots.length !== bestPlan.count)
+        return "ERR: Loi tao vi tri dan. Hay thu lai.";
+      slots = orderSlotsForBatch(slots, batch);
+
+      var frontItems = [];
+      var backItems = [];
+      var slotIndex;
+      prepareOutputLayer(frontLayer);
+      for (slotIndex = 0; slotIndex < slots.length; slotIndex++) {
+        var model = batch[slotIndex % batch.length];
+        var frontItem = copyAt(
+          model.front,
+          frontLayer,
+          slots[slotIndex].x,
+          slots[slotIndex].y,
+          slots[slotIndex].angle,
+        );
+        frontItems.push(frontItem);
+      }
+      centerItems(frontItems, frontRect);
+
+      if (twoSided) {
+        var backSafeLeft = backRect[0] + MARGIN;
+        var backSafeTop = backRect[1] - MARGIN;
+        prepareOutputLayer(backLayer);
+        for (slotIndex = 0; slotIndex < slots.length; slotIndex++) {
+          model = batch[slotIndex % batch.length];
+          var slot = slots[slotIndex];
+          var relativeX = slot.x - frontSafeLeft;
+          var relativeY = frontSafeTop - slot.y;
+          var mirroredLeft = backSafeLeft + usableW - relativeX - slot.w;
+          var mirroredTop = backSafeTop - relativeY;
+          var backAngle = slot.angle === 90 ? -90 : 0;
+          var backItem = copyAt(model.back, backLayer, mirroredLeft, mirroredTop, backAngle);
+          backItems.push(backItem);
+        }
+        centerItems(backItems, backRect);
+      }
+    }
+
+    var outputWasSelected = false;
+    try {
+      doc.artboards.setActiveArtboardIndex(firstFrontIndex);
+      // Illustrator xu ly cham neu gan mot mang hang tram PageItem vao
+      // doc.selection. Layer.hasSelectedArtwork la thao tac native, chon toan
+      // bo bai vua dan ma khong bat JSX duyet tung object o buoc ket thuc.
+      doc.selection = null;
+      frontLayer.hasSelectedArtwork = true;
+      if (backLayer) backLayer.hasSelectedArtwork = true;
+      prepareOutputLayer(frontLayer);
+      outputWasSelected = true;
+    } catch (e) {}
+
+    var sheetCount = outputBatches.length;
+    var detail =
+      "Da tao " + sheetCount + " artboard va canh giua artwork; cac to da tu xuong hang khi het be ngang.";
+    if (twoSided)
+      detail =
+        "Da tao " +
+        sheetCount +
+        " cap artboard truoc/sau doi xung va canh giua artwork; cac cap da tu xuong hang khi het be ngang.";
+    if (multiPerArtboard && models.length > 1) {
+      if (multiExtraSlots === 0)
+        detail += " Da dan deu " + models.length + " mau.";
+      else
+        detail +=
+          " Da dan du " +
+          models.length +
+          " mau; " +
+          multiExtraSlots +
+          " slot du lap mau dau theo tung cum.";
+    } else if (sheetCount > 1) {
+      detail += " Moi mau duoc dan day tren mot to rieng.";
+    }
+    if (!outputWasSelected)
+      detail +=
+        " Artwork nam tren layer Dan toi uu; Illustrator khong the tu chon tat ca trong tai lieu nay.";
+    return "OK:[[COUNT:" + bestPlan.count + "]] " + detail;
+  } catch (e) {
+    return "ERR: " + dcMoTaLoi(e);
+  }
+}
+
+// ============================================================
 //  HÀM TEST kết nối (Bước 1) — giữ lại để panel kiểm tra.
 // ============================================================
 function dcTestConnection() {
@@ -20445,6 +21770,159 @@ function _dcClipToSizeCore(wCm, hCm, unit) {
       errs.join("\n- ");
   }
   return msg;
+}
+
+// ============================================================
+//  dcResizeSelectionToSize - Resize tung object dang chon theo W x H.
+//  Giu tam object va uu tien visibleBounds de kich thuoc nhin thay la chuan.
+// ============================================================
+function dcResizeSelectionToSize(wText, hText, unit) {
+  try {
+    if (app.documents.length === 0) return "ERR: Chua mo tai lieu nao.";
+    var doc = app.activeDocument;
+    var perUnit = { cm: 28.34645669, mm: 2.834645669, "in": 72, pt: 1 };
+    unit = unit === undefined || unit === null || String(unit) === "" ? "cm" : String(unit);
+    var unitSize = perUnit[unit];
+    if (!unitSize) return "ERR: Don vi khong hop le.";
+
+    var targetW = parseFloat(String(wText).replace(",", ".")) * unitSize;
+    var targetH = parseFloat(String(hText).replace(",", ".")) * unitSize;
+    if (!isFinite(targetW) || !isFinite(targetH) || targetW <= 0 || targetH <= 0)
+      return "ERR: Kich thuoc Rong x Cao phai lon hon 0.";
+
+    var selection = doc.selection;
+    if (!selection || selection.length === 0)
+      return "ERR: Hay chon it nhat mot object de resize.";
+
+    function boundsOf(item) {
+      try {
+        return item.visibleBounds;
+      } catch (e) {
+        try {
+          return item.geometricBounds;
+        } catch (e2) {
+          return null;
+        }
+      }
+    }
+
+    function sizeOf(bounds) {
+      if (!bounds) return null;
+      var width = bounds[2] - bounds[0];
+      var height = bounds[1] - bounds[3];
+      if (!isFinite(width) || !isFinite(height) || width <= 0 || height <= 0) return null;
+      return { width: width, height: height };
+    }
+
+    function centerOf(bounds) {
+      return { x: (bounds[0] + bounds[2]) / 2, y: (bounds[1] + bounds[3]) / 2 };
+    }
+
+    function resizeAtCenter(item, scaleX, scaleY) {
+      var before = boundsOf(item);
+      if (!before) throw new Error("Khong do duoc object truoc khi resize.");
+      var center = centerOf(before);
+      try {
+        item.resize(
+          scaleX * 100,
+          scaleY * 100,
+          true,
+          true,
+          true,
+          true,
+          100,
+          Transformation.CENTER,
+        );
+      } catch (resizeCenterError) {
+        item.resize(scaleX * 100, scaleY * 100);
+      }
+      var after = boundsOf(item);
+      if (!after) throw new Error("Khong do duoc object sau khi resize.");
+      var afterCenter = centerOf(after);
+      item.translate(center.x - afterCenter.x, center.y - afterCenter.y);
+      return boundsOf(item);
+    }
+
+    function resizeOne(item) {
+      var before = boundsOf(item);
+      var beforeSize = sizeOf(before);
+      if (!beforeSize) throw new Error("Kich thuoc object khong hop le.");
+
+      // Thu tang truc X 1% de biet X noi bo dang anh huong ngang hay doc.
+      var probe = resizeAtCenter(item, 1.01, 1);
+      var probeSize = sizeOf(probe);
+      if (!probeSize) throw new Error("Khong do duoc truc resize cua object.");
+      var xChangesWidth =
+        Math.abs(probeSize.width - beforeSize.width) >=
+        Math.abs(probeSize.height - beforeSize.height);
+      var scaleX = xChangesWidth
+        ? targetW / probeSize.width
+        : targetH / probeSize.height;
+      var scaleY = xChangesWidth
+        ? targetH / probeSize.height
+        : targetW / probeSize.width;
+      if (!isFinite(scaleX) || !isFinite(scaleY) || scaleX <= 0 || scaleY <= 0)
+        throw new Error("Khong tinh duoc ti le resize.");
+
+      var finalBounds = resizeAtCenter(item, scaleX, scaleY);
+      var finalSize = sizeOf(finalBounds);
+      if (!finalSize) throw new Error("Khong do duoc kich thuoc sau khi resize.");
+
+      // Bu them mot lan cho Raster/PlacedItem hoac object co truc xoay noi bo.
+      if (
+        Math.abs(finalSize.width - targetW) > 0.5 ||
+        Math.abs(finalSize.height - targetH) > 0.5
+      ) {
+        var fixX = xChangesWidth ? targetW / finalSize.width : targetH / finalSize.height;
+        var fixY = xChangesWidth ? targetH / finalSize.height : targetW / finalSize.width;
+        finalBounds = resizeAtCenter(item, fixX, fixY);
+        finalSize = sizeOf(finalBounds);
+      }
+      if (
+        !finalSize ||
+        Math.abs(finalSize.width - targetW) > 1 ||
+        Math.abs(finalSize.height - targetH) > 1
+      )
+        throw new Error("Khong the dat dung kich thuoc cho object nay.");
+      return item;
+    }
+
+    var sources = [];
+    for (var i = 0; i < selection.length; i++) sources.push(selection[i]);
+    var results = [];
+    var errors = [];
+    for (i = 0; i < sources.length; i++) {
+      try {
+        results.push(resizeOne(sources[i]));
+      } catch (itemError) {
+        errors.push("Object " + (i + 1) + ": " + itemError);
+      }
+    }
+
+    try {
+      doc.selection = null;
+      for (i = 0; i < results.length; i++) results[i].selected = true;
+      app.redraw();
+    } catch (e) {}
+
+    var message =
+      "Da resize " +
+      results.length +
+      "/" +
+      sources.length +
+      " object thanh " +
+      wText +
+      " x " +
+      hText +
+      " " +
+      unit +
+      ".";
+    if (errors.length)
+      return (results.length ? "OK: " : "ERR: ") + message + "\n" + errors.join("\n");
+    return "OK: " + message;
+  } catch (e) {
+    return "ERR: " + (typeof dcMoTaLoi === "function" ? dcMoTaLoi(e) : e.toString());
+  }
 }
 
 // ============================================================
