@@ -1341,6 +1341,25 @@ body {
 .field.half {
   flex: 1;
 }
+.toiuu-actions .btn-primary {
+  flex: 1;
+}
+.note-copy-input {
+  flex: 1;
+  min-width: 0;
+  appearance: none;
+  border: 1px solid var(--line-soft);
+  background: var(--bg-input);
+  color: var(--ink);
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  font-size: 12px;
+  font-family: inherit;
+}
+.note-copy-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
 
 /* ===== TÊN CHẠY GRADIENT CẦU VỒNG 7 MÀU ===== */
 /* ============ HIỆU ỨNG GRADIENT CHỮ ============ */

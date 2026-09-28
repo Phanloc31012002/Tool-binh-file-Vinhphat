@@ -1373,7 +1373,7 @@
         .replace(/\\/g, "/");
       var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
       return (
-        "if (typeof dcDanToiUu !== 'function' || typeof dcDanToiUuVersion === 'undefined' || dcDanToiUuVersion < 9) { $.evalFile(" +
+        "if (typeof dcDanToiUu !== 'function' || typeof dcCopyToiUuNoteToOddArtboards !== 'function' || typeof dcDanToiUuVersion === 'undefined' || dcDanToiUuVersion < 13) { $.evalFile(" +
         jsStr(jsxPath) +
         "); } "
       );
@@ -1389,6 +1389,51 @@
       var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
       return (
         "if (typeof dcResizeSelectionToSize !== 'function') { $.evalFile(" +
+        jsStr(jsxPath) +
+        "); } "
+      );
+    } catch (e) {
+      return "";
+    }
+  }
+  function loadClipJsx() {
+    try {
+      var extensionRoot = cs
+        .getSystemPath(SystemPath.EXTENSION)
+        .replace(/\\/g, "/");
+      var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
+      return (
+          "if (typeof dcClipToSize !== 'function' || typeof dcClipToSizeVersion === 'undefined' || dcClipToSizeVersion < 3) { $.evalFile(" +
+        jsStr(jsxPath) +
+        "); } "
+      );
+    } catch (e) {
+      return "";
+    }
+  }
+  function loadCatalogueJsx() {
+    try {
+      var extensionRoot = cs
+        .getSystemPath(SystemPath.EXTENSION)
+        .replace(/\\/g, "/");
+      var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
+      return (
+        "if (typeof dcRunCatalogueAuto !== 'function' || typeof dcCatalogueAutoVersion === 'undefined' || dcCatalogueAutoVersion < 9) { $.evalFile(" +
+        jsStr(jsxPath) +
+        "); } "
+      );
+    } catch (e) {
+      return "";
+    }
+  }
+  function loadOffsetJsx() {
+    try {
+      var extensionRoot = cs
+        .getSystemPath(SystemPath.EXTENSION)
+        .replace(/\\/g, "/");
+      var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
+      return (
+        "if (typeof dcRunSignature8 !== 'function' || typeof dcSignature8AutoPonVersion === 'undefined' || dcSignature8AutoPonVersion < 1) { $.evalFile(" +
         jsStr(jsxPath) +
         "); } "
       );
@@ -1513,6 +1558,23 @@
         function (res) {
           btnDanToiUu.disabled = false;
           showDanToiUuResult(res);
+        },
+      );
+    });
+  }
+
+  var btnCopyToiUuNote = document.getElementById("btnCopyToiUuNote");
+  if (btnCopyToiUuNote && outDanToiUu) {
+    btnCopyToiUuNote.addEventListener("click", function () {
+      var notePrefixInput = document.getElementById("autoSheetNotePrefixes");
+      var notePrefixes = notePrefixInput ? notePrefixInput.value || "" : "";
+      show(outDanToiUu, "Đang copy ghi chú sang các artboard mặt trước…");
+      btnCopyToiUuNote.disabled = true;
+      cs.evalScript(
+        loadDanToiUuJsx() + "dcCopyToiUuNoteToOddArtboards(" + jsStr(notePrefixes) + ")",
+        function (res) {
+          btnCopyToiUuNote.disabled = false;
+          handleRes(outDanToiUu, res);
         },
       );
     });
@@ -1987,8 +2049,312 @@
   }
 
   // ---- Raster object đang chọn ----
-  // Luôn xác nhận khung card, clip một lần ở ngoài rồi mới raster.
+  // Raster exactly one output per selected object. Do not infer an artboard,
+  // nested mask, or parent group: those guesses can merge separate pages.
   function rasterizeSelectionInHost() {
+    function rasterizeExactSelection(doc, liveSelection) {
+      var options = new RasterizeOptions();
+      options.resolution = 450;
+      options.transparency = true;
+      options.antiAliasingMethod = AntiAliasingMethod.ARTOPTIMIZED;
+      // clipBounds already crops the pixels. Asking Illustrator to create one
+      // more clipping mask leaves unnecessary vector-mask remnants behind.
+      options.clippingMask = false;
+      options.padding = 0;
+      options.convertSpotColors = false;
+
+      function copyBounds(bounds) {
+        if (!bounds || bounds.length < 4) return null;
+        var result = [
+          Number(bounds[0]),
+          Number(bounds[1]),
+          Number(bounds[2]),
+          Number(bounds[3]),
+        ];
+        return result[2] > result[0] && result[1] > result[3] ? result : null;
+      }
+
+      function directChildren(group) {
+        var result = [];
+        try {
+          var items = group.pageItems;
+          for (var i = 0; i < items.length; i++) {
+            try {
+              if (items[i].parent === group) result.push(items[i]);
+            } catch (parentError) {}
+          }
+          if (result.length === 0)
+            for (var j = 0; j < items.length; j++) result.push(items[j]);
+        } catch (childrenError) {}
+        return result;
+      }
+
+      function isClipPath(item) {
+        try {
+          if (item.clipping === true) return true;
+        } catch (clipError) {}
+        try {
+          if (item.typename === "CompoundPathItem") {
+            for (var i = 0; i < item.pathItems.length; i++)
+              if (item.pathItems[i].clipping === true) return true;
+          }
+        } catch (compoundError) {}
+        return false;
+      }
+
+      // A clipping path is authoritative only when it belongs directly to the
+      // selected group. Never promote a descendant's frame to its parent.
+      function directClipFrame(item) {
+        try {
+          if (item.typename !== "GroupItem" || item.clipped !== true)
+            return null;
+        } catch (groupError) {
+          return null;
+        }
+        var children = directChildren(item);
+        for (var i = 0; i < children.length; i++) {
+          if (!isClipPath(children[i])) continue;
+          try {
+            return copyBounds(children[i].geometricBounds);
+          } catch (boundsError) {}
+        }
+        return null;
+      }
+
+      function frameArea(frame) {
+        if (!frame) return 0;
+        return Math.max(0, frame[2] - frame[0]) * Math.max(0, frame[1] - frame[3]);
+      }
+
+      function frameCoversItem(frame, item) {
+        var itemBounds = null;
+        try {
+          itemBounds = copyBounds(item.visibleBounds);
+        } catch (visibleError) {}
+        if (!itemBounds) {
+          try {
+            itemBounds = copyBounds(item.geometricBounds);
+          } catch (geometricError) {}
+        }
+        if (!itemBounds) return false;
+
+        var itemWidth = itemBounds[2] - itemBounds[0];
+        var itemHeight = itemBounds[1] - itemBounds[3];
+        var overlapWidth = Math.max(
+          0,
+          Math.min(frame[2], itemBounds[2]) - Math.max(frame[0], itemBounds[0]),
+        );
+        var overlapHeight = Math.max(
+          0,
+          Math.min(frame[1], itemBounds[1]) - Math.max(frame[3], itemBounds[3]),
+        );
+
+        // A page clip can include bleed, but it must still cover almost all of
+        // the selected group's visual envelope. A photo clip will not pass.
+        return (
+          overlapWidth >= itemWidth * 0.9 &&
+          overlapHeight >= itemHeight * 0.9 &&
+          overlapWidth * overlapHeight >= frameArea(itemBounds) * 0.85
+        );
+      }
+
+      // Some imported pages have one normal outer group and their actual page
+      // clipping group one level below it. Collect only the outermost clipped
+      // children so photo masks inside a page do not become raster boundaries.
+      function collectNestedPageFrames(group, frames) {
+        var children = directChildren(group);
+        for (var i = 0; i < children.length; i++) {
+          var child = children[i];
+          try {
+            if (child.typename !== "GroupItem") continue;
+            if (child.clipped === true) {
+              var frame = directClipFrame(child);
+              if (frame) frames.push(frame);
+              continue;
+            }
+            collectNestedPageFrames(child, frames);
+          } catch (childError) {}
+        }
+      }
+
+      function nestedPageFrame(item) {
+        try {
+          if (item.typename !== "GroupItem") return null;
+        } catch (itemError) {
+          return null;
+        }
+
+        var frames = [];
+        collectNestedPageFrames(item, frames);
+        if (frames.length === 1)
+          return frameCoversItem(frames[0], item) ? frames[0] : null;
+        if (frames.length < 2) return null;
+
+        // A page frame must be clearly larger than photo/detail masks. Two
+        // similarly large frames mean the selection contains more than one page,
+        // so retaining the whole selected object is safer than guessing.
+        frames.sort(function (a, b) {
+          return frameArea(b) - frameArea(a);
+        });
+        return frameArea(frames[0]) >= frameArea(frames[1]) * 2 &&
+          frameCoversItem(frames[0], item)
+          ? frames[0]
+          : null;
+      }
+
+      function rasterFrame(item) {
+        var clipFrame = directClipFrame(item);
+        if (clipFrame) return clipFrame;
+        var nestedFrame = nestedPageFrame(item);
+        if (nestedFrame) return nestedFrame;
+        try {
+          var visible = copyBounds(item.visibleBounds);
+          if (visible) return visible;
+        } catch (visibleError) {}
+        try {
+          return copyBounds(item.geometricBounds);
+        } catch (geometricError) {
+          return null;
+        }
+      }
+
+      function isEditable(item) {
+        try {
+          if (item.locked === true || item.hidden === true || item.guides === true)
+            return false;
+        } catch (itemStateError) {}
+        try {
+          if (item.layer.locked === true || item.layer.visible === false) return false;
+        } catch (layerStateError) {}
+        return true;
+      }
+
+      function isAncestor(ancestor, item) {
+        var current = item;
+        while (current) {
+          try {
+            current = current.parent;
+          } catch (parentError) {
+            return false;
+          }
+          if (!current || current === ancestor) return current === ancestor;
+          try {
+            if (current.typename === "Layer" || current.typename === "Document")
+              return false;
+          } catch (endError) {
+            return false;
+          }
+        }
+        return false;
+      }
+
+      // The source remains untouched until the clipped duplicate has become a
+      // RasterItem. This avoids losing a page if Illustrator rejects one item.
+      function rasterOne(source, frame) {
+        var duplicate = null;
+        var raster = null;
+        try {
+          duplicate = source.duplicate(source, ElementPlacement.PLACEAFTER);
+          // Document.rasterize disposes of the copied source and clips pixels
+          // to frame. A prepared Clip group already contains its background.
+          raster = doc.rasterize(duplicate, frame, options);
+          if (!raster) throw new Error("Illustrator khong tra ve RasterItem.");
+          // Most Illustrator versions consume duplicate. Some complex clipped
+          // groups leave that duplicate alive, so remove only a surviving
+          // non-raster copy before deleting the original source.
+          try {
+            if (duplicate !== raster && duplicate.typename !== "RasterItem") duplicate.remove();
+          } catch (removeDuplicateError) {}
+          try {
+            raster.move(source, ElementPlacement.PLACEBEFORE);
+          } catch (moveError) {}
+          try {
+            source.remove();
+          } catch (removeSourceError) {
+            try {
+              raster.remove();
+            } catch (removeRasterError) {}
+            throw new Error("Khong the thay object goc: " + removeSourceError);
+          }
+          return raster;
+        } catch (rasterError) {
+          try {
+            if (raster) raster.remove();
+          } catch (removeRasterError2) {}
+          try {
+            if (duplicate) duplicate.remove();
+          } catch (cleanupError) {}
+          throw rasterError;
+        }
+      }
+
+      // Snapshot before the first mutation. A live Illustrator selection can
+      // otherwise skip items or change to a parent as earlier items are removed.
+      var snapshot = [];
+      for (var s = 0; s < liveSelection.length; s++) snapshot.push(liveSelection[s]);
+
+      var unique = [];
+      for (var u = 0; u < snapshot.length; u++) {
+        var seen = false;
+        for (var q = 0; q < unique.length; q++) {
+          if (unique[q] === snapshot[u]) {
+            seen = true;
+            break;
+          }
+        }
+        if (!seen) unique.push(snapshot[u]);
+      }
+
+      // When a selected parent also contains a selected child, raster the
+      // explicit parent once. Separate sibling selections remain independent.
+      var targets = [];
+      for (var i = 0; i < unique.length; i++) {
+        var nested = false;
+        for (var j = 0; j < unique.length; j++) {
+          if (i !== j && isAncestor(unique[j], unique[i])) {
+            nested = true;
+            break;
+          }
+        }
+        if (!nested) targets.push(unique[i]);
+      }
+
+      var rasters = [];
+      var errors = [];
+      for (var t = 0; t < targets.length; t++) {
+        try {
+          if (!isEditable(targets[t]))
+            throw new Error("object hoac layer dang khoa/an.");
+          var frame = rasterFrame(targets[t]);
+          if (!frame) throw new Error("khong do duoc khung object.");
+          rasters.push(rasterOne(targets[t], frame));
+        } catch (itemError) {
+          errors.push("Object " + (t + 1) + ": " + itemError);
+        }
+      }
+
+      if (rasters.length > 0) {
+        try {
+          doc.selection = rasters;
+        } catch (selectError) {}
+      }
+      app.redraw();
+      if (errors.length > 0)
+        return (
+          "OK: Da raster " +
+          rasters.length +
+          "/" +
+          targets.length +
+          " object doc lap. Canh bao: " +
+          errors.join(" | ")
+        );
+      return (
+        "OK: Da raster " +
+        rasters.length +
+        " object doc lap - CMYK, 450 ppi, nen trong suot."
+      );
+    }
+
     try {
       if (app.documents.length === 0) return "ERR: Chưa mở tài liệu nào.";
 
@@ -1998,6 +2364,8 @@
         return "ERR: Hãy chọn ít nhất 1 object để raster.";
       if (doc.documentColorSpace !== DocumentColorSpace.CMYK)
         return "ERR: Tài liệu đang ở RGB. Hãy đổi File > Document Color Mode > CMYK Color rồi bấm Raster.";
+
+      return rasterizeExactSelection(doc, selection);
 
       var options = new RasterizeOptions();
       options.resolution = 450;
@@ -2799,6 +3167,7 @@
         if (clipMsg) clipMsg.textContent = "Đang clip…";
         clipOk.disabled = true;
         var expr =
+          loadClipJsx() +
           "dcClipToSize(" +
           jsStr(wv) +
           ", " +
@@ -2846,6 +3215,8 @@
 
   // ---- Dàn Catalogue ----
   var outCatalogue = document.getElementById("outCatalogue");
+  // Retain these handlers only if an older CEP-cached HTML file is open.
+  if (document.getElementById("selCatA4")) {
 
   // dropdown chọn khổ -> ẩn/hiện ô nhập kích thước
   var selCatA4 = document.getElementById("selCatA4");
@@ -2918,6 +3289,36 @@
   });
 
   // ---- Dàn CTL Offset (signature 8) ----
+  }
+
+  var btnCatalogueAuto = document.getElementById("btnCatalogueAuto");
+  if (btnCatalogueAuto && outCatalogue) {
+    btnCatalogueAuto.addEventListener("click", function () {
+      var w = document.getElementById("wCatalogueAuto").value;
+      var h = document.getElementById("hCatalogueAuto").value;
+      var pw = parseFloat(String(w).replace(",", "."));
+      var ph = parseFloat(String(h).replace(",", "."));
+      if (isNaN(pw) || isNaN(ph) || pw <= 0 || ph <= 0) {
+        show(outCatalogue, "Kich thuoc khong hop le (rong x cao, cm).", "warn");
+        return;
+      }
+      show(outCatalogue, "Dang tinh 1 hay 2 cuon tren to...");
+      btnCatalogueAuto.disabled = true;
+      cs.evalScript(
+        loadCatalogueJsx() +
+          "dcRunCatalogueAuto(" +
+          jsStr(w) +
+          "," +
+          jsStr(h) +
+          ")",
+        function (res) {
+          btnCatalogueAuto.disabled = false;
+          handleRes(outCatalogue, res);
+        },
+      );
+    });
+  }
+
   var btnOffset = document.getElementById("btnOffset");
   var outOffset = document.getElementById("outOffset");
   btnOffset.addEventListener("click", function () {
@@ -2933,6 +3334,7 @@
     show(outOffset, "Đang dàn CTL Offset…");
     btnOffset.disabled = true;
     var expr =
+      loadOffsetJsx() +
       "dcRunSignature8(" +
       jsStr(w) +
       ", " +

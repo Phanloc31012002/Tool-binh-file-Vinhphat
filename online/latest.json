@@ -1,9 +1,9 @@
 {
     "product":  "com.locdev.dancard",
-    "version":  "2.12.0",
-    "title":  "beta thêm chức năng tự động dàn tối ưu",
-    "description":  "Dàn tối ưu nhất trên 1 tờ giấy với kích thước tùy chỉnh",
-    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.12.0.zip",
-    "sha256":  "FF4D7B53F8BF1B2C8C6FDD040A7749F41F365A9E9E4D73CAC2C8F63011DFB38E",
-    "publishedUtc":  "2026-09-26T01:57:30.3445439Z"
+    "version":  "2.12.1",
+    "title":  "Bản vá sửa lỗi raster + clip khi gặp file tào lao của khách.",
+    "description":  "Raster đưa raster chuẩn nhất về phần clip\r\nClip chuyển về giống như clip card nhưng vẫn có vài nhược điểm khi gặp file siêu chó.",
+    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.12.1.zip",
+    "sha256":  "98F440F25195ADCB6B264B888C3C540E8CBFA8B66E8D53E26E4E6B2926DFA4A9",
+    "publishedUtc":  "2026-09-28T11:24:04.3291458Z"
 }

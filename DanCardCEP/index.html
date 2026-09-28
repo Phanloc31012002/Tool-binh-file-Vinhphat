@@ -378,9 +378,28 @@
             Các tờ mới được xếp từ trái sang phải, hết chỗ sẽ tự xuống hàng.
           </p>
         </div>
-        <button id="btnDanToiUu" class="btn btn-primary" type="button">
-          <span class="btn-label">Dàn tối ưu</span>
-        </button>
+        <div class="field-row toiuu-actions">
+          <button id="btnDanToiUu" class="btn btn-primary" type="button" style="flex: 1">
+            <span class="btn-label">Dàn tối ưu</span>
+          </button>
+        </div>
+        <div class="field-row toiuu-actions">
+          <input
+            id="autoSheetNotePrefixes"
+            class="note-copy-input"
+            type="text"
+            placeholder="F1, F2, F3..."
+            title="Nội dung theo thứ tự artboard 1, 3, 5, 7...; ngăn cách bằng dấu phẩy"
+          />
+          <button
+            id="btnCopyToiUuNote"
+            class="btn"
+            type="button"
+            title="Chọn ghi chú ở artboard mặt trước đầu tiên để copy sang các artboard mặt trước tiếp theo"
+          >
+            Copy ghi chú
+          </button>
+        </div>
         <div id="outDanToiUu" class="out">Chọn một bài rồi bấm Dàn tối ưu.</div>
       </main>
 
@@ -484,77 +503,33 @@
         </div>
       </main>
 
-      <!-- TAB: CATALOGUE (accordion: A4+nhỏ hơn / A5+nhỏ hơn) -->
+      <!-- TAB: CATALOGUE -->
       <main class="body tabpane" id="pane-catalogue">
         <div class="field">
           <div class="label">Dàn trang catalogue đóng gáy giữa</div>
           <p class="hint">
             Chọn các trang theo thứ tự đọc (trái → phải, trên → dưới). Số trang
-            phải là bội số của 4. Tool sẽ hỏi chọn file pon ở lần chạy đầu.
+            phải là bội số của 4. Nhập kích thước thành phẩm của một trang.
           </p>
         </div>
 
-        <!-- Accordion: A4 + nhỏ hơn A4 -->
-        <div class="acc">
-          <button class="acc-head" data-acc="catA4">
-            <span class="acc-arrow">&#9654;</span>
-            <span>A4 + nhỏ hơn A4</span>
-          </button>
-          <div class="acc-body" id="acc-catA4">
-            <div class="field">
-              <div class="label">Khổ</div>
-              <select id="selCatA4" class="select">
-                <option value="a4">A4 (21.1 × 29.9 cm)</option>
-                <option value="custom">Khổ khác (nhỏ hơn A4)</option>
-              </select>
-            </div>
-            <div class="field hidden" id="sizeCatA4">
-              <div class="label">Kích thước đích (cm)</div>
-              <div class="size-row">
-                <input type="text" id="wCatA4" class="num" placeholder="rộng" />
-                <span class="times">×</span>
-                <input type="text" id="hCatA4" class="num" placeholder="cao" />
-              </div>
-              <p class="hint">
-                Ví dụ trang gốc 14.7 × 26.7 → nhập 14.9 × 26.9. Mỗi khổ nhớ pon
-                riêng.
-              </p>
-            </div>
-            <button id="btnCatA4" class="btn btn-primary"><span class="btn-label">Dàn Catalogue</span></button>
+        <div class="field">
+          <div class="label">Kích thước 1 trang (cm)</div>
+          <div class="size-row">
+            <input type="text" id="wCatalogueAuto" class="num" value="21.1" placeholder="rộng" />
+            <span class="times">×</span>
+            <input type="text" id="hCatalogueAuto" class="num" value="29.9" placeholder="cao" />
           </div>
+          <p class="hint">
+            Tool ưu tiên 2 cuốn giống nhau trên một tờ, xả một dao ở chính giữa.
+            Nếu không vừa, tool tự chuyển sang 1 cuốn/tờ. PON được vẽ theo bố cục đã chọn.
+          </p>
         </div>
 
-        <!-- Accordion: A5 + nhỏ hơn A5 -->
-        <div class="acc">
-          <button class="acc-head" data-acc="catA5">
-            <span class="acc-arrow">&#9654;</span>
-            <span>A5 + nhỏ hơn A5</span>
-          </button>
-          <div class="acc-body" id="acc-catA5">
-            <div class="field">
-              <div class="label">Khổ</div>
-              <select id="selCatA5" class="select">
-                <option value="a5">A5 dọc (14.95 × 21.1 cm)</option>
-                <option value="custom">
-                  Khổ khác (nhỏ hơn A5) — 2 con 1 tờ
-                </option>
-              </select>
-            </div>
-            <div class="field hidden" id="sizeCatA5">
-              <div class="label">Kích thước 1 trang (cm)</div>
-              <div class="size-row">
-                <input type="text" id="wCatA5" class="num" placeholder="rộng" />
-                <span class="times">×</span>
-                <input type="text" id="hCatA5" class="num" placeholder="cao" />
-              </div>
-              <p class="hint">Dàn 2 con 1 tờ. Mỗi khổ nhớ pon riêng.</p>
-            </div>
-            <button id="btnCatA5" class="btn btn-primary"><span class="btn-label">Dàn Catalogue</span></button>
-          </div>
-        </div>
+        <button id="btnCatalogueAuto" class="btn btn-primary"><span class="btn-label">Dàn Catalogue</span></button>
 
         <div id="outCatalogue" class="out">
-          Chọn các trang catalogue rồi chọn khổ để dàn.
+          Chọn trang, nhập kích thước một trang rồi bấm Dàn Catalogue.
         </div>
       </main>
 
@@ -563,8 +538,8 @@
         <div class="field">
           <div class="label">Dàn CTL Offset (in offset khổ lớn 65×86)</div>
           <p class="hint">
-            Chọn các trang theo thứ tự đọc. Tool hỏi chọn pon ở lần chạy đầu
-            (nhớ theo khổ).
+            Chọn các trang theo thứ tự đọc. Tool tự tạo artboard và vẽ PON
+            theo form CTL Offset.
           </p>
         </div>
 
@@ -577,8 +552,8 @@
           <div class="acc-body" id="acc-offSig">
             <p class="hint">
               Bình bài AB + tự trở (đóng gáy giữa lồng nhau). Bìa = 4 trang
-              ngoài cùng làm TT4. Bội số của 4; phần ruột dư 0/4/8/12. Pon chính
-              65×86 + pon TT4 65×43.
+              ngoài cùng làm TT4. Bội số của 4; phần ruột dư 0/4/8/12. PON được
+              vẽ tự động: AB/TT8 dùng form 65×86, TT4 dùng form 65×43.
             </p>
             <div class="field">
               <div class="label">Kích thước 1 trang (cm)</div>
@@ -793,7 +768,7 @@
       </main>
 
       <footer class="foot">
-        <span class="ver">v2.12.0</span>
+        <span class="ver">v2.12.1</span>
       </footer>
     </div>
 

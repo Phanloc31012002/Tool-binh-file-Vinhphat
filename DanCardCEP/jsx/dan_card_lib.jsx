@@ -3546,7 +3546,206 @@ function dcDanToiUuV2(pageWidthText, pageHeightText) {
 //  - Artboard moi tu xep theo luoi canvas, trai sang phai roi xuong hang.
 //  - Tach hinh chu nhat de tan dung khoang trong chu L, van cat dao duoc.
 // ============================================================
-var dcDanToiUuVersion = 9;
+var dcDanToiUuVersion = 13;
+
+// Ghi chu duoc dat tren artboard mat truoc dau tien. Nhan ban giu nguyen
+// dinh dang, chi doi toa do de khoang cach voi mep artboard luon giong nhau.
+function dcCopyToiUuNoteToOddArtboards(prefixListText) {
+  try {
+    if (app.documents.length === 0) return "ERR: Chua mo tai lieu nao.";
+
+    var doc = app.activeDocument;
+    var selection = doc.selection;
+    if (!selection || selection.length === 0)
+      return "ERR: Chon ghi chu tren artboard mat truoc dau tien truoc khi copy.";
+
+    var EPS = 0.01;
+    function boundsOf(item) {
+      try {
+        var visible = item.visibleBounds;
+        return [visible[0], visible[1], visible[2], visible[3]];
+      } catch (e) {}
+      try {
+        var geometric = item.geometricBounds;
+        return [geometric[0], geometric[1], geometric[2], geometric[3]];
+      } catch (e2) {}
+      return null;
+    }
+
+    function findArtboardAt(x, y) {
+      for (var i = 0; i < doc.artboards.length; i++) {
+        var rect = doc.artboards[i].artboardRect;
+        if (
+          x >= rect[0] - EPS &&
+          x <= rect[2] + EPS &&
+          y <= rect[1] + EPS &&
+          y >= rect[3] - EPS
+        )
+          return i;
+      }
+      return -1;
+    }
+
+    function parsePrefixes(text) {
+      var raw = String(text === undefined || text === null ? "" : text).split(",");
+      var result = [];
+      for (var i = 0; i < raw.length; i++) {
+        var value = raw[i].replace(/^\s+|\s+$/g, "");
+        if (value) result.push(value);
+      }
+      return result;
+    }
+
+    function collectTextFrames(item, output) {
+      if (!item) return;
+      try {
+        if (item.typename === "TextFrame") {
+          output.push(item);
+          return;
+        }
+      } catch (e) {}
+      try {
+        if (item.typename === "GroupItem") {
+          for (var i = 0; i < item.pageItems.length; i++)
+            collectTextFrames(item.pageItems[i], output);
+        }
+      } catch (e2) {}
+    }
+
+    var records = [];
+    var sourceIndex = -1;
+    for (var si = 0; si < selection.length; si++) {
+      var sourceBounds = boundsOf(selection[si]);
+      if (!sourceBounds) continue;
+      var centerX = (sourceBounds[0] + sourceBounds[2]) / 2;
+      var centerY = (sourceBounds[1] + sourceBounds[3]) / 2;
+      var itemArtboard = findArtboardAt(centerX, centerY);
+      if (itemArtboard < 0)
+        return "ERR: Ghi chu dang chon nam ngoai artboard. Dat no vao artboard mat truoc dau tien.";
+      if (sourceIndex < 0) sourceIndex = itemArtboard;
+      else if (sourceIndex !== itemArtboard)
+        return "ERR: Chi chon ghi chu tren mot artboard trong mot lan copy.";
+      records.push({ item: selection[si], bounds: sourceBounds });
+    }
+    if (records.length === 0)
+      return "ERR: Khong doc duoc ghi chu dang chon.";
+    if (sourceIndex % 2 !== 0)
+      return "ERR: Ghi chu phai nam tren artboard mat truoc (artboard so le).";
+
+    var targetIndexes = [];
+    for (var ai = sourceIndex + 2; ai < doc.artboards.length; ai += 2)
+      targetIndexes.push(ai);
+    if (targetIndexes.length === 0)
+      return "ERR: Chua co artboard mat truoc tiep theo de copy ghi chu.";
+
+    var prefixes = parsePrefixes(prefixListText);
+    var usePrefixes = prefixes.length > 0;
+    var prefixRecordIndex = -1;
+    var prefixTextIndex = -1;
+    var originalTextContents = "";
+    if (usePrefixes) {
+      if (prefixes.length !== targetIndexes.length + 1)
+        return (
+          "ERR: Can " +
+          (targetIndexes.length + 1) +
+          " noi dung cho artboard " +
+          (sourceIndex + 1) +
+          ", " +
+          (sourceIndex + 3) +
+          ", ...; hien dang co " +
+          prefixes.length +
+          "."
+        );
+
+      var selectedTextFrames = [];
+      for (var tri = 0; tri < records.length; tri++) {
+        var recordTextFrames = [];
+        collectTextFrames(records[tri].item, recordTextFrames);
+        for (var tfi = 0; tfi < recordTextFrames.length; tfi++) {
+          selectedTextFrames.push({
+            frame: recordTextFrames[tfi],
+            recordIndex: tri,
+            textIndex: tfi,
+          });
+        }
+      }
+      if (selectedTextFrames.length !== 1)
+        return "ERR: Khi nhap noi dung, hay chon mot ghi chu co dung mot TextFrame (co the nam trong group).";
+
+      prefixRecordIndex = selectedTextFrames[0].recordIndex;
+      prefixTextIndex = selectedTextFrames[0].textIndex;
+      originalTextContents = selectedTextFrames[0].frame.contents;
+      selectedTextFrames[0].frame.contents =
+        prefixes[0] + " - " + originalTextContents;
+    }
+
+    var sourceRect = doc.artboards[sourceIndex].artboardRect;
+    for (var ri = 0; ri < records.length; ri++) {
+      records[ri].bounds = boundsOf(records[ri].item);
+      if (!records[ri].bounds)
+        return "ERR: Khong do duoc ghi chu sau khi them noi dung.";
+      records[ri].leftOffset = records[ri].bounds[0] - sourceRect[0];
+      records[ri].topOffset = records[ri].bounds[1] - sourceRect[1];
+    }
+
+    var copied = [];
+    for (var ti = 0; ti < targetIndexes.length; ti++) {
+      var targetRect = doc.artboards[targetIndexes[ti]].artboardRect;
+      for (ri = 0; ri < records.length; ri++) {
+        var copy = records[ri].item.duplicate();
+        var copyBounds = boundsOf(copy);
+        if (!copyBounds) {
+          try {
+            copy.remove();
+          } catch (removeError) {}
+          throw new Error("Khong do duoc ban sao ghi chu.");
+        }
+        copy.translate(
+          targetRect[0] + records[ri].leftOffset - copyBounds[0],
+          targetRect[1] + records[ri].topOffset - copyBounds[1],
+        );
+        if (usePrefixes && ri === prefixRecordIndex) {
+          var copyTextFrames = [];
+          collectTextFrames(copy, copyTextFrames);
+          if (copyTextFrames.length <= prefixTextIndex)
+            throw new Error("Khong tim duoc TextFrame tren ban sao ghi chu.");
+          copyTextFrames[prefixTextIndex].contents =
+            prefixes[ti + 1] + " - " + originalTextContents;
+          // Noi dung co do dai khac nhau co the lam bounds doi. Canh lai lan
+          // nua de vi tri hien thi trung voi ghi chu tren artboard nguon.
+          var prefixedCopyBounds = boundsOf(copy);
+          if (!prefixedCopyBounds)
+            throw new Error("Khong do duoc ban sao sau khi them noi dung.");
+          copy.translate(
+            targetRect[0] + records[ri].leftOffset - prefixedCopyBounds[0],
+            targetRect[1] + records[ri].topOffset - prefixedCopyBounds[1],
+          );
+        }
+        copied.push(copy);
+      }
+    }
+
+    try {
+      doc.selection = null;
+      for (var ci = 0; ci < copied.length; ci++) copied[ci].selected = true;
+      doc.artboards.setActiveArtboardIndex(targetIndexes[0]);
+    } catch (selectError) {}
+    app.redraw();
+    return (
+      "OK: Da copy " +
+      records.length +
+      " ghi chu tu artboard " +
+      (sourceIndex + 1) +
+      " sang " +
+      targetIndexes.length +
+      " artboard mat truoc tiep theo." +
+      (usePrefixes ? " Da them noi dung theo thu tu da nhap." : "")
+    );
+  } catch (e) {
+    return "ERR: " + dcMoTaLoi(e);
+  }
+}
+
 function dcDanToiUu(pageWidthText, pageHeightText, twoSidedArg, multiPerArtboardArg) {
   try {
     if (app.documents.length === 0) return "ERR: Chua mo tai lieu nao.";
@@ -13026,6 +13225,159 @@ function dcFlattenForImposition(doc, item, frame, resolution) {
   return raster;
 }
 
+// Catalogue KTS A4 uses a fixed 43 x 32.5 cm sheet. The old reference AI
+// contains four black L registration marks. Draw the same marks directly so
+// the imposition never needs to open or duplicate that reference file.
+function dcCatalogueCreateAutoPonLayer(doc) {
+  var layerName = "Pon Catalogue tu dong";
+  for (var li = doc.layers.length - 1; li >= 0; li--) {
+    try {
+      if (doc.layers[li].name === layerName) {
+        doc.layers[li].locked = false;
+        doc.layers[li].remove();
+      }
+    } catch (e) {}
+  }
+  var layer = doc.layers.add();
+  layer.name = layerName;
+  try {
+    layer.locked = false;
+    layer.visible = true;
+  } catch (e2) {}
+  return layer;
+}
+
+function dcCatalogueAddAutoPon(layer, artboardRect) {
+  var MM = 2.834645669;
+  var xInset = 4 * MM;
+  var yInset = 13 * MM;
+  var verticalLength = 11; // pt, matches the supplied KTS reference form.
+  var horizontalLength = 4.803049;
+  var black = new CMYKColor();
+  black.cyan = 0;
+  black.magenta = 0;
+  black.yellow = 0;
+  black.black = 100;
+
+  function draw(p1, p2) {
+    var line = layer.pathItems.add();
+    line.setEntirePath([p1, p2]);
+    line.filled = false;
+    line.stroked = true;
+    line.strokeColor = black;
+    line.strokeWidth = 1;
+  }
+
+  var left = artboardRect[0];
+  var top = artboardRect[1];
+  var right = artboardRect[2];
+  var bottom = artboardRect[3];
+  var xLeft = left + xInset;
+  var xRight = right - xInset;
+  var yTop = top - yInset;
+  var yBottom = bottom + yInset;
+
+  // Top left / top right.
+  draw([xLeft, yTop + verticalLength], [xLeft, yTop]);
+  draw([xRight, yTop + verticalLength], [xRight, yTop]);
+  draw([xLeft - horizontalLength, yTop], [xLeft, yTop]);
+  draw([xRight, yTop], [xRight + horizontalLength, yTop]);
+  // Bottom left / bottom right.
+  draw([xLeft, yBottom], [xLeft, yBottom - verticalLength]);
+  draw([xRight, yBottom], [xRight, yBottom - verticalLength]);
+  draw([xLeft - horizontalLength, yBottom], [xLeft, yBottom]);
+  draw([xRight, yBottom], [xRight + horizontalLength, yBottom]);
+}
+
+// Form Catalogue A5 dung chung kho 43 x 32.5 cm, nhung co them mot cap
+// dau pon o tam to de canh hai cot A5. Toa do va net ve khop form A5 da gui.
+function dcCatalogueAddAutoPonA5(layer, artboardRect) {
+  var MM = 2.834645669;
+  var xInset = 4 * MM;
+  var yInset = 13 * MM;
+  var verticalLength = 11;
+  var horizontalLength = 4.803049;
+  var black = new CMYKColor();
+  black.cyan = 0;
+  black.magenta = 0;
+  black.yellow = 0;
+  black.black = 100;
+
+  function draw(p1, p2) {
+    var line = layer.pathItems.add();
+    line.setEntirePath([p1, p2]);
+    line.filled = false;
+    line.stroked = true;
+    line.strokeColor = black;
+    line.strokeWidth = 1;
+  }
+
+  var left = artboardRect[0];
+  var top = artboardRect[1];
+  var right = artboardRect[2];
+  var bottom = artboardRect[3];
+  var xLeft = left + xInset;
+  var xMiddle = (left + right) / 2;
+  var xRight = right - xInset;
+  var yTop = top - yInset;
+  var yBottom = bottom + yInset;
+
+  // Hai dau L ben trai/phai va cap dau doc o chinh giua to A5.
+  draw([xLeft, yTop + verticalLength], [xLeft, yTop]);
+  draw([xMiddle, yTop + verticalLength], [xMiddle, yTop]);
+  draw([xRight, yTop + verticalLength], [xRight, yTop]);
+  draw([xLeft, yBottom], [xLeft, yBottom - verticalLength]);
+  draw([xMiddle, yBottom], [xMiddle, yBottom - verticalLength]);
+  draw([xRight, yBottom], [xRight, yBottom - verticalLength]);
+  draw([xLeft - horizontalLength, yTop], [xLeft, yTop]);
+  draw([xRight, yTop], [xRight + horizontalLength, yTop]);
+  draw([xLeft - horizontalLength, yBottom], [xLeft, yBottom]);
+  draw([xRight, yBottom], [xRight + horizontalLength, yBottom]);
+}
+
+// Draw PON from the actual imposed artwork boundary. For the exact A4 and A5
+// formats this produces the same coordinates as the two reference forms;
+// smaller formats get their own correctly positioned marks without importing
+// any old PON artwork.
+function dcCatalogueAddDynamicPon(layer, artworkRect, twoBooklets) {
+  var verticalLength = 11;
+  var horizontalLength = 4.803049;
+  var black = new CMYKColor();
+  black.cyan = 0;
+  black.magenta = 0;
+  black.yellow = 0;
+  black.black = 100;
+
+  function draw(p1, p2) {
+    var line = layer.pathItems.add();
+    line.setEntirePath([p1, p2]);
+    line.filled = false;
+    line.stroked = true;
+    line.strokeColor = black;
+    line.strokeWidth = 1;
+  }
+
+  var xLeft = artworkRect[0];
+  var yTop = artworkRect[1];
+  var xRight = artworkRect[2];
+  var yBottom = artworkRect[3];
+
+  draw([xLeft, yTop + verticalLength], [xLeft, yTop]);
+  draw([xRight, yTop + verticalLength], [xRight, yTop]);
+  draw([xLeft - horizontalLength, yTop], [xLeft, yTop]);
+  draw([xRight, yTop], [xRight + horizontalLength, yTop]);
+  draw([xLeft, yBottom], [xLeft, yBottom - verticalLength]);
+  draw([xRight, yBottom], [xRight, yBottom - verticalLength]);
+  draw([xLeft - horizontalLength, yBottom], [xLeft, yBottom]);
+  draw([xRight, yBottom], [xRight + horizontalLength, yBottom]);
+
+  if (twoBooklets) {
+    var xMiddle = (xLeft + xRight) / 2;
+    draw([xMiddle, yTop + verticalLength], [xMiddle, yTop]);
+    draw([xMiddle, yBottom], [xMiddle, yBottom - verticalLength]);
+  }
+}
+
 function dcRunCatalogueA4() {
   try {
     // ============================================================
@@ -13435,7 +13787,47 @@ function dcRunCatalogueA4() {
       var numFaces = numSheets * 2; // số cụm 2 trang = số mặt (mỗi tờ 2 mặt)
 
       // ---- Import pon ----
-      var ponFile = _ponGet();
+       var useAutoPon = true;
+       if (useAutoPon) {
+         var formWpt = 430 * MM;
+         var formHpt = 325 * MM;
+         var startL = selectionLeft;
+         var startT = selectionTop;
+         var MAX_ROWS = 16;
+         var blockWpt = formWpt * 2;
+         var abPositions = [];
+         var oldAbCountAuto = doc.artboards.length;
+         var artworkLayer = doc.activeLayer;
+         var autoPonLayer = dcCatalogueCreateAutoPonLayer(doc);
+         for (var autoFace = 0; autoFace < numFaces; autoFace++) {
+           var autoSheetIndex = Math.floor(autoFace / 2);
+           var autoSide = autoFace % 2;
+           var autoBlock = Math.floor(autoSheetIndex / MAX_ROWS);
+           var autoRow = autoSheetIndex % MAX_ROWS;
+           var autoLeft = startL + autoBlock * blockWpt + autoSide * formWpt;
+           var autoTop = startT - autoRow * formHpt;
+           var autoRect = [
+             autoLeft,
+             autoTop,
+             autoLeft + formWpt,
+             autoTop - formHpt,
+           ];
+           doc.artboards.add(autoRect);
+           dcCatalogueAddAutoPon(autoPonLayer, autoRect);
+           abPositions.push(autoRect);
+         }
+         try {
+           autoPonLayer.zOrder(ZOrderMethod.BRINGTOFRONT);
+           autoPonLayer.locked = true;
+           doc.activeLayer = artworkLayer;
+         } catch (autoPonError) {}
+         for (var autoOld = oldAbCountAuto - 1; autoOld >= 0; autoOld--) {
+           try {
+             doc.artboards.remove(autoOld);
+           } catch (autoOldError) {}
+         }
+       } else {
+       var ponFile = _ponGet();
       if (!ponFile) {
         alert("Chưa chọn file pon. Dừng.");
         return;
@@ -13590,7 +13982,8 @@ function dcRunCatalogueA4() {
       // ---- Dàn trang vào giữa từng artboard (cụm 2 trang / artboard) ----
       //  Thứ tự cụm (mặt): tờ 0 trước = AB0, tờ 0 sau = AB1, tờ 1 trước = AB2...
       //  faces[k] = cặp [L,R] trang của cụm k.
-      var faces = [];
+       }
+       var faces = [];
       for (var sf = 0; sf < numSheets; sf++) {
         faces.push(sheets[sf].front); // mặt trước
         faces.push(sheets[sf].back); // mặt sau
@@ -14185,6 +14578,47 @@ function dcRunCatalogueA5() {
       var numFaces = numSheets * 2; // số cụm 2 trang = số mặt (mỗi tờ 2 mặt)
 
       // ---- Import pon ----
+      var useAutoPon = true;
+      if (useAutoPon) {
+        // Form A5 theo file mẫu: 43 x 32.5 cm, có thêm pon giữa tờ.
+        var formWpt = 430 * MM;
+        var formHpt = 325 * MM;
+        var startL = selectionLeft;
+        var startT = selectionTop;
+        var MAX_ROWS = 12;
+        var blockWpt = formWpt * 2;
+        var abPositions = [];
+        var oldAbCountAuto = doc.artboards.length;
+        var artworkLayer = doc.activeLayer;
+        var autoPonLayer = dcCatalogueCreateAutoPonLayer(doc);
+        for (var autoFace = 0; autoFace < numFaces; autoFace++) {
+          var autoSheetIndex = Math.floor(autoFace / 2);
+          var autoSide = autoFace % 2;
+          var autoBlock = Math.floor(autoSheetIndex / MAX_ROWS);
+          var autoRow = autoSheetIndex % MAX_ROWS;
+          var autoLeft = startL + autoBlock * blockWpt + autoSide * formWpt;
+          var autoTop = startT - autoRow * formHpt;
+          var autoRect = [
+            autoLeft,
+            autoTop,
+            autoLeft + formWpt,
+            autoTop - formHpt,
+          ];
+          doc.artboards.add(autoRect);
+          dcCatalogueAddAutoPonA5(autoPonLayer, autoRect);
+          abPositions.push(autoRect);
+        }
+        try {
+          autoPonLayer.zOrder(ZOrderMethod.BRINGTOFRONT);
+          autoPonLayer.locked = true;
+          doc.activeLayer = artworkLayer;
+        } catch (autoPonError) {}
+        for (var autoOld = oldAbCountAuto - 1; autoOld >= 0; autoOld--) {
+          try {
+            doc.artboards.remove(autoOld);
+          } catch (autoOldError) {}
+        }
+      } else {
       var ponFile = _ponGet();
       if (!ponFile) {
         alert("Chưa chọn file pon. Dừng.");
@@ -14337,6 +14771,7 @@ function dcRunCatalogueA5() {
         }
       }
 
+      }
       // ---- Dàn trang vào giữa từng artboard (cụm 2 trang / artboard) ----
       //  Thứ tự cụm (mặt): tờ 0 trước = AB0, tờ 0 sau = AB1, tờ 1 trước = AB2...
       //  faces[k] = cặp [L,R] trang của cụm k.
@@ -14996,7 +15431,49 @@ function dcRunCatalogueCustom(wCm, hCm) {
 
       var numFaces = numSheets * 2;
 
-      var ponFile = _ponGet();
+       var useAutoPon = true;
+       if (useAutoPon) {
+         // Pon tu ve theo cum 2 trang thuc te: ngang cach 4 mm moi ben,
+         // doc cach 13 mm moi ben. Khong dung form A4 cho kho nho hon A4.
+         var formWpt = spreadWpt + 8 * MM;
+         var formHpt = pageHpt + 26 * MM;
+         var startL = selectionLeft;
+         var startT = selectionTop;
+         var MAX_ROWS = 16;
+         var blockWpt = formWpt * 2;
+         var abPositions = [];
+         var oldAbCountAuto = doc.artboards.length;
+         var artworkLayer = doc.activeLayer;
+         var autoPonLayer = dcCatalogueCreateAutoPonLayer(doc);
+         for (var autoFace = 0; autoFace < numFaces; autoFace++) {
+           var autoSheetIndex = Math.floor(autoFace / 2);
+           var autoSide = autoFace % 2;
+           var autoBlock = Math.floor(autoSheetIndex / MAX_ROWS);
+           var autoRow = autoSheetIndex % MAX_ROWS;
+           var autoLeft = startL + autoBlock * blockWpt + autoSide * formWpt;
+           var autoTop = startT - autoRow * formHpt;
+           var autoRect = [
+             autoLeft,
+             autoTop,
+             autoLeft + formWpt,
+             autoTop - formHpt,
+           ];
+           doc.artboards.add(autoRect);
+           dcCatalogueAddAutoPon(autoPonLayer, autoRect);
+           abPositions.push(autoRect);
+         }
+         try {
+           autoPonLayer.zOrder(ZOrderMethod.BRINGTOFRONT);
+           autoPonLayer.locked = true;
+           doc.activeLayer = artworkLayer;
+         } catch (autoPonError) {}
+         for (var autoOld = oldAbCountAuto - 1; autoOld >= 0; autoOld--) {
+           try {
+             doc.artboards.remove(autoOld);
+           } catch (autoOldError) {}
+         }
+       } else {
+       var ponFile = _ponGet();
       if (!ponFile) {
         alert("Chua chon file pon. Dung.");
         return;
@@ -15124,6 +15601,7 @@ function dcRunCatalogueCustom(wCm, hCm) {
         }
       }
 
+       }
       var faces = [];
       for (var sf = 0; sf < numSheets; sf++) {
         faces.push(sheets[sf].front);
@@ -16044,6 +16522,395 @@ function dcRunCatalogueCustomA5(wCm, hCm) {
 //   5. Nhập ghi chú (bìa + ruột).
 // ============================================================
 
+// ============================================================
+// Catalogue KTS auto: decide whether the 43 x 32.5 cm form holds
+// one booklet or two identical booklets. Two booklets share the
+// central cut line and use the A5-style PON marks.
+// ============================================================
+var dcCatalogueAutoVersion = 9;
+
+function dcRunCatalogueAuto(wCm, hCm) {
+  var MM = 2.834645669;
+
+  function numberCm(value) {
+    var n = parseFloat(String(value).replace(",", "."));
+    return isNaN(n) ? 0 : n;
+  }
+
+  function getBounds(item) {
+    try {
+      return item.visibleBounds.slice(0);
+    } catch (e) {
+      try {
+        return item.geometricBounds.slice(0);
+      } catch (e2) {
+        return null;
+      }
+    }
+  }
+
+  function centerAt(item, cx, cy) {
+    var b = getBounds(item);
+    if (!b) throw new Error("Khong do duoc kich thuoc artwork.");
+    item.translate(cx - (b[0] + b[2]) / 2, cy - (b[1] + b[3]) / 2);
+  }
+
+  try {
+    var pageWCm = numberCm(wCm);
+    var pageHCm = numberCm(hCm);
+    if (pageWCm <= 0 || pageHCm <= 0) {
+      return "ERR: Nhap kich thuoc 1 trang hop le (cm).";
+    }
+
+    var pageW = pageWCm * 10;
+    var pageH = pageHCm * 10;
+    var formW = 430;
+    var formH = 325;
+    // The artwork-safe area inside the form: 4 mm left/right, 13 mm top/bottom.
+    var safeW = 422;
+    var safeH = 299;
+    var tolerance = 0.05;
+    var spreadW = pageW * 2;
+    var spreadH = pageH;
+
+    function fits(w, h) {
+      return w <= safeW + tolerance && h <= safeH + tolerance;
+    }
+
+    // A5 is allowed up to 15 x 21.1 cm. At 15 cm wide its rotated
+    // two-booklet block reaches 30 cm high, only 0.5 mm past each of the
+    // 29.9 cm PON-safe edges; the supplied PON marks still remain outside it.
+    function fitsTwoA5Maximum() {
+      return (
+        pageW <= 150 + tolerance &&
+        pageH <= 211 + tolerance &&
+        spreadH * 2 <= safeW + tolerance &&
+        spreadW <= 300 + tolerance
+      );
+    }
+
+    // Prefer two copies. Both copies always sit left/right so one vertical cut
+    // separates them. A rotated spread is exactly the standard A5 arrangement.
+    var plan = null;
+    if (fits(spreadW * 2, spreadH)) {
+      plan = {
+        copies: 2,
+        rotate: false,
+        bookW: spreadW,
+        bookH: spreadH,
+      };
+    } else if (fits(spreadH * 2, spreadW) || fitsTwoA5Maximum()) {
+      plan = {
+        copies: 2,
+        rotate: true,
+        bookW: spreadH,
+        bookH: spreadW,
+      };
+    } else if (fits(spreadW, spreadH)) {
+      plan = {
+        copies: 1,
+        rotate: false,
+        bookW: spreadW,
+        bookH: spreadH,
+      };
+    } else if (fits(spreadH, spreadW)) {
+      plan = {
+        copies: 1,
+        rotate: true,
+        bookW: spreadH,
+        bookH: spreadW,
+      };
+    }
+
+    if (!plan) {
+      return (
+        "ERR: Kho " +
+        pageWCm.toFixed(2) +
+        " x " +
+        pageHCm.toFixed(2) +
+        " cm khong nam trong vung dan 42.2 x 29.9 cm cua to PON 43 x 32.5 cm."
+      );
+    }
+
+    if (app.documents.length === 0) {
+      return "ERR: Chua mo tai lieu Illustrator.";
+    }
+    var doc = app.activeDocument;
+    var selection = doc.selection;
+    if (!selection || selection.length === 0) {
+      return "ERR: Chon cac trang catalogue truoc khi dan.";
+    }
+    if (selection.length % 4 !== 0) {
+      return (
+        "ERR: So trang catalogue phai la boi so cua 4. Dang chon " +
+        selection.length +
+        " trang."
+      );
+    }
+
+    var source = [];
+    var selectionLeft = null;
+    var selectionTop = null;
+    for (var si = 0; si < selection.length; si++) {
+      var sourceItem = selection[si];
+      var sourceBounds = getBounds(sourceItem);
+      if (!sourceBounds) {
+        return "ERR: Co artwork khong do duoc kich thuoc.";
+      }
+      try {
+        if (sourceItem.locked || sourceItem.layer.locked) {
+          return "ERR: Mo khoa layer va object da chon truoc khi dan.";
+        }
+      } catch (lockError) {}
+      source.push({
+        item: sourceItem,
+        left: sourceBounds[0],
+        top: sourceBounds[1],
+      });
+      if (selectionLeft === null) {
+        selectionLeft = sourceBounds[0];
+        selectionTop = sourceBounds[1];
+      } else {
+        selectionLeft = Math.min(selectionLeft, sourceBounds[0]);
+        selectionTop = Math.max(selectionTop, sourceBounds[1]);
+      }
+    }
+
+    // Input order is read order: left to right, then top to bottom.
+    source.sort(function (a, b) {
+      var dy = b.top - a.top;
+      if (Math.abs(dy) > 20 * MM) return dy;
+      return a.left - b.left;
+    });
+
+    var layoutLayer = doc.layers.add();
+    layoutLayer.name = "Dan Catalogue tu dong";
+    try {
+      layoutLayer.locked = false;
+      layoutLayer.visible = true;
+    } catch (layerError) {}
+
+    var processed = [];
+    for (var pi = 0; pi < source.length; pi++) {
+      var frame = getBounds(source[pi].item);
+      var flat = dcFlattenForImposition(doc, source[pi].item, frame, 400);
+      try {
+        flat.move(layoutLayer, ElementPlacement.PLACEATEND);
+      } catch (moveError) {}
+      var flatBounds = getBounds(flat);
+      if (!flatBounds) throw new Error("Khong tao duoc trang raster.");
+      var currentW = flatBounds[2] - flatBounds[0];
+      var currentH = flatBounds[1] - flatBounds[3];
+      if (currentW <= 0 || currentH <= 0) {
+        throw new Error("Trang co kich thuoc khong hop le.");
+      }
+      flat.resize((pageW * MM * 100) / currentW, (pageH * MM * 100) / currentH);
+      processed.push(flat);
+    }
+
+    var numSheets = processed.length / 4;
+    var numFaces = numSheets * 2;
+    var formWPt = formW * MM;
+    var formHPt = formH * MM;
+    var imposedWidthPt = plan.bookW * MM * plan.copies;
+    var imposedHeightPt = plan.bookH * MM;
+    var artboardPositions = [];
+    var oldArtboardCount = doc.artboards.length;
+    var maxRows = 16;
+    var blockWidth = formWPt * 2;
+    var ponLayer = dcCatalogueCreateAutoPonLayer(doc);
+
+    for (var fi = 0; fi < numFaces; fi++) {
+      var sheetIndex = Math.floor(fi / 2);
+      var side = fi % 2;
+      var block = Math.floor(sheetIndex / maxRows);
+      var row = sheetIndex % maxRows;
+      var left = selectionLeft + block * blockWidth + side * formWPt;
+      var top = selectionTop - row * formHPt;
+      var rect = [left, top, left + formWPt, top - formHPt];
+      var artboard = doc.artboards.add(rect);
+      try {
+        artboard.name =
+          "Catalogue - " + (side === 0 ? "Mat truoc " : "Mat sau ") + (sheetIndex + 1);
+      } catch (nameError) {}
+      var artboardCenterX = (rect[0] + rect[2]) / 2;
+      var artboardCenterY = (rect[1] + rect[3]) / 2;
+      dcCatalogueAddDynamicPon(
+        ponLayer,
+        [
+          artboardCenterX - imposedWidthPt / 2,
+          artboardCenterY + imposedHeightPt / 2,
+          artboardCenterX + imposedWidthPt / 2,
+          artboardCenterY - imposedHeightPt / 2,
+        ],
+        plan.copies === 2
+      );
+      artboardPositions.push(rect);
+    }
+    try {
+      ponLayer.zOrder(ZOrderMethod.BRINGTOFRONT);
+      ponLayer.locked = true;
+      doc.activeLayer = layoutLayer;
+    } catch (ponError) {}
+    for (var oldIndex = oldArtboardCount - 1; oldIndex >= 0; oldIndex--) {
+      try {
+        doc.artboards.remove(oldIndex);
+      } catch (removeArtboardError) {}
+    }
+
+    var faces = [];
+    for (var sheet = 0; sheet < numSheets; sheet++) {
+      faces.push([processed.length - 2 * sheet, 1 + 2 * sheet]);
+      faces.push([2 + 2 * sheet, processed.length - 1 - 2 * sheet]);
+    }
+
+    var pageWPt = pageW * MM;
+    var spineReductionPerSheet = 0.25 * MM;
+    var placedGroups = [];
+
+    function showNoteDialog() {
+      var dialog = new Window("dialog", "Nh\u1eadp ghi ch\u00fa");
+      dialog.orientation = "column";
+      dialog.alignChildren = "fill";
+      dialog.margins = 16;
+      dialog.spacing = 10;
+
+      dialog.add("statictext", undefined, "Ghi ch\u00fa B\u00ccA (artboard 1):");
+      var coverField = dialog.add("edittext", undefined, "");
+      coverField.characters = 40;
+
+      dialog.add(
+        "statictext",
+        undefined,
+        "Ghi ch\u00fa RU\u1ed8T (t\u1ef1 th\u00eam RU\u1ed8T 1, RU\u1ed8T 2...):"
+      );
+      var insideField = dialog.add("edittext", undefined, "");
+      insideField.characters = 40;
+
+      var buttons = dialog.add("group");
+      buttons.alignment = "right";
+      var cancelButton = buttons.add("button", undefined, "B\u1ecf qua", { name: "cancel" });
+      var okButton = buttons.add("button", undefined, "\u0110i\u1ec1n ghi ch\u00fa", { name: "ok" });
+      var result = null;
+      okButton.onClick = function () {
+        result = { bia: coverField.text, ruot: insideField.text };
+        dialog.close();
+      };
+      cancelButton.onClick = function () {
+        dialog.close();
+      };
+      dialog.show();
+      return result;
+    }
+
+    function addCatalogueNote(text, rect) {
+      if (!text) return;
+      try {
+        var textFrame = layoutLayer.textFrames.add();
+        textFrame.contents = text;
+        textFrame.textRange.characterAttributes.size = 13;
+        var black = new CMYKColor();
+        black.cyan = 0;
+        black.magenta = 0;
+        black.yellow = 0;
+        black.black = 100;
+        textFrame.textRange.characterAttributes.fillColor = black;
+
+        // Keep notes in one predictable location on every face: 2 cm from
+        // the artboard's left edge and 1 cm below its top edge.
+        textFrame.position = [rect[0] + 20 * MM, rect[1] - 10 * MM];
+      } catch (noteError) {}
+    }
+
+    function placeBook(pair, rect, copyIndex, faceIndex) {
+      var leftItem = processed[pair[0] - 1];
+      var rightItem = processed[pair[1] - 1];
+      if (!leftItem || !rightItem) throw new Error("Thieu trang trong bo dan.");
+      var book = layoutLayer.groupItems.add();
+      book.name = "Catalogue " + (faceIndex + 1) + " - cuon " + (copyIndex + 1);
+      if (copyIndex > 0) {
+        leftItem = leftItem.duplicate(layoutLayer, ElementPlacement.PLACEATEND);
+        rightItem = rightItem.duplicate(layoutLayer, ElementPlacement.PLACEATEND);
+      }
+      leftItem.move(book, ElementPlacement.PLACEATEND);
+      rightItem.move(book, ElementPlacement.PLACEATEND);
+
+      var centerX = (rect[0] + rect[2]) / 2;
+      var centerY = (rect[1] + rect[3]) / 2;
+      // Ruot sau is squeezed progressively. PON and artboard positions never
+      // move; only the two-page booklet becomes narrower at its spine axis.
+      var sheetNumber = Math.floor(faceIndex / 2);
+      var squeezePt = sheetNumber * spineReductionPerSheet;
+      var effectivePageWPt = pageWPt - squeezePt / 2;
+      var effectiveBookWPt = plan.rotate ? plan.bookW * MM : effectivePageWPt * 2;
+      var bookCenterX =
+        plan.copies === 2
+          ? centerX + (copyIndex === 0 ? -effectiveBookWPt / 2 : effectiveBookWPt / 2)
+          : centerX;
+      try {
+        leftItem.resize((effectivePageWPt * 100) / pageWPt, 100);
+        rightItem.resize((effectivePageWPt * 100) / pageWPt, 100);
+      } catch (squeezeError) {}
+      centerAt(leftItem, bookCenterX - effectivePageWPt / 2, centerY);
+      centerAt(rightItem, bookCenterX + effectivePageWPt / 2, centerY);
+      // Duplex catalogue: the odd artboard turns left and its paired even
+      // artboard turns right. Both duplicate booklets on one artboard retain
+      // that same direction; they are never mirrored horizontally.
+      if (plan.rotate) book.rotate(faceIndex % 2 === 0 ? 90 : -90);
+      centerAt(book, bookCenterX, centerY);
+      return book;
+    }
+
+    for (var faceIndex = 0; faceIndex < faces.length; faceIndex++) {
+      // Build duplicate booklets first. The source pages remain untransformed
+      // until their duplicate has been made, so left/right copies receive the
+      // same single resize and rotate operation.
+      for (var copyIndex = plan.copies - 1; copyIndex >= 0; copyIndex--) {
+        placedGroups.push(
+          placeBook(faces[faceIndex], artboardPositions[faceIndex], copyIndex, faceIndex)
+        );
+      }
+    }
+
+    app.redraw();
+    var note = showNoteDialog();
+    if (note) {
+      var insideNumber = 0;
+      for (var artboardIndex = 0; artboardIndex < artboardPositions.length; artboardIndex += 2) {
+        if (artboardIndex === 0) {
+          addCatalogueNote(note.bia, artboardPositions[artboardIndex]);
+        } else {
+          insideNumber++;
+          addCatalogueNote(
+            "RU\u1ed8T " + insideNumber + (note.ruot ? " " + note.ruot : ""),
+            artboardPositions[artboardIndex]
+          );
+        }
+      }
+    }
+
+    try {
+      doc.selection = placedGroups;
+    } catch (selectError) {}
+    app.redraw();
+
+    return (
+      "OK: Da dan " +
+      plan.copies +
+      (plan.copies === 2 ? " cuon giong nhau / to, xa 1 dao o giua. " : " cuon / to. ") +
+      "PON " +
+      (plan.copies === 2 ? "2-cuon" : "1-cuon") +
+      " da duoc ve tu dong; " +
+      numFaces +
+      " artboard truoc/sau."
+    );
+  } catch (e) {
+    return "ERR: Catalogue tu tinh: " + e.toString();
+  }
+}
+
+var dcSignature8AutoPonVersion = 1;
+
 function dcRunSignature8(wCm, hCm, coBia) {
   try {
     var MM = 2.834645669;
@@ -16627,48 +17494,94 @@ function dcRunSignature8(wCm, hCm, coBia) {
       return { dup: dup, W: W, H: H, offX: offX, offY: offY };
     }
 
-    // Load pon chinh (65x86) cho TT8/AB.
-    var ponMain = loadPon(null, "chính (khổ 65x86 / " + _sizeKey() + ")");
-    if (!ponMain) {
-      alert("Chưa chọn pon chính. Dừng.");
-      return "OK: (dừng)";
-    }
-
-    // Neu co face TT4 -> load them pon rieng (65x43).
+    // Form PON is generated directly from the two supplied offset templates.
+    // TT4 uses the 65 x 43 form and TT8/AB use the 65 x 86 form, so this
+    // flow never opens a file picker or relies on a saved PON path.
     var hasTT4 = false;
     for (var ci2 = 0; ci2 < faces.length; ci2++)
       if (faces[ci2].type === "TT4") {
         hasTT4 = true;
         break;
       }
-    var ponTT4 = null;
-    if (hasTT4) {
-      ponTT4 = loadPon("tt4", "riêng cho cụm 4 (khổ 65x43)");
-      if (!ponTT4) {
-        alert("Chưa chọn pon TT4. Dừng.");
-        return "OK: (dừng)";
+    var ponMain = { W: 858 * MM, H: 625 * MM };
+    var ponTT4 = { W: 648 * MM, H: 418 * MM };
+
+    function createAutoPonLayer() {
+      var layerName = "Pon CTL Offset tu dong";
+      for (var li = doc.layers.length - 1; li >= 0; li--) {
+        try {
+          if (doc.layers[li].name === layerName) {
+            doc.layers[li].locked = false;
+            doc.layers[li].remove();
+          }
+        } catch (removePonLayerError) {}
+      }
+      var layer = doc.layers.add();
+      layer.name = layerName;
+      try {
+        layer.locked = false;
+        layer.visible = true;
+      } catch (ponLayerStateError) {}
+      return layer;
+    }
+
+    function addAutoPon(layer, rect, isTT4) {
+      var horizontalLength = isTT4 ? 14.173 : 18.766;
+      var verticalLength = isTT4 ? 14.106 : 21.091;
+      var strokeWidth = isTT4 ? 1.995 : 3.971;
+      var black = new CMYKColor();
+      black.cyan = 0;
+      black.magenta = 0;
+      black.yellow = 0;
+      black.black = 100;
+
+      function draw(x1, y1, x2, y2) {
+        var mark = layer.pathItems.add();
+        mark.setEntirePath([[x1, y1], [x2, y2]]);
+        mark.filled = false;
+        mark.stroked = true;
+        mark.strokeColor = black;
+        mark.strokeWidth = strokeWidth;
+      }
+
+      var left = rect[0];
+      var top = rect[1];
+      var right = rect[2];
+      var bottom = rect[3];
+      draw(left, top, left + horizontalLength, top);
+      draw(left, top, left, top - verticalLength);
+      draw(right - horizontalLength, top, right, top);
+      draw(right, top, right, top - verticalLength);
+      draw(left, bottom, left + horizontalLength, bottom);
+      draw(left, bottom, left, bottom + verticalLength);
+      draw(right - horizontalLength, bottom, right, bottom);
+      draw(right, bottom, right, bottom + verticalLength);
+    }
+
+    var artworkLayer = doc.activeLayer;
+    var ponLayer = createAutoPonLayer();
+    try {
+      doc.activeLayer = artworkLayer;
+    } catch (restoreArtworkLayerError) {
+      for (var fallbackLayer = 0; fallbackLayer < doc.layers.length; fallbackLayer++) {
+        try {
+          if (doc.layers[fallbackLayer] !== ponLayer) {
+            artworkLayer = doc.layers[fallbackLayer];
+            doc.activeLayer = artworkLayer;
+            break;
+          }
+        } catch (findArtworkLayerError) {}
       }
     }
 
-    //  Chọn pon theo loại face.
+    // Chọn form theo loại face.
     function ponFor(face) {
-      return face.type === "TT4" && ponTT4 ? ponTT4 : ponMain;
+      return face.type === "TT4" ? ponTT4 : ponMain;
     }
 
-    // Gốc đặt: dựa theo vị trí THẬT của pon chính vừa duplicate.
-    var startL, startT;
-    if (ponMain.dup) {
-      var pgb = ponMain.dup.geometricBounds;
-      var rcx = (pgb[0] + pgb[2]) / 2,
-        rcy = (pgb[1] + pgb[3]) / 2;
-      var ab0Cx = rcx - ponMain.offX,
-        ab0Cy = rcy - ponMain.offY;
-      startL = ab0Cx - ponMain.W / 2;
-      startT = ab0Cy + ponMain.H / 2;
-    } else {
-      startL = 0;
-      startT = 0;
-    }
+    // The supplied PON forms use their top-left corner as the origin.
+    var startL = 0;
+    var startT = 0;
 
     // ---- Vị trí artboard theo faces[] ----
     //  - SOLO (TT4/TT8): 1 minh 1 hang (cot 0).
@@ -16924,33 +17837,15 @@ function dcRunSignature8(wCm, hCm, coBia) {
       placeFace(faces[ff], abPos[ff]);
     }
 
-    // ---- Nhân bản PON vào từng artboard, đặt LÊN TRÊN CÙNG (PLACEATBEGINNING) ----
-    //  Làm SAU khi đặt trang để pon hiện đè lên bài dàn (không bị trang che).
+    // Draw PON after artwork so its dedicated layer always stays on top.
     for (var kp = 0; kp < numFaces; kp++) {
-      var posP = abPos[kp];
-      var pf = ponFor(faces[kp]);
-      if (pf.dup) {
-        try {
-          var g = pf.dup.duplicate(
-            doc.activeLayer,
-            ElementPlacement.PLACEATBEGINNING,
-          );
-          var gb = g.geometricBounds;
-          var gcx = (gb[0] + gb[2]) / 2,
-            gcy = (gb[1] + gb[3]) / 2;
-          var acx = (posP[0] + posP[2]) / 2,
-            acy = (posP[1] + posP[3]) / 2;
-          g.translate(acx + pf.offX - gcx, acy + pf.offY - gcy);
-        } catch (e) {}
-      }
+      addAutoPon(ponLayer, abPos[kp], faces[kp].type === "TT4");
     }
-    // Xóa bản pon gốc (dup mẫu).
     try {
-      if (ponMain.dup) ponMain.dup.remove();
-    } catch (e) {}
-    try {
-      if (ponTT4 && ponTT4.dup) ponTT4.dup.remove();
-    } catch (e) {}
+      ponLayer.zOrder(ZOrderMethod.BRINGTOFRONT);
+      ponLayer.locked = true;
+      doc.activeLayer = artworkLayer;
+    } catch (ponLayerOrderError) {}
 
     // ============================================================
     //  GHI CHU "RUOT N" (+ text them). Giong A4/A5, chỉ khác VỊ TRÍ.
@@ -17078,8 +17973,8 @@ function dcRunSignature8(wCm, hCm, coBia) {
         "Dư " +
         du +
         " -> tự trở trước (4 và/hoặc 8), rồi các tờ AB.\n" +
-        (hasTT4 ? "TT4 dùng pon riêng (65x43).\n" : "") +
-        "Pon trên cùng. Ghi chú RUỘT N đã điền.",
+        (hasTT4 ? "TT4 dùng form PON tự vẽ 65x43.\n" : "") +
+        "PON tự vẽ nằm trên cùng. Ghi chú RUỘT N đã điền.",
     );
   } catch (e) {
     return "ERR: signature8: " + e.toString();
@@ -21644,6 +22539,8 @@ function dcPickFolder() {
 //    unit     : "cm" | "mm" | "in" | "pt"  (mặc định "cm")
 //  Trả về "OK: ..." hoặc "ERR: ...".
 // ============================================================
+var dcClipToSizeVersion = 3;
+
 function dcClipToSize(wCm, hCm, unit) {
   try {
     return _dcClipToSizeCore(wCm, hCm, unit);
@@ -21655,121 +22552,299 @@ function dcClipToSize(wCm, hCm, unit) {
 }
 
 function _dcClipToSizeCore(wCm, hCm, unit) {
-  if (app.documents.length === 0) return "ERR: Chưa mở tài liệu nào.";
+  if (app.documents.length === 0) return "ERR: Chua mo tai lieu nao.";
   var doc = app.activeDocument;
+  unit = unit === undefined || unit === null || String(unit) === "" ? "cm" : String(unit);
+  var perUnit = { cm: 28.34645669, mm: 2.834645669, "in": 72, pt: 1 };
+  var unitSize = perUnit[unit];
+  if (!unitSize) return "ERR: Don vi khong hop le: " + unit;
 
-  // ----- Đổi đơn vị sang point -----
-  unit =
-    unit === undefined || unit === null || String(unit) === ""
-      ? "cm"
-      : String(unit);
-  var PER = { "cm": 28.34645669, "mm": 2.834645669, "in": 72, "pt": 1 };
-  var k = PER[unit];
-  if (!k) return "ERR: Đơn vị không hợp lệ: " + unit;
+  var W = parseFloat(String(wCm).replace(",", ".")) * unitSize;
+  var H = parseFloat(String(hCm).replace(",", ".")) * unitSize;
+  if (!isFinite(W) || !isFinite(H) || W <= 0 || H <= 0)
+    return "ERR: Kich thuoc Rong x Cao phai lon hon 0.";
 
-  var W = parseFloat(String(wCm).replace(",", ".")) * k;
-  var H = parseFloat(String(hCm).replace(",", ".")) * k;
-  if (isNaN(W) || isNaN(H) || W <= 0 || H <= 0)
-    return "ERR: Kích thước không hợp lệ (Rộng × Cao phải > 0).";
+  var selection = doc.selection;
+  if (!selection || selection.length === 0)
+    return "ERR: Hay chon it nhat 1 object de clip.";
 
-  var sel = doc.selection;
-  if (!sel || sel.length === 0)
-    return "ERR: Hãy chọn ít nhất 1 object để clip.";
+  function copyBounds(bounds) {
+    if (!bounds || bounds.length < 4) return null;
+    var result = [Number(bounds[0]), Number(bounds[1]), Number(bounds[2]), Number(bounds[3])];
+    return result[2] > result[0] && result[1] > result[3] ? result : null;
+  }
 
-  // Bounds an toàn (ưu tiên visibleBounds).
-  function bndOf(item) {
+  function visibleBounds(item) {
     try {
-      return item.visibleBounds;
-    } catch (e) {
-      try {
-        return item.geometricBounds;
-      } catch (e2) {
-        return null;
-      }
+      var visible = copyBounds(item.visibleBounds);
+      if (visible) return visible;
+    } catch (visibleError) {}
+    try {
+      return copyBounds(item.geometricBounds);
+    } catch (geometricError) {
+      return null;
     }
   }
 
-  // Clip 1 object thành khung W x H canh giữa tâm object.
-  function clipOne(item) {
-    var g = bndOf(item); // [left, top, right, bottom]
-    if (!g) throw new Error("không đo được object.");
-    var cx = (g[0] + g[2]) / 2;
-    var cy = (g[1] + g[3]) / 2;
+  function geometricBounds(item) {
+    try {
+      return copyBounds(item.geometricBounds);
+    } catch (geometricError) {
+      return null;
+    }
+  }
 
-    var parent = item.parent;
-    var lay = item.layer;
+  function centerOf(bounds) {
+    return { x: (bounds[0] + bounds[2]) / 2, y: (bounds[1] + bounds[3]) / 2 };
+  }
 
-    // Nhóm bọc: mask + object -> clip group.
+  function itemType(item) {
+    try {
+      return item.typename;
+    } catch (typeError) {
+      return "";
+    }
+  }
+
+  function directChildren(group) {
+    var result = [];
+    try {
+      var all = group.pageItems;
+      for (var i = 0; i < all.length; i++) {
+        try {
+          if (all[i].parent === group) result.push(all[i]);
+        } catch (parentError) {}
+      }
+    } catch (childrenError) {}
+    return result;
+  }
+
+  function isBackgroundFrameCandidate(item) {
+    var type = itemType(item);
+    return (
+      type === "PlacedItem" ||
+      type === "RasterItem" ||
+      type === "PathItem" ||
+      type === "CompoundPathItem"
+    );
+  }
+
+  function frameMatchesSize(bounds) {
+    if (!bounds) return false;
+    var tolerance = Math.max(1.5, Math.min(W, H) * 0.006);
+    return (
+      Math.abs((bounds[2] - bounds[0]) - W) <= tolerance &&
+      Math.abs((bounds[1] - bounds[3]) - H) <= tolerance
+    );
+  }
+
+  function scanBackgroundFrames(node, result) {
+    if (!node) return;
+    var type = itemType(node);
+    if (isBackgroundFrameCandidate(node)) {
+      var bounds = geometricBounds(node);
+      if (frameMatchesSize(bounds)) result.push({ item: node, bounds: bounds });
+      return;
+    }
+    if (type !== "GroupItem") return;
+    var children = directChildren(node);
+    for (var i = 0; i < children.length; i++) scanBackgroundFrames(children[i], result);
+  }
+
+  function clippingBounds(item) {
+    try {
+      if (item.clipping === true) return geometricBounds(item);
+    } catch (clipError) {}
+    if (itemType(item) === "CompoundPathItem") {
+      try {
+        var paths = item.pathItems;
+        for (var i = 0; i < paths.length; i++) {
+          if (paths[i].clipping === true) return geometricBounds(item);
+        }
+      } catch (compoundError) {}
+    }
+    return null;
+  }
+
+  // A previously clipped page is the strongest reference: its direct clipping
+  // path is the already approved page frame, including when the new W x H changes.
+  function findScopeByExistingClip(item) {
+    var scope = item;
+    var depth = 0;
+    while (scope && depth < 12) {
+      if (itemType(scope) === "GroupItem") {
+        var isClipped = false;
+        try {
+          isClipped = scope.clipped === true;
+        } catch (clippedError) {}
+        if (isClipped) {
+          var children = directChildren(scope);
+          for (var i = 0; i < children.length; i++) {
+            var bounds = clippingBounds(children[i]);
+            if (bounds) return { scope: scope, clip: { item: children[i], bounds: bounds } };
+          }
+        }
+      }
+      try {
+        scope = scope.parent;
+      } catch (parentError) {
+        break;
+      }
+      if (itemType(scope) === "Layer" || itemType(scope) === "Document") break;
+      depth++;
+    }
+    return null;
+  }
+
+  function scopeLooksLikeOnePage(scope, frame) {
+    var scopeBounds = visibleBounds(scope);
+    if (!scopeBounds) return false;
+    var scopeCenter = centerOf(scopeBounds);
+    var frameCenter = centerOf(frame);
+    var frameWidth = frame[2] - frame[0];
+    var frameHeight = frame[1] - frame[3];
+    return (
+      Math.abs(scopeCenter.x - frameCenter.x) <= frameWidth * 0.3 &&
+      Math.abs(scopeCenter.y - frameCenter.y) <= frameHeight * 0.3 &&
+      scopeBounds[2] - scopeBounds[0] <= frameWidth * 1.8 &&
+      scopeBounds[1] - scopeBounds[3] <= frameHeight * 1.8
+    );
+  }
+
+  // The entered size chooses an image background. The nearest group containing
+  // one page-sized background becomes the clip scope, rather than a child with
+  // an expanded effect or an unrelated photo mask.
+  function findScopeByBackground(item) {
+    var scope = item;
+    var depth = 0;
+    while (scope && depth < 12) {
+      if (itemType(scope) === "GroupItem") {
+        var matches = [];
+        scanBackgroundFrames(scope, matches);
+        if (matches.length === 1 && scopeLooksLikeOnePage(scope, matches[0].bounds))
+          return { scope: scope, background: matches[0] };
+        if (matches.length > 1) {
+          var scopeBounds = visibleBounds(scope);
+          var scopeCenter = scopeBounds ? centerOf(scopeBounds) : null;
+          var best = null;
+          var bestDistance = 1e20;
+          for (var i = 0; i < matches.length; i++) {
+            var candidateCenter = centerOf(matches[i].bounds);
+            var distance = scopeCenter
+              ? Math.abs(scopeCenter.x - candidateCenter.x) + Math.abs(scopeCenter.y - candidateCenter.y)
+              : 0;
+            if (distance < bestDistance) {
+              bestDistance = distance;
+              best = matches[i];
+            }
+          }
+          if (best && scopeLooksLikeOnePage(scope, best.bounds))
+            return { scope: scope, background: best };
+        }
+      }
+      try {
+        scope = scope.parent;
+      } catch (parentError) {
+        break;
+      }
+      if (itemType(scope) === "Layer" || itemType(scope) === "Document") break;
+      depth++;
+    }
+    return null;
+  }
+
+  function clipOne(scope, anchor) {
+    var reference = anchor ? anchor.bounds : geometricBounds(scope) || visibleBounds(scope);
+    if (!reference) throw new Error("Khong do duoc object.");
+    var center = centerOf(reference);
+    var parent = scope.parent;
+    var layer = scope.layer;
     var wrapper = parent.groupItems.add();
     try {
-      wrapper.move(item, ElementPlacement.PLACEBEFORE);
-    } catch (e) {}
+      wrapper.move(scope, ElementPlacement.PLACEBEFORE);
+    } catch (orderError) {}
 
-    // Rectangle(top, left, width, height) — top là y lớn (hướng lên).
-    var maskTop = cy + H / 2;
-    var maskLeft = cx - W / 2;
-    var mask = lay.pathItems.rectangle(maskTop, maskLeft, W, H);
+    var mask = layer.pathItems.rectangle(center.y + H / 2, center.x - W / 2, W, H);
     mask.filled = false;
     mask.stroked = false;
     mask.move(wrapper, ElementPlacement.PLACEATBEGINNING);
-
-    item.move(wrapper, ElementPlacement.PLACEATEND);
+    scope.move(wrapper, ElementPlacement.PLACEATEND);
     mask.clipping = true;
     wrapper.clipped = true;
     return wrapper;
   }
 
-  // Chọn lại các bản đã clip cho tiện thao tác tiếp.
-  var results = [];
-  var done = 0,
-    errs = [];
-  // Lưu tham chiếu selection ra mảng (clip làm thay đổi selection).
-  var arr = [];
-  for (var i = 0; i < sel.length; i++) arr.push(sel[i]);
+  var snapshot = [];
+  for (var i = 0; i < selection.length; i++) snapshot.push(selection[i]);
 
-  for (i = 0; i < arr.length; i++) {
+  // Several selected children can belong to the same page group. Clip it once.
+  var jobs = [];
+  for (i = 0; i < snapshot.length; i++) {
+    var existingClip = findScopeByExistingClip(snapshot[i]);
+    var found = existingClip ? null : findScopeByBackground(snapshot[i]);
+    var scope = existingClip ? existingClip.scope : found ? found.scope : snapshot[i];
+    var duplicate = false;
+    for (var j = 0; j < jobs.length; j++) {
+      if (jobs[j].scope === scope) {
+        duplicate = true;
+        break;
+      }
+    }
+    if (!duplicate)
+      jobs.push({
+        scope: scope,
+        anchor: existingClip ? existingClip.clip : found ? found.background : null,
+        anchorType: existingClip ? "clip" : found ? "background" : "fallback",
+      });
+  }
+
+  var results = [];
+  var done = 0;
+  var byBackground = 0;
+  var byExistingClip = 0;
+  var errors = [];
+  for (i = 0; i < jobs.length; i++) {
     try {
-      var w = clipOne(arr[i]);
-      results.push(w);
+      var clipped = clipOne(jobs[i].scope, jobs[i].anchor);
+      results.push(clipped);
       done++;
-    } catch (e2) {
-      errs.push(
+      if (jobs[i].anchorType === "background") byBackground++;
+      if (jobs[i].anchorType === "clip") byExistingClip++;
+    } catch (clipError) {
+      errors.push(
         "Object " +
           (i + 1) +
           ": " +
-          (typeof dcMoTaLoi === "function" ? dcMoTaLoi(e2) : e2.toString()),
+          (typeof dcMoTaLoi === "function" ? dcMoTaLoi(clipError) : clipError.toString()),
       );
     }
   }
 
   try {
-    app.selection = null;
+    doc.selection = null;
     for (i = 0; i < results.length; i++) results[i].selected = true;
-  } catch (e) {}
+    app.redraw();
+  } catch (selectionError) {}
 
-  var msg =
-    "OK: Đã clip " +
+  var message =
+    "Da clip " +
     done +
     "/" +
-    arr.length +
-    " object thành " +
+    jobs.length +
+    " group thanh " +
     wCm +
-    " × " +
+    " x " +
     hCm +
     " " +
     unit +
-    " (canh giữa).";
-  if (errs.length) {
-    msg =
-      (done > 0 ? "OK: " : "ERR: ") +
-      "Clip được " +
-      done +
-      "/" +
-      arr.length +
-      " object.\nLỗi:\n- " +
-      errs.join("\n- ");
-  }
-  return msg;
+    (byExistingClip ? "; neo theo " + byExistingClip + " clip cha" : "") +
+    (byBackground ? "; neo theo " + byBackground + " background khop KT" : "") +
+    (done - byBackground - byExistingClip
+      ? "; " + (done - byBackground - byExistingClip) + " group dung fallback tam geometricBounds."
+      : ".");
+  if (errors.length)
+    return (done ? "OK: " : "ERR: ") + message + "\n" + errors.join("\n");
+  return "OK: " + message;
 }
 
 // ============================================================

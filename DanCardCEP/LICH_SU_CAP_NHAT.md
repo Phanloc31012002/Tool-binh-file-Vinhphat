@@ -2,6 +2,13 @@
 
 _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
+## v2.12.1 — Bản vá sửa lỗi raster + clip khi gặp file tào lao của khách.
+
+- Raster đưa raster chuẩn nhất về phần clip
+- Clip chuyển về giống như clip card nhưng vẫn có vài nhược điểm khi gặp file siêu chó.
+
+---
+
 ## v2.12.0 — beta thêm chức năng tự động dàn tối ưu
 
 - Dàn tối ưu nhất trên 1 tờ giấy với kích thước tùy chỉnh
