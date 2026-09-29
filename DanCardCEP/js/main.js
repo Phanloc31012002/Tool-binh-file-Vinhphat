@@ -1463,7 +1463,7 @@
         .replace(/\\/g, "/");
       var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
       return (
-        "if (typeof dcDanTuTro !== 'function' || typeof dcDanTuTroVersion === 'undefined' || dcDanTuTroVersion < 6) { $.evalFile(" +
+        "if (typeof dcDanTuTro !== 'function' || typeof dcDanTuTroVersion === 'undefined' || dcDanTuTroVersion < 9) { $.evalFile(" +
         jsStr(jsxPath) +
         "); } "
       );
@@ -1614,7 +1614,7 @@
     });
   }
 
-  // ---- Dàn Offset: Tự trở (1 artboard) / AB (2 artboard) ----
+  // ---- Dàn Offset: Tự trở (1 artboard) ----
   var btnDanOffset = document.getElementById("btnDanOffset");
   var outDanOffset = document.getElementById("outDanOffset");
   if (btnDanOffset && outDanOffset) {
@@ -1625,44 +1625,17 @@
       "offsetMaxBop",
     ].forEach(attachSelectFirst);
 
-    var OFFSET_MODE_HINTS = {
-      tutro:
-        "Tự trở: mặt trước và mặt sau nằm chung một artboard, đối xứng qua tim dọc tờ giấy. In xong lật ngang tờ giấy rồi in lại bằng chính bản kẽm đó, cắt ra là mỗi con đủ 2 mặt.",
-      ab: "AB: mặt trước và mặt sau nằm trên 2 artboard riêng, in bằng 2 bản kẽm. Kiểu này chưa làm.",
-    };
-    var offsetModeHint = document.getElementById("offsetModeHint");
-    var offsetModeRadios = document.querySelectorAll(
-      'input[name="offsetDanMode"]',
-    );
-    var currentOffsetMode = function () {
-      for (var i = 0; i < offsetModeRadios.length; i++)
-        if (offsetModeRadios[i].checked) return offsetModeRadios[i].value;
-      return "tutro";
-    };
-    for (var omi = 0; omi < offsetModeRadios.length; omi++) {
-      offsetModeRadios[omi].addEventListener("change", function () {
-        if (offsetModeHint)
-          offsetModeHint.textContent =
-            OFFSET_MODE_HINTS[currentOffsetMode()] || "";
-      });
-    }
-
     btnDanOffset.addEventListener("click", function () {
-      if (currentOffsetMode() !== "tutro") {
-        show(
-          outDanOffset,
-          "Kiểu AB (2 artboard trước / sau) chưa làm. Chọn Tự trở để dàn.",
-          "warn",
-        );
-        return;
-      }
       var width = document.getElementById("offsetSheetWidth").value || "";
       var height = document.getElementById("offsetSheetHeight").value || "";
       var margin = document.getElementById("offsetMargin").value || "0";
       var maxBop = document.getElementById("offsetMaxBop").value || "0";
       var repeatFillBox = document.getElementById("offsetRepeatFill");
       var repeatFill = repeatFillBox ? repeatFillBox.checked : false;
-      show(outDanOffset, "Đang tính bố cục tự trở và tạo tờ giấy…");
+      show(
+        outDanOffset,
+        "Đang tính bố cục tự trở và tạo tờ giấy…",
+      );
       btnDanOffset.disabled = true;
       cs.evalScript(
         loadDanTuTroJsx() +

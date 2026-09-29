@@ -1,9 +1,9 @@
 {
     "product":  "com.locdev.dancard",
-    "version":  "2.12.8",
-    "title":  "Clip kích thước không dừng cả selection bản vá",
-    "description":  "Clip kích thước không dừng cả selection bản vá",
-    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.12.8.zip",
-    "sha256":  "99D1A51CC1FED4DEFAA20C37C4F78E49B4B3D38B45FF842B1F28235998B4326F",
-    "publishedUtc":  "2026-09-29T08:41:54.9188100Z"
+    "version":  "2.13.0",
+    "title":  "Hoàn chỉnh dàn tự trở",
+    "description":  "Hoàn chỉnh dàn tự trở",
+    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.13.0.zip",
+    "sha256":  "63E359185BF237FCA554F09B77EC45E8390C76DAD4D972A49AE5B9BDEB64287D",
+    "publishedUtc":  "2026-09-29T09:16:26.3942126Z"
 }

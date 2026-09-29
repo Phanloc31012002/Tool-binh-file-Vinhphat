@@ -2,6 +2,26 @@
 
 _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
+## v2.13.0 — Hoàn chỉnh dàn tự trở
+
+- Hoàn chỉnh dàn tự trở
+
+---
+
+## v2.12.10 — Rút gọn Dàn Offset
+
+- Bỏ lựa chọn AB trùng với Dàn KTS; Dàn Offset chỉ còn tự trở trên một artboard.
+
+---
+
+## v2.12.9 — Dàn Offset AB
+
+- Dàn AB tạo artboard A (mặt trước) và B (mặt sau) cùng khổ giấy.
+- Mỗi artboard có PON giấy ở đủ 4 góc theo chính kích thước nhập.
+- Chọn AB lần đầu đặt sẵn khổ 85.8 × 63.8 cm; mỗi chế độ nhớ khổ giấy riêng.
+
+---
+
 ## v2.12.8 — Clip kích thước không dừng cả selection bản vá
 
 - Clip kích thước không dừng cả selection bản vá

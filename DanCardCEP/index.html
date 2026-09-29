@@ -420,22 +420,7 @@
             <span>Dàn Offset</span>
           </button>
           <div class="acc-body" id="acc-toiuuOffset">
-            <div class="field">
-              <div class="label">Kiểu dàn</div>
-              <div class="radio-list">
-                <label class="radio-row"
-                  ><input type="radio" name="offsetDanMode" value="tutro" checked /><span
-                    >Tự trở (1 artboard)</span
-                  ></label
-                >
-                <label class="radio-row"
-                  ><input type="radio" name="offsetDanMode" value="ab" /><span
-                    >AB (2 artboard trước / sau)</span
-                  ></label
-                >
-              </div>
-            </div>
-            <p class="hint" id="offsetModeHint">
+            <p class="hint">
               Tự trở: mặt trước và mặt sau nằm chung một artboard, đối xứng qua tim
               dọc tờ giấy. In xong lật ngang tờ giấy rồi in lại bằng chính bản kẽm
               đó, cắt ra là mỗi con đủ 2 mặt.
@@ -465,8 +450,10 @@
               object bên trái là mặt trước, bên phải là mặt sau. Các cặp được phép khác
               khổ nhau; riêng hai mặt của cùng một cặp phải cùng khung. Mỗi mặt chỉ cần
               là một object hoàn chỉnh, không bắt buộc phải group. Tool tự thử xoay 90°
-              và nén nhiều khổ vào chung nửa tờ; bóp chỉ dùng khi nhờ đó dàn thêm được
-              cặp. Bóp 0 mm là giữ nguyên kích thước bài, không đánh PON.
+              và nén nhiều khổ vào chung nửa tờ bằng bố cục guillotine: mọi cụm đều có
+              đường ra cho dao cắt thẳng, không tạo hốc bị khóa. Bóp chỉ dùng khi nhờ đó
+              dàn thêm được cặp. Hai nửa tự trở dính sát tim tờ, không có khe giữa. Bóp
+              0 mm là giữ nguyên kích thước bài, không đánh PON.
             </p>
             <p class="hint">
               Mỗi cặp ăn một chỗ trên tờ. Tool không ưu tiên thứ tự chọn: khổ nào không
@@ -860,7 +847,7 @@
       </main>
 
       <footer class="foot">
-        <span class="ver">v2.12.8</span>
+        <span class="ver">v2.13.0</span>
       </footer>
     </div>
 

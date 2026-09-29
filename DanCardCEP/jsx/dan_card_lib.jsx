@@ -4599,14 +4599,15 @@ function dcDanToiUu(pageWidthText, pageHeightText, twoSidedArg, multiPerArtboard
 //  Tool tự thử xoay 90°, tự thử bóp bài tối đa N mm mỗi chiều
 //  nếu nhờ vậy dàn thêm được con, và không đánh pon.
 // ============================================================
-var dcDanTuTroVersion = 6;
+var dcDanTuTroVersion = 9;
 
 function dcDanTuTro(
   pageWidthText,
   pageHeightText,
   marginText,
   maxBopText,
-  repeatToFillArg
+  repeatToFillArg,
+  modeArg
 ) {
   try {
     if (app.documents.length === 0) return "ERR: Chưa mở tài liệu nào.";
@@ -4784,7 +4785,7 @@ function dcDanTuTro(
       )
         hasMixedFinishedSize = true;
     }
-    if (hasMixedFinishedSize)
+    if (hasMixedFinishedSize || String(modeArg) === "ab")
       return dcDanTuTroNhieuKho(
         doc,
         pairs,
@@ -4794,7 +4795,8 @@ function dcDanTuTro(
         pageHeightText,
         marginText,
         maxBopText,
-        repeatToFillArg
+        repeatToFillArg,
+        modeArg
       );
 
     function checkSameSize(item, sideLabel, pairNumber) {
@@ -5455,6 +5457,16 @@ function dcDanTuTro(
     var leftoverPairs = repeatToFill ? 0 : pairs.length - usedSlots;
     var emptySlots = slots.length - usedSlots;
 
+    // Tự trở không chừa khe ở tim giấy: dồn riêng phần slot thực sự dùng
+    // sát mép tim của nửa trái; nửa phải là ảnh gương nên hai cụm sẽ chạm nhau.
+    var occupiedRight = safeLeft;
+    for (var centerSlotIndex = 0; centerSlotIndex < usedSlots; centerSlotIndex++)
+      occupiedRight = Math.max(occupiedRight, slots[centerSlotIndex].x + slots[centerSlotIndex].w);
+    var centerShift = safeLeft + halfW - occupiedRight;
+    if (centerShift > EPS)
+      for (centerSlotIndex = 0; centerSlotIndex < usedSlots; centerSlotIndex++)
+        slots[centerSlotIndex].x += centerShift;
+
     // Gom các chỗ theo từng cặp nguồn: một cặp chỉ phải bóp/nhân bản một lần.
     var assignments = [];
     var assignIndex = {};
@@ -5637,7 +5649,8 @@ function dcDanTuTroNhieuKho(
   pageHeightText,
   marginText,
   maxBopText,
-  repeatToFillArg
+  repeatToFillArg,
+  modeArg
 ) {
   try {
     var MM = 2.834645669;
@@ -5700,6 +5713,7 @@ function dcDanTuTroNhieuKho(
       0,
       50
     );
+    var isAB = String(modeArg) === "ab";
     var repeatToFill = repeatToFillArg === true || String(repeatToFillArg) === "true";
     var repeatOnePair = repeatToFill && pairs.length === 1;
     var repeatIgnoredForMixed = repeatToFill && pairs.length > 1;
@@ -5718,7 +5732,8 @@ function dcDanTuTroNhieuKho(
     var usableH = paperH - 2 * MARGIN;
     if (usableW <= EPS || usableH <= EPS)
       return "ERR: Khổ giấy phải lớn hơn lề an toàn hai bên.";
-    var halfW = usableW / 2;
+    // Tự trở chia đôi một tờ; AB dùng trọn khổ trên từng artboard A/B.
+    var halfW = isAB ? usableW : usableW / 2;
 
     // ---- Guillotine: mọi vùng trống là một hình chữ nhật độc lập. Khi đặt
     // một cặp, vùng đó chỉ được chẻ bằng hai nhát thẳng từ mép tới mép. Như
@@ -6151,11 +6166,11 @@ function dcDanTuTroNhieuKho(
       throw new Error("Không tìm được vị trí trong canvas để đặt artboard mới.");
     }
 
-    function addOutputArtboard(rect) {
+    function addOutputArtboard(rect, name) {
       var index = doc.artboards.length;
       var board = doc.artboards.add(rect);
       try {
-        board.name = "Tự trở nhiều khổ " + (index + 1);
+        board.name = name || "Tự trở nhiều khổ " + (index + 1);
       } catch (e) {}
       return index;
     }
@@ -6220,16 +6235,67 @@ function dcDanTuTroNhieuKho(
       return copy;
     }
 
+    // PON giấy luôn bám đúng bốn góc artboard, không phụ thuộc khổ nhập.
+    function addPaperPonAtCorners(layer, rect) {
+      var markLength = 3 * MM;
+      var strokeWidth = 1.995;
+      var black = new CMYKColor();
+      black.cyan = 0;
+      black.magenta = 0;
+      black.yellow = 0;
+      black.black = 100;
+      function draw(x1, y1, x2, y2) {
+        var mark = layer.pathItems.add();
+        mark.setEntirePath([[x1, y1], [x2, y2]]);
+        mark.filled = false;
+        mark.stroked = true;
+        mark.strokeColor = black;
+        mark.strokeWidth = strokeWidth;
+      }
+      var inset = strokeWidth / 2;
+      var left = rect[0] + inset;
+      var top = rect[1] - inset;
+      var right = rect[2] - inset;
+      var bottom = rect[3] + inset;
+      draw(left, top, left + markLength, top);
+      draw(left, top, left, top - markLength);
+      draw(right - markLength, top, right, top);
+      draw(right, top, right, top - markLength);
+      draw(left, bottom, left + markLength, bottom);
+      draw(left, bottom, left, bottom + markLength);
+      draw(right - markLength, bottom, right, bottom);
+      draw(right, bottom, right, bottom + markLength);
+    }
+
     // ---- đổi slot cục bộ thành tọa độ tờ, gom theo cặp đã thực sự đặt ----
     var sheetRect = reserveSheetRect();
-    var sheetArtboardIndex = addOutputArtboard(sheetRect);
+    var backSheetRect = isAB ? reserveSheetRect() : sheetRect;
+    var sheetArtboardIndex = addOutputArtboard(
+      sheetRect,
+      isAB ? "Dàn Offset AB - Mặt A" : "Tự trở nhiều khổ"
+    );
+    var backArtboardIndex = isAB
+      ? addOutputArtboard(backSheetRect, "Dàn Offset AB - Mặt B")
+      : sheetArtboardIndex;
     var safeLeft = sheetRect[0] + MARGIN;
     var safeTop = sheetRect[1] - MARGIN;
+    var backSafeLeft = backSheetRect[0] + MARGIN;
+    var backSafeTop = backSheetRect[1] - MARGIN;
     var placedSlots = bestPacking.placed.slice(0);
     placedSlots.sort(function (a, b) {
       if (Math.abs(a.y - b.y) > EPS) return a.y - b.y;
       return a.x - b.x;
     });
+    // Không để một khoảng trắng nhân tạo ở tim tờ tự trở. AB dùng toàn bộ
+    // khổ ở mỗi artboard nên không dịch cụm này.
+    if (!isAB) {
+      var packedRight = 0;
+      for (var psr = 0; psr < placedSlots.length; psr++)
+        packedRight = Math.max(packedRight, placedSlots[psr].x + placedSlots[psr].w);
+      var packedCenterShift = halfW - packedRight;
+      if (packedCenterShift > EPS)
+        for (psr = 0; psr < placedSlots.length; psr++) placedSlots[psr].x += packedCenterShift;
+    }
     var assignments = [];
     var assignmentByPair = {};
     for (var sl = 0; sl < placedSlots.length; sl++) {
@@ -6282,10 +6348,13 @@ function dcDanTuTroNhieuKho(
       prepareOutputLayer(backLayer);
       for (var bs = 0; bs < assignment.slots.length; bs++) {
         var backSlot = assignment.slots[bs];
-        var mirroredLeft = safeLeft + usableW - (backSlot.x - safeLeft) - backSlot.w;
-        var backAngle = backSlot.angle === 90 ? -90 : 0;
+        var mirroredLeft = isAB
+          ? backSafeLeft + (backSlot.x - safeLeft)
+          : safeLeft + usableW - (backSlot.x - safeLeft) - backSlot.w;
+        var mirroredTop = isAB ? backSafeTop - (safeTop - backSlot.y) : backSlot.y;
+        var backAngle = isAB ? backSlot.angle : backSlot.angle === 90 ? -90 : 0;
         placedItems.push(
-          copyAt(backSource, backLayer, mirroredLeft, backSlot.y, backAngle, backSlot.w, backSlot.h)
+          copyAt(backSource, backLayer, mirroredLeft, mirroredTop, backAngle, backSlot.w, backSlot.h)
         );
       }
 
@@ -6304,6 +6373,16 @@ function dcDanTuTroNhieuKho(
       try {
         pair.back.remove();
       } catch (e) {}
+    }
+
+    if (isAB) {
+      var paperPonLayer = addOutputLayer("PON giấy Dàn Offset AB");
+      addPaperPonAtCorners(paperPonLayer, sheetRect);
+      addPaperPonAtCorners(paperPonLayer, backSheetRect);
+      try {
+        paperPonLayer.zOrder(ZOrderMethod.BRINGTOFRONT);
+        paperPonLayer.locked = true;
+      } catch (paperPonLayerError) {}
     }
 
     var outputWasSelected = false;
@@ -6334,7 +6413,9 @@ function dcDanTuTroNhieuKho(
       " cm: đã dàn " +
       placedCount +
       (repeatOnePair ? " lần của 1 cặp" : " / " + pairs.length + " cặp") +
-      ". Mỗi cặp có 1 mặt trước + 1 mặt sau đối xứng tự trở.";
+      (isAB
+        ? ". Đã tạo 2 artboard A/B cùng khổ; mỗi artboard có PON giấy ở 4 góc."
+        : ". Mỗi cặp có 1 mặt trước + 1 mặt sau đối xứng tự trở.");
     if (needSqueeze) {
       var bopParts = [];
       if (pickDw > EPS) bopParts.push("ngang " + formatMm(pickDw) + " mm");
@@ -6350,7 +6431,9 @@ function dcDanTuTroNhieuKho(
         leftOver +
         " cặp chưa dàn, giữ nguyên ở vị trí cũ để chạy tờ tiếp theo.";
     else if (!repeatOnePair) detail += " Đã dàn hết các cặp nguồn chọn vào tờ này.";
-    detail += " In xong lật ngang tờ giấy rồi in lại bằng chính bản kẽm đó.";
+    detail += isAB
+      ? " Mặt A và mặt B đã nằm trên hai artboard riêng."
+      : " In xong lật ngang tờ giấy rồi in lại bằng chính bản kẽm đó.";
     if (!outputWasSelected)
       detail += " Artwork nằm trên layer Dàn tự trở; Illustrator không tự chọn được toàn bộ trong tài liệu này.";
     return "OK:[[COUNT:" + placedCount + "]] " + detail;
