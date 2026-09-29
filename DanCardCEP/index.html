@@ -340,16 +340,17 @@
         <!-- Accordion: DÀN KTS (bố cục cũ, giữ nguyên) -->
         <div class="acc">
           <button class="acc-head" data-acc="toiuuKts">
-            <span class="acc-arrow">&#9660;</span>
+            <span class="acc-arrow">&#9654;</span>
             <span>Dàn KTS</span>
           </button>
-          <div class="acc-body open" id="acc-toiuuKts">
+          <div class="acc-body" id="acc-toiuuKts">
             <div class="field">
               <div class="label">Dàn tối ưu không pon</div>
               <p class="hint">
                 Chọn một hoặc nhiều bài (mỗi bài nên là một group), nhập khổ giấy rồi dàn.
                 Tool ưu tiên dàn một chiều đồng nhất (toàn bộ ngang hoặc toàn bộ dọc).
                 Chỉ dùng bố cục xoay/trộn hoặc chữ L khi được nhiều con hơn.
+                Nếu cùng số con, tool chọn phương án cần ít đường cắt guillotine nhất và giữ các cụm cùng chiều liền nhau.
               </p>
             </div>
             <div class="field-row">
@@ -460,23 +461,27 @@
               </label>
             </div>
             <p class="hint">
-              Chọn từng cặp theo hàng: object bên trái là mặt trước, bên phải là mặt
-              sau. Chỉ cần nhập khổ giấy rồi bấm dàn — tool tự thử xoay 90°, tự thử
-              bóp bài tối đa số mm ở trên nếu nhờ đó dàn thêm được con, và không đánh
-              pon. Bóp 0 mm là giữ nguyên kích thước bài.
+              Dùng cho mọi khổ thành phẩm, không riêng card: chọn từng cặp theo hàng,
+              object bên trái là mặt trước, bên phải là mặt sau. Các cặp được phép khác
+              khổ nhau; riêng hai mặt của cùng một cặp phải cùng khung. Mỗi mặt chỉ cần
+              là một object hoàn chỉnh, không bắt buộc phải group. Tool tự thử xoay 90°
+              và nén nhiều khổ vào chung nửa tờ; bóp chỉ dùng khi nhờ đó dàn thêm được
+              cặp. Bóp 0 mm là giữ nguyên kích thước bài, không đánh PON.
             </p>
             <p class="hint">
-              Mỗi cặp ăn một chỗ trên tờ, xếp theo đúng thứ tự đã chọn. Dàn tới đâu
-              con nguồn mất tới đó; cặp chưa dàn được để nguyên chỗ cũ để dàn tiếp
-              vào tờ sau. Chỉ tạo đúng 1 artboard.
+              Mỗi cặp ăn một chỗ trên tờ. Tool không ưu tiên thứ tự chọn: khổ nào không
+              vừa sẽ được bỏ qua để thử các khổ khác, rồi chọn phương án có nhiều cặp
+              nhất. Tool chỉ xóa đúng các cặp đã dàn; cặp chưa vào được tờ vẫn ở nguyên
+              chỗ cũ để chạy tờ sau. Chỉ tạo đúng 1 artboard.
             </p>
             <label class="check">
               <input type="checkbox" id="offsetRepeatFill" />
-              <span>Lặp lại mẫu cho đầy tờ</span>
+              <span>Lặp lại 1 cặp cho đầy tờ</span>
             </label>
             <p class="hint">
-              Tắt: hết mẫu thì chừa chỗ trống. Bật: dàn lần lượt lặp lại các mẫu đã
-              chọn cho kín tờ (dùng khi chỉ có ít mẫu mà cần in đầy).
+              Tắt: mỗi cặp chỉ dàn một lần. Bật chỉ có tác dụng khi chọn đúng 1 cặp.
+              Khi chọn nhiều cặp, tool luôn giữ từng cặp riêng để còn biết cặp nào chưa
+              dàn và không xóa nhầm nguồn.
             </p>
             <button id="btnDanOffset" class="btn btn-primary" type="button">
               <span class="btn-label">Dàn Offset</span>
@@ -855,7 +860,7 @@
       </main>
 
       <footer class="foot">
-        <span class="ver">v2.12.3</span>
+        <span class="ver">v2.12.8</span>
       </footer>
     </div>
 

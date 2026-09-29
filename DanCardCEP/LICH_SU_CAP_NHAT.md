@@ -2,6 +2,40 @@
 
 _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
+## v2.12.8 — Clip kích thước không dừng cả selection bản vá
+
+- Clip kích thước không dừng cả selection bản vá
+
+---
+
+## v2.12.7 — Clip kích thước không dừng cả selection
+
+- Lỗi khi dò clip cha hoặc khung nền của một object không còn làm dừng toàn bộ lệnh Clip.
+- Object đó dùng fallback; nếu vẫn không clip được, panel báo rõ object lỗi và vẫn xử lý các object còn lại.
+
+---
+
+## v2.12.6 — Thu gọn Dàn tối ưu
+
+- Hai mục Dàn KTS và Dàn Offset trong tab Dàn tối ưu đều đóng khi panel vừa mở.
+
+---
+
+## v2.12.5 — Nhiều khổ không theo thứ tự chọn
+
+- Với dàn Offset tự trở nhiều khổ, cặp không vừa bị bỏ qua để thử cặp kích thước khác.
+- Bộ xếp chọn phương án có số cặp nhiều nhất, không dùng thứ tự chọn làm ưu tiên.
+
+---
+
+## v2.12.4 — Dàn Offset tự trở nhiều khổ
+
+- Dàn chung các cặp có kích thước thành phẩm khác nhau trên một tờ tự trở.
+- Tối đa số cặp đặt được, chỉ xóa cặp nguồn đã dàn; cặp còn lại giữ nguyên để chạy tờ sau.
+- Bóp chỉ dùng khi tăng được số cặp; hai mặt của từng cặp vẫn kiểm tra khớp khung.
+
+---
+
 ## v2.12.3 — Bản vá lỗi dàn, ctl, thêm chức nắng dàn offset
 
 - Bản vá lỗi dàn, ctl, thêm chức nắng dàn offset

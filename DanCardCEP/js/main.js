@@ -1373,7 +1373,7 @@
         .replace(/\\/g, "/");
       var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
       return (
-        "if (typeof dcDanToiUu !== 'function' || typeof dcCopyToiUuNoteToOddArtboards !== 'function' || typeof dcDanToiUuVersion === 'undefined' || dcDanToiUuVersion < 14) { $.evalFile(" +
+        "if (typeof dcDanToiUu !== 'function' || typeof dcCopyToiUuNoteToOddArtboards !== 'function' || typeof dcDanToiUuVersion === 'undefined' || dcDanToiUuVersion < 15) { $.evalFile(" +
         jsStr(jsxPath) +
         "); } "
       );
@@ -1403,7 +1403,7 @@
         .replace(/\\/g, "/");
       var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
       return (
-          "if (typeof dcClipToSize !== 'function' || typeof dcClipToSizeVersion === 'undefined' || dcClipToSizeVersion < 4 || typeof dcClipCard926Version === 'undefined' || dcClipCard926Version < 2) { $.evalFile(" +
+          "if (typeof dcClipToSize !== 'function' || typeof dcClipToSizeVersion === 'undefined' || dcClipToSizeVersion < 5 || typeof dcClipCard926Version === 'undefined' || dcClipCard926Version < 2) { $.evalFile(" +
         jsStr(jsxPath) +
         "); } "
       );
@@ -1433,7 +1433,7 @@
         .replace(/\\/g, "/");
       var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
       return (
-        "if (typeof dcRunSignature8 !== 'function' || typeof dcSignature8AutoPonVersion === 'undefined' || dcSignature8AutoPonVersion < 11) { $.evalFile(" +
+        "if (typeof dcRunSignature8 !== 'function' || typeof dcSignature8AutoPonVersion === 'undefined' || dcSignature8AutoPonVersion < 14) { $.evalFile(" +
         jsStr(jsxPath) +
         "); } "
       );
@@ -1463,7 +1463,7 @@
         .replace(/\\/g, "/");
       var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
       return (
-        "if (typeof dcDanTuTro !== 'function' || typeof dcDanTuTroVersion === 'undefined' || dcDanTuTroVersion < 2) { $.evalFile(" +
+        "if (typeof dcDanTuTro !== 'function' || typeof dcDanTuTroVersion === 'undefined' || dcDanTuTroVersion < 6) { $.evalFile(" +
         jsStr(jsxPath) +
         "); } "
       );
