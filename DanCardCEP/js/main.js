@@ -1403,7 +1403,7 @@
         .replace(/\\/g, "/");
       var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
       return (
-          "if (typeof dcClipToSize !== 'function' || typeof dcClipToSizeVersion === 'undefined' || dcClipToSizeVersion < 3) { $.evalFile(" +
+          "if (typeof dcClipToSize !== 'function' || typeof dcClipToSizeVersion === 'undefined' || dcClipToSizeVersion < 3 || typeof dcClipCard926Version === 'undefined' || dcClipCard926Version < 2) { $.evalFile(" +
         jsStr(jsxPath) +
         "); } "
       );
@@ -1433,7 +1433,22 @@
         .replace(/\\/g, "/");
       var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
       return (
-        "if (typeof dcRunSignature8 !== 'function' || typeof dcSignature8AutoPonVersion === 'undefined' || dcSignature8AutoPonVersion < 1) { $.evalFile(" +
+        "if (typeof dcRunSignature8 !== 'function' || typeof dcSignature8AutoPonVersion === 'undefined' || dcSignature8AutoPonVersion < 7) { $.evalFile(" +
+        jsStr(jsxPath) +
+        "); } "
+      );
+    } catch (e) {
+      return "";
+    }
+  }
+  function loadKeoGayJsx() {
+    try {
+      var extensionRoot = cs
+        .getSystemPath(SystemPath.EXTENSION)
+        .replace(/\\/g, "/");
+      var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
+      return (
+        "if (typeof dcRunKeoGay !== 'function' || typeof dcKeoGayAutoPonVersion === 'undefined' || dcKeoGayAutoPonVersion < 5) { $.evalFile(" +
         jsStr(jsxPath) +
         "); } "
       );
@@ -3361,7 +3376,7 @@
     }
     show(outOffset, "Đang dàn keo gáy…");
     btnKeo.disabled = true;
-    var expr = "dcRunKeoGay(" + jsStr(w) + ", " + jsStr(h) + ")";
+    var expr = loadKeoGayJsx() + "dcRunKeoGay(" + jsStr(w) + ", " + jsStr(h) + ")";
     cs.evalScript(expr, function (res) {
       btnKeo.disabled = false;
       handleRes(outOffset, res);
@@ -3431,7 +3446,7 @@
     btnClipCard.addEventListener("click", function () {
       if (outClipCard) outClipCard.textContent = "Đang clip 9.2×5.6…";
       btnClipCard.disabled = true;
-      cs.evalScript("dcClipCard926()", function (res) {
+      cs.evalScript(loadClipJsx() + "dcClipCard926()", function (res) {
         btnClipCard.disabled = false;
         if (!outClipCard) return;
         if (res && res.indexOf("OK:") === 0)

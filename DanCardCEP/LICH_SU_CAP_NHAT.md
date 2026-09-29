@@ -2,6 +2,12 @@
 
 _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
+## v2.12.2 — Bản cải tiến bình ctl offset + kts ko cần dùng pon, linh hoạt trên mọi mặt trận a4 a5
+
+- Bản cải tiến bình ctl offset + kts ko cần dùng pon, linh hoạt trên mọi mặt trận a4 a5
+
+---
+
 ## v2.12.1 — Bản vá sửa lỗi raster + clip khi gặp file tào lao của khách.
 
 - Raster đưa raster chuẩn nhất về phần clip
