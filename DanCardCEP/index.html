@@ -337,70 +337,155 @@
 
       <!-- TAB: DÀN TỐI ƯU (không pon) -->
       <main class="body tabpane" id="pane-toiuu">
-        <div class="field">
-          <div class="label">Dàn tối ưu không pon</div>
-          <p class="hint">
-            Chọn một hoặc nhiều bài (mỗi bài nên là một group), nhập khổ giấy rồi dàn.
-            Tool tự thử xoay 90° và chọn bố cục có nhiều con nhất.
-          </p>
-        </div>
-        <div class="field-row">
-          <label class="field half" for="autoSheetWidth">
-            <span class="label">Ngang giấy (cm)</span>
-            <input id="autoSheetWidth" class="num" type="text" value="33" inputmode="decimal" />
-          </label>
-          <label class="field half" for="autoSheetHeight">
-            <span class="label">Dọc giấy (cm)</span>
-            <input id="autoSheetHeight" class="num" type="text" value="35.4" inputmode="decimal" />
-          </label>
-        </div>
-        <label class="check">
-          <input type="checkbox" id="autoSheetTwoSided" />
-          <span>Dàn 2 mặt đối xứng</span>
-        </label>
-        <p class="hint">
-          Khi bật: chọn từng cặp theo hàng, object bên trái là mặt trước và bên phải
-          là mặt sau. Mặt sau được dàn đối xứng theo mặt trước.
-        </p>
-        <label class="check">
-          <input type="checkbox" id="autoSheetMultiPerArtboard" />
-          <span>Dàn nhiều mẫu vào một tờ</span>
-        </label>
-        <p class="hint">
-          Mặc định: mỗi mẫu tạo một tờ riêng và được dàn đầy. Tick: các mẫu cùng
-          kích thước được dàn luân phiên trên một tờ; nếu số chỗ không chia đều,
-          tool sẽ hỏi trước khi dàn.
-        </p>
-        <div class="field">
-          <p class="hint">
-            Lề an toàn cố định: 3 mm mỗi cạnh. Khe giữa bài: 0 mm. Tool tạo
-            artboard mới, không đặt pon; bài dàn xong được canh giữa và chọn sẵn.
-            Các tờ mới được xếp từ trái sang phải, hết chỗ sẽ tự xuống hàng.
-          </p>
-        </div>
-        <div class="field-row toiuu-actions">
-          <button id="btnDanToiUu" class="btn btn-primary" type="button" style="flex: 1">
-            <span class="btn-label">Dàn tối ưu</span>
+        <!-- Accordion: DÀN KTS (bố cục cũ, giữ nguyên) -->
+        <div class="acc">
+          <button class="acc-head" data-acc="toiuuKts">
+            <span class="acc-arrow">&#9660;</span>
+            <span>Dàn KTS</span>
           </button>
+          <div class="acc-body open" id="acc-toiuuKts">
+            <div class="field">
+              <div class="label">Dàn tối ưu không pon</div>
+              <p class="hint">
+                Chọn một hoặc nhiều bài (mỗi bài nên là một group), nhập khổ giấy rồi dàn.
+                Tool ưu tiên dàn một chiều đồng nhất (toàn bộ ngang hoặc toàn bộ dọc).
+                Chỉ dùng bố cục xoay/trộn hoặc chữ L khi được nhiều con hơn.
+              </p>
+            </div>
+            <div class="field-row">
+              <label class="field half" for="autoSheetWidth">
+                <span class="label">Ngang giấy (cm)</span>
+                <input id="autoSheetWidth" class="num" type="text" value="33" inputmode="decimal" />
+              </label>
+              <label class="field half" for="autoSheetHeight">
+                <span class="label">Dọc giấy (cm)</span>
+                <input id="autoSheetHeight" class="num" type="text" value="35.4" inputmode="decimal" />
+              </label>
+            </div>
+            <label class="check">
+              <input type="checkbox" id="autoSheetTwoSided" />
+              <span>Dàn 2 mặt đối xứng</span>
+            </label>
+            <p class="hint">
+              Khi bật: chọn từng cặp theo hàng, object bên trái là mặt trước và bên phải
+              là mặt sau. Mặt sau được dàn đối xứng theo mặt trước.
+            </p>
+            <label class="check">
+              <input type="checkbox" id="autoSheetMultiPerArtboard" />
+              <span>Dàn nhiều mẫu vào một tờ</span>
+            </label>
+            <p class="hint">
+              Mặc định: mỗi mẫu tạo một tờ riêng và được dàn đầy. Tick: các mẫu cùng
+              kích thước được dàn luân phiên trên một tờ; nếu số chỗ không chia đều,
+              tool sẽ hỏi trước khi dàn.
+            </p>
+            <div class="field">
+              <p class="hint">
+                Lề an toàn cố định: 3 mm mỗi cạnh. Khe giữa bài: 0 mm. Tool tạo
+                artboard mới, không đặt pon; bài dàn xong được canh giữa và chọn sẵn.
+                Các tờ mới được xếp từ trái sang phải, hết chỗ sẽ tự xuống hàng.
+              </p>
+            </div>
+            <div class="field-row toiuu-actions">
+              <button id="btnDanToiUu" class="btn btn-primary" type="button" style="flex: 1">
+                <span class="btn-label">Dàn tối ưu</span>
+              </button>
+            </div>
+            <div class="field-row toiuu-actions">
+              <input
+                id="autoSheetNotePrefixes"
+                class="note-copy-input"
+                type="text"
+                placeholder="F1, F2, F3..."
+                title="Nội dung theo thứ tự artboard 1, 3, 5, 7...; ngăn cách bằng dấu phẩy"
+              />
+              <button
+                id="btnCopyToiUuNote"
+                class="btn"
+                type="button"
+                title="Chọn ghi chú ở artboard mặt trước đầu tiên để copy sang các artboard mặt trước tiếp theo"
+              >
+                Copy ghi chú
+              </button>
+            </div>
+            <div id="outDanToiUu" class="out">Chọn một bài rồi bấm Dàn tối ưu.</div>
+          </div>
         </div>
-        <div class="field-row toiuu-actions">
-          <input
-            id="autoSheetNotePrefixes"
-            class="note-copy-input"
-            type="text"
-            placeholder="F1, F2, F3..."
-            title="Nội dung theo thứ tự artboard 1, 3, 5, 7...; ngăn cách bằng dấu phẩy"
-          />
-          <button
-            id="btnCopyToiUuNote"
-            class="btn"
-            type="button"
-            title="Chọn ghi chú ở artboard mặt trước đầu tiên để copy sang các artboard mặt trước tiếp theo"
-          >
-            Copy ghi chú
+
+        <!-- Accordion: DÀN OFFSET -->
+        <div class="acc">
+          <button class="acc-head" data-acc="toiuuOffset">
+            <span class="acc-arrow">&#9654;</span>
+            <span>Dàn Offset</span>
           </button>
+          <div class="acc-body" id="acc-toiuuOffset">
+            <div class="field">
+              <div class="label">Kiểu dàn</div>
+              <div class="radio-list">
+                <label class="radio-row"
+                  ><input type="radio" name="offsetDanMode" value="tutro" checked /><span
+                    >Tự trở (1 artboard)</span
+                  ></label
+                >
+                <label class="radio-row"
+                  ><input type="radio" name="offsetDanMode" value="ab" /><span
+                    >AB (2 artboard trước / sau)</span
+                  ></label
+                >
+              </div>
+            </div>
+            <p class="hint" id="offsetModeHint">
+              Tự trở: mặt trước và mặt sau nằm chung một artboard, đối xứng qua tim
+              dọc tờ giấy. In xong lật ngang tờ giấy rồi in lại bằng chính bản kẽm
+              đó, cắt ra là mỗi con đủ 2 mặt.
+            </p>
+            <div class="field-row">
+              <label class="field half" for="offsetSheetWidth">
+                <span class="label">Ngang giấy (cm)</span>
+                <input id="offsetSheetWidth" class="num" type="text" value="86" inputmode="decimal" />
+              </label>
+              <label class="field half" for="offsetSheetHeight">
+                <span class="label">Dọc giấy (cm)</span>
+                <input id="offsetSheetHeight" class="num" type="text" value="65" inputmode="decimal" />
+              </label>
+            </div>
+            <div class="field-row">
+              <label class="field half" for="offsetMargin">
+                <span class="label">Lề an toàn (mm)</span>
+                <input id="offsetMargin" class="num" type="text" value="0" inputmode="decimal" />
+              </label>
+              <label class="field half" for="offsetMaxBop">
+                <span class="label">Bóp tối đa (mm)</span>
+                <input id="offsetMaxBop" class="num" type="text" value="1" inputmode="decimal" />
+              </label>
+            </div>
+            <p class="hint">
+              Chọn từng cặp theo hàng: object bên trái là mặt trước, bên phải là mặt
+              sau. Chỉ cần nhập khổ giấy rồi bấm dàn — tool tự thử xoay 90°, tự thử
+              bóp bài tối đa số mm ở trên nếu nhờ đó dàn thêm được con, và không đánh
+              pon. Bóp 0 mm là giữ nguyên kích thước bài.
+            </p>
+            <p class="hint">
+              Mỗi cặp ăn một chỗ trên tờ, xếp theo đúng thứ tự đã chọn. Dàn tới đâu
+              con nguồn mất tới đó; cặp chưa dàn được để nguyên chỗ cũ để dàn tiếp
+              vào tờ sau. Chỉ tạo đúng 1 artboard.
+            </p>
+            <label class="check">
+              <input type="checkbox" id="offsetRepeatFill" />
+              <span>Lặp lại mẫu cho đầy tờ</span>
+            </label>
+            <p class="hint">
+              Tắt: hết mẫu thì chừa chỗ trống. Bật: dàn lần lượt lặp lại các mẫu đã
+              chọn cho kín tờ (dùng khi chỉ có ít mẫu mà cần in đầy).
+            </p>
+            <button id="btnDanOffset" class="btn btn-primary" type="button">
+              <span class="btn-label">Dàn Offset</span>
+            </button>
+            <div id="outDanOffset" class="out">
+              Chọn cặp mặt trước + mặt sau rồi bấm Dàn Offset.
+            </div>
+          </div>
         </div>
-        <div id="outDanToiUu" class="out">Chọn một bài rồi bấm Dàn tối ưu.</div>
       </main>
 
       <!-- TAB: DẤU CẮT -->
@@ -536,10 +621,11 @@
       <!-- TAB: CTL OFFSET (signature 8 - khổ lớn 65x68) -->
       <main class="body tabpane" id="pane-offset">
         <div class="field">
-          <div class="label">Dàn CTL Offset (in offset khổ lớn 65×86)</div>
+          <div class="label">Dàn CTL Offset (bấm ghim giữa, tự chọn khổ)</div>
           <p class="hint">
             Chọn các trang theo thứ tự đọc. Tool tự tạo artboard và vẽ PON
-            theo form CTL Offset.
+            theo form CTL Offset. Tối đa 15 × 21.15 cm tự dàn kiểu A5; lớn hơn
+            sẽ tự dàn kiểu A4.
           </p>
         </div>
 
@@ -551,9 +637,10 @@
           </button>
           <div class="acc-body" id="acc-offSig">
             <p class="hint">
-              Bình bài AB + tự trở (đóng gáy giữa lồng nhau). Bìa = 4 trang
-              ngoài cùng làm TT4. Bội số của 4; phần ruột dư 0/4/8/12. PON được
-              vẽ tự động: AB/TT8 dùng form 65×86, TT4 dùng form 65×43.
+              Bội số của 4, dàn lồng từ ngoài vào trong. Khổ đến 15 × 21.15 cm:
+              4 trang = 43×32.5, 8 trang = 65×43, 16 trang = 65×86, 32 trang =
+              65×86 A/B. Khổ lớn hơn dùng logic A4 hiện có. PON giấy và PON cắt
+              được vẽ tự động; không cần chọn file PON.
             </p>
             <div class="field">
               <div class="label">Kích thước 1 trang (cm)</div>
@@ -768,7 +855,7 @@
       </main>
 
       <footer class="foot">
-        <span class="ver">v2.12.2</span>
+        <span class="ver">v2.12.3</span>
       </footer>
     </div>
 

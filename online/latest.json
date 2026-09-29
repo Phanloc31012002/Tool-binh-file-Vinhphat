@@ -1,9 +1,9 @@
 {
     "product":  "com.locdev.dancard",
-    "version":  "2.12.2",
-    "title":  "Bản cải tiến bình ctl offset + kts ko cần dùng pon, linh hoạt trên mọi mặt trận a4 a5",
-    "description":  "Bản cải tiến bình ctl offset + kts ko cần dùng pon, linh hoạt trên mọi mặt trận a4 a5",
-    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.12.2.zip",
-    "sha256":  "499DB2E958FEDD241CB0852ED2E09F4F3BEC8E79697C27AFAF71B4D5F52B4E19",
-    "publishedUtc":  "2026-09-29T01:47:16.6180677Z"
+    "version":  "2.12.3",
+    "title":  "Bản vá lỗi dàn, ctl, thêm chức nắng dàn offset",
+    "description":  "Bản vá lỗi dàn, ctl, thêm chức nắng dàn offset",
+    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.12.3.zip",
+    "sha256":  "68BF533AED8840E2E83200A6822CDBF3858F860E182E27C039E0F9DD71102AA4",
+    "publishedUtc":  "2026-09-29T04:41:34.4723750Z"
 }

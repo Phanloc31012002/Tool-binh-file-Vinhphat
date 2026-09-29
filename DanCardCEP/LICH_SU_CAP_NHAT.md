@@ -2,6 +2,12 @@
 
 _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
+## v2.12.3 — Bản vá lỗi dàn, ctl, thêm chức nắng dàn offset
+
+- Bản vá lỗi dàn, ctl, thêm chức nắng dàn offset
+
+---
+
 ## v2.12.2 — Bản cải tiến bình ctl offset + kts ko cần dùng pon, linh hoạt trên mọi mặt trận a4 a5
 
 - Bản cải tiến bình ctl offset + kts ko cần dùng pon, linh hoạt trên mọi mặt trận a4 a5

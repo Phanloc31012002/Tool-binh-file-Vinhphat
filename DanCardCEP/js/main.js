@@ -1373,7 +1373,7 @@
         .replace(/\\/g, "/");
       var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
       return (
-        "if (typeof dcDanToiUu !== 'function' || typeof dcCopyToiUuNoteToOddArtboards !== 'function' || typeof dcDanToiUuVersion === 'undefined' || dcDanToiUuVersion < 13) { $.evalFile(" +
+        "if (typeof dcDanToiUu !== 'function' || typeof dcCopyToiUuNoteToOddArtboards !== 'function' || typeof dcDanToiUuVersion === 'undefined' || dcDanToiUuVersion < 14) { $.evalFile(" +
         jsStr(jsxPath) +
         "); } "
       );
@@ -1403,7 +1403,7 @@
         .replace(/\\/g, "/");
       var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
       return (
-          "if (typeof dcClipToSize !== 'function' || typeof dcClipToSizeVersion === 'undefined' || dcClipToSizeVersion < 3 || typeof dcClipCard926Version === 'undefined' || dcClipCard926Version < 2) { $.evalFile(" +
+          "if (typeof dcClipToSize !== 'function' || typeof dcClipToSizeVersion === 'undefined' || dcClipToSizeVersion < 4 || typeof dcClipCard926Version === 'undefined' || dcClipCard926Version < 2) { $.evalFile(" +
         jsStr(jsxPath) +
         "); } "
       );
@@ -1418,7 +1418,7 @@
         .replace(/\\/g, "/");
       var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
       return (
-        "if (typeof dcRunCatalogueAuto !== 'function' || typeof dcCatalogueAutoVersion === 'undefined' || dcCatalogueAutoVersion < 9) { $.evalFile(" +
+        "if (typeof dcRunCatalogueAuto !== 'function' || typeof dcCatalogueAutoVersion === 'undefined' || dcCatalogueAutoVersion < 12) { $.evalFile(" +
         jsStr(jsxPath) +
         "); } "
       );
@@ -1433,7 +1433,7 @@
         .replace(/\\/g, "/");
       var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
       return (
-        "if (typeof dcRunSignature8 !== 'function' || typeof dcSignature8AutoPonVersion === 'undefined' || dcSignature8AutoPonVersion < 7) { $.evalFile(" +
+        "if (typeof dcRunSignature8 !== 'function' || typeof dcSignature8AutoPonVersion === 'undefined' || dcSignature8AutoPonVersion < 11) { $.evalFile(" +
         jsStr(jsxPath) +
         "); } "
       );
@@ -1456,6 +1456,21 @@
       return "";
     }
   }
+  function loadDanTuTroJsx() {
+    try {
+      var extensionRoot = cs
+        .getSystemPath(SystemPath.EXTENSION)
+        .replace(/\\/g, "/");
+      var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
+      return (
+        "if (typeof dcDanTuTro !== 'function' || typeof dcDanTuTroVersion === 'undefined' || dcDanTuTroVersion < 2) { $.evalFile(" +
+        jsStr(jsxPath) +
+        "); } "
+      );
+    } catch (e) {
+      return "";
+    }
+  }
   function handleRes(el, res) {
     if (res === "EvalScript error." || res === undefined || res === "")
       show(el, "Lỗi gọi ExtendScript.", "warn");
@@ -1465,24 +1480,25 @@
       showOkWithWarn(el, res.substring(3).replace(/^\s+/, ""));
     else show(el, res, "ok");
   }
-  function showDanToiUuResult(res) {
+  // Hiển thị kết quả dàn có kèm số con/tờ: "OK:[[COUNT:n]] ghi chú…"
+  function showCountResult(el, res) {
     if (res === "EvalScript error." || res === undefined || res === "") {
-      show(outDanToiUu, "Lỗi gọi ExtendScript.", "warn");
+      show(el, "Lỗi gọi ExtendScript.", "warn");
       return;
     }
     if (res.indexOf("ERR:") === 0) {
-      show(outDanToiUu, res.substring(4).replace(/^\s+/, ""), "warn");
+      show(el, res.substring(4).replace(/^\s+/, ""), "warn");
       return;
     }
     if (res.indexOf("OK:") !== 0) {
-      show(outDanToiUu, res, "ok");
+      show(el, res, "ok");
       return;
     }
 
     var message = res.substring(3).replace(/^\s+/, "");
     var match = /^\[\[COUNT:(\d+)\]\]\s*/.exec(message);
     if (!match) {
-      showOkWithWarn(outDanToiUu, message);
+      showOkWithWarn(el, message);
       return;
     }
     var safe = message
@@ -1490,13 +1506,16 @@
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;");
-    outDanToiUu.className = "out ok";
-    outDanToiUu.innerHTML =
+    el.className = "out ok";
+    el.innerHTML =
       '<strong class="optimal-capacity">' +
       match[1] +
       " con / tờ</strong><br>" +
       safe;
-    fitOut(outDanToiUu);
+    fitOut(el);
+  }
+  function showDanToiUuResult(res) {
+    showCountResult(outDanToiUu, res);
   }
 
   // ---- Dấu cắt ----
@@ -1590,6 +1609,77 @@
         function (res) {
           btnCopyToiUuNote.disabled = false;
           handleRes(outDanToiUu, res);
+        },
+      );
+    });
+  }
+
+  // ---- Dàn Offset: Tự trở (1 artboard) / AB (2 artboard) ----
+  var btnDanOffset = document.getElementById("btnDanOffset");
+  var outDanOffset = document.getElementById("outDanOffset");
+  if (btnDanOffset && outDanOffset) {
+    [
+      "offsetSheetWidth",
+      "offsetSheetHeight",
+      "offsetMargin",
+      "offsetMaxBop",
+    ].forEach(attachSelectFirst);
+
+    var OFFSET_MODE_HINTS = {
+      tutro:
+        "Tự trở: mặt trước và mặt sau nằm chung một artboard, đối xứng qua tim dọc tờ giấy. In xong lật ngang tờ giấy rồi in lại bằng chính bản kẽm đó, cắt ra là mỗi con đủ 2 mặt.",
+      ab: "AB: mặt trước và mặt sau nằm trên 2 artboard riêng, in bằng 2 bản kẽm. Kiểu này chưa làm.",
+    };
+    var offsetModeHint = document.getElementById("offsetModeHint");
+    var offsetModeRadios = document.querySelectorAll(
+      'input[name="offsetDanMode"]',
+    );
+    var currentOffsetMode = function () {
+      for (var i = 0; i < offsetModeRadios.length; i++)
+        if (offsetModeRadios[i].checked) return offsetModeRadios[i].value;
+      return "tutro";
+    };
+    for (var omi = 0; omi < offsetModeRadios.length; omi++) {
+      offsetModeRadios[omi].addEventListener("change", function () {
+        if (offsetModeHint)
+          offsetModeHint.textContent =
+            OFFSET_MODE_HINTS[currentOffsetMode()] || "";
+      });
+    }
+
+    btnDanOffset.addEventListener("click", function () {
+      if (currentOffsetMode() !== "tutro") {
+        show(
+          outDanOffset,
+          "Kiểu AB (2 artboard trước / sau) chưa làm. Chọn Tự trở để dàn.",
+          "warn",
+        );
+        return;
+      }
+      var width = document.getElementById("offsetSheetWidth").value || "";
+      var height = document.getElementById("offsetSheetHeight").value || "";
+      var margin = document.getElementById("offsetMargin").value || "0";
+      var maxBop = document.getElementById("offsetMaxBop").value || "0";
+      var repeatFillBox = document.getElementById("offsetRepeatFill");
+      var repeatFill = repeatFillBox ? repeatFillBox.checked : false;
+      show(outDanOffset, "Đang tính bố cục tự trở và tạo tờ giấy…");
+      btnDanOffset.disabled = true;
+      cs.evalScript(
+        loadDanTuTroJsx() +
+          "dcDanTuTro(" +
+          jsStr(width) +
+          ", " +
+          jsStr(height) +
+          ", " +
+          jsStr(margin) +
+          ", " +
+          jsStr(maxBop) +
+          ", " +
+          (repeatFill ? "true" : "false") +
+          ")",
+        function (res) {
+          btnDanOffset.disabled = false;
+          showCountResult(outDanOffset, res);
         },
       );
     });
