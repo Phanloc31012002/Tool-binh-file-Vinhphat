@@ -2,6 +2,12 @@
 
 _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
+## v2.13.21 — cài lại cho máy nv
+
+- cài lại cho máy nv
+
+---
+
 ## v2.13.20 — Dựng lại lưới, PON và bóp của CTL Offset
 
 - *Khổ artboard cố định, không co theo khổ trang**

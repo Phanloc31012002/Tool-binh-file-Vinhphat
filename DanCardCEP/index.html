@@ -413,6 +413,33 @@
           </div>
         </div>
 
+        <!-- Accordion: DÀN BẾ (decal 1 mặt, né PON của file khuôn) -->
+        <div class="acc">
+          <button class="acc-head" data-acc="toiuuDie">
+            <span class="acc-arrow">&#9654;</span>
+            <span>Dàn bế</span>
+          </button>
+          <div class="acc-body" id="acc-toiuuDie">
+            <div class="field">
+              <div class="label">Dàn decal theo khuôn bế</div>
+              <p class="hint">
+                Nguồn có 2 layer: <b>Khuôn bế</b> và <b>Bài</b>. Tool ghép khuôn với bài
+                gần tâm nhất, rồi hỏi chọn file PON AI ở mỗi lần chạy. Khổ tờ và 4 PON
+                tròn được đọc trực tiếp từ file đó.
+              </p>
+              <p class="hint">
+                Bài tràn là biên dàn thực: cách nhau tối thiểu 1 mm và né mép PON 7,5 mm.
+                Khuôn cách mép tờ ít nhất 4 mm. Tool xoay 0° / 90° / 180° / 270°, luân
+                phiên đều các loại và giữ khuôn dưới bài trên artboard mới.
+              </p>
+            </div>
+            <button id="btnDanBe" class="btn btn-primary" type="button">
+              <span class="btn-label">Chọn PON AI &amp; Dàn bế</span>
+            </button>
+            <div id="outDanBe" class="out">Chuẩn bị layer Khuôn bế + Bài rồi bấm Dàn bế.</div>
+          </div>
+        </div>
+
         <!-- Accordion: DÀN OFFSET -->
         <div class="acc">
           <button class="acc-head" data-acc="toiuuOffset">
@@ -849,7 +876,7 @@
       </main>
 
       <footer class="foot">
-          <span class="ver">v2.13.20</span>
+          <span class="ver">v2.13.21</span>
       </footer>
     </div>
 

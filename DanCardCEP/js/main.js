@@ -1373,7 +1373,7 @@
         .replace(/\\/g, "/");
       var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
       return (
-        "if (typeof dcDanToiUu !== 'function' || typeof dcCopyToiUuNoteToOddArtboards !== 'function' || typeof dcDanToiUuVersion === 'undefined' || dcDanToiUuVersion < 15) { $.evalFile(" +
+        "if (typeof dcDanToiUu !== 'function' || typeof dcCopyToiUuNoteToOddArtboards !== 'function' || typeof dcDanToiUuVersion === 'undefined' || dcDanToiUuVersion < 15 || typeof dcDanBe !== 'function' || typeof dcDanBeVersion === 'undefined' || dcDanBeVersion < 1) { $.evalFile(" +
         jsStr(jsxPath) +
         "); } "
       );
@@ -1594,6 +1594,20 @@
           showDanToiUuResult(res);
         },
       );
+    });
+  }
+
+  // ---- Dàn bế decal: đọc PON AI, dàn biên thật của bài + khuôn ----
+  var btnDanBe = document.getElementById("btnDanBe");
+  var outDanBe = document.getElementById("outDanBe");
+  if (btnDanBe && outDanBe) {
+    btnDanBe.addEventListener("click", function () {
+      show(outDanBe, "Đang chọn file PON và tính dàn bế…");
+      btnDanBe.disabled = true;
+      cs.evalScript(loadDanToiUuJsx() + "dcDanBe()", function (res) {
+        btnDanBe.disabled = false;
+        showCountResult(outDanBe, res);
+      });
     });
   }
 
