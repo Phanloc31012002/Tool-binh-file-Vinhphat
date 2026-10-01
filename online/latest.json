@@ -1,9 +1,9 @@
 {
     "product":  "com.locdev.dancard",
-    "version":  "2.13.21",
-    "title":  "cài lại cho máy nv",
-    "description":  "cài lại cho máy nv",
-    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.13.21.zip",
-    "sha256":  "4F151BBCF7BEDDE40CF15A3A8623E414338407C8DF0C2980575DD1B574DC5267",
-    "publishedUtc":  "2026-10-01T06:47:56.1323396Z"
+    "version":  "2.14.0",
+    "title":  "vá lại \"in\"",
+    "description":  "vá lại \"in\"",
+    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.14.0.zip",
+    "sha256":  "3E84054A52CC072EC8410EDD875FC5FEB25CEC0D86C08273F70883CD98BAA318",
+    "publishedUtc":  "2026-10-01T07:05:40.8512200Z"
 }

@@ -1403,7 +1403,7 @@
         .replace(/\\/g, "/");
       var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
       return (
-        "if (typeof dcClipToSize !== 'function' || typeof dcClipToSizeVersion === 'undefined' || dcClipToSizeVersion < 6 || typeof dcClipCard926Version === 'undefined' || dcClipCard926Version < 2) { $.evalFile(" +
+        "if (typeof dcClipToSize !== 'function' || typeof dcClipToSizeVersion === 'undefined' || dcClipToSizeVersion < 7 || typeof dcClipCard926Version === 'undefined' || dcClipCard926Version < 2) { $.evalFile(" +
         jsStr(jsxPath) +
         "); } "
       );
@@ -3278,14 +3278,15 @@
         if (clipMsg) clipMsg.textContent = "Đang clip…";
         clipOk.disabled = true;
         var expr =
+          "(function(){try{" +
           loadClipJsx() +
-          "dcClipToSize(" +
+          "return dcClipToSize(" +
           jsStr(wv) +
           ", " +
           jsStr(hv) +
           ", " +
           jsStr(uv) +
-          ")";
+          ");}catch(e){return 'ERR: ' + e.toString();}})()";
         cs.evalScript(expr, function (res) {
           clipOk.disabled = false;
           if (!clipMsg) return;

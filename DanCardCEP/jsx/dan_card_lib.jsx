@@ -26359,7 +26359,7 @@ function dcPickFolder() {
 //    unit     : "cm" | "mm" | "in" | "pt"  (mặc định "cm")
 //  Trả về "OK: ..." hoặc "ERR: ...".
 // ============================================================
-var dcClipToSizeVersion = 6;
+var dcClipToSizeVersion = 7;
 
 function dcClipToSize(wCm, hCm, unit) {
   try {
@@ -26381,7 +26381,8 @@ function _dcClipToCardStyleCore(wText, hText, unit) {
     unit === undefined || unit === null || String(unit) === ""
       ? "cm"
       : String(unit);
-  var perUnit = { cm: 28.34645669, mm: 2.834645669, in: 72, pt: 1 };
+  // "in" is reserved in ExtendScript, so it must be a quoted object key.
+  var perUnit = { cm: 28.34645669, mm: 2.834645669, "in": 72, pt: 1 };
   var unitSize = perUnit[unit];
   if (!unitSize) return "ERR: Don vi khong hop le: " + unit;
 
@@ -26595,7 +26596,7 @@ function _dcClipToSizeCore(wCm, hCm, unit) {
     unit === undefined || unit === null || String(unit) === ""
       ? "cm"
       : String(unit);
-  var perUnit = { cm: 28.34645669, mm: 2.834645669, in: 72, pt: 1 };
+  var perUnit = { cm: 28.34645669, mm: 2.834645669, "in": 72, pt: 1 };
   var unitSize = perUnit[unit];
   if (!unitSize) return "ERR: Don vi khong hop le: " + unit;
 
@@ -26949,7 +26950,7 @@ function dcResizeSelectionToSize(wText, hText, unit) {
   try {
     if (app.documents.length === 0) return "ERR: Chua mo tai lieu nao.";
     var doc = app.activeDocument;
-    var perUnit = { cm: 28.34645669, mm: 2.834645669, in: 72, pt: 1 };
+    var perUnit = { cm: 28.34645669, mm: 2.834645669, "in": 72, pt: 1 };
     unit =
       unit === undefined || unit === null || String(unit) === ""
         ? "cm"

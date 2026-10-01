@@ -2,6 +2,12 @@
 
 _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
+## v2.14.0 — vá lại "in"
+
+- vá lại "in"
+
+---
+
 ## v2.13.21 — cài lại cho máy nv
 
 - cài lại cho máy nv
