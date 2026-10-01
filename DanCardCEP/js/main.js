@@ -1403,7 +1403,7 @@
         .replace(/\\/g, "/");
       var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
       return (
-          "if (typeof dcClipToSize !== 'function' || typeof dcClipToSizeVersion === 'undefined' || dcClipToSizeVersion < 5 || typeof dcClipCard926Version === 'undefined' || dcClipCard926Version < 2) { $.evalFile(" +
+        "if (typeof dcClipToSize !== 'function' || typeof dcClipToSizeVersion === 'undefined' || dcClipToSizeVersion < 6 || typeof dcClipCard926Version === 'undefined' || dcClipCard926Version < 2) { $.evalFile(" +
         jsStr(jsxPath) +
         "); } "
       );
@@ -1418,7 +1418,7 @@
         .replace(/\\/g, "/");
       var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
       return (
-        "if (typeof dcRunCatalogueAuto !== 'function' || typeof dcCatalogueAutoVersion === 'undefined' || dcCatalogueAutoVersion < 12) { $.evalFile(" +
+        "if (typeof dcRunCatalogueAuto !== 'function' || typeof dcCatalogueAutoVersion === 'undefined' || dcCatalogueAutoVersion < 13) { $.evalFile(" +
         jsStr(jsxPath) +
         "); } "
       );
@@ -1433,7 +1433,7 @@
         .replace(/\\/g, "/");
       var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
       return (
-        "if (typeof dcRunSignature8 !== 'function' || typeof dcSignature8AutoPonVersion === 'undefined' || dcSignature8AutoPonVersion < 14) { $.evalFile(" +
+        "if (typeof dcRunSignature8 !== 'function' || typeof dcSignature8AutoPonVersion === 'undefined' || dcSignature8AutoPonVersion < 34) { $.evalFile(" +
         jsStr(jsxPath) +
         "); } "
       );
@@ -1463,7 +1463,7 @@
         .replace(/\\/g, "/");
       var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
       return (
-        "if (typeof dcDanTuTro !== 'function' || typeof dcDanTuTroVersion === 'undefined' || dcDanTuTroVersion < 9) { $.evalFile(" +
+        "if (typeof dcDanTuTro !== 'function' || typeof dcDanTuTroVersion === 'undefined' || dcDanTuTroVersion < 10) { $.evalFile(" +
         jsStr(jsxPath) +
         "); } "
       );
@@ -1605,7 +1605,10 @@
       show(outDanToiUu, "Đang copy ghi chú sang các artboard mặt trước…");
       btnCopyToiUuNote.disabled = true;
       cs.evalScript(
-        loadDanToiUuJsx() + "dcCopyToiUuNoteToOddArtboards(" + jsStr(notePrefixes) + ")",
+        loadDanToiUuJsx() +
+          "dcCopyToiUuNoteToOddArtboards(" +
+          jsStr(notePrefixes) +
+          ")",
         function (res) {
           btnCopyToiUuNote.disabled = false;
           handleRes(outDanToiUu, res);
@@ -1632,10 +1635,7 @@
       var maxBop = document.getElementById("offsetMaxBop").value || "0";
       var repeatFillBox = document.getElementById("offsetRepeatFill");
       var repeatFill = repeatFillBox ? repeatFillBox.checked : false;
-      show(
-        outDanOffset,
-        "Đang tính bố cục tự trở và tạo tờ giấy…",
-      );
+      show(outDanOffset, "Đang tính bố cục tự trở và tạo tờ giấy…");
       btnDanOffset.disabled = true;
       cs.evalScript(
         loadDanTuTroJsx() +
@@ -1736,19 +1736,25 @@
             for (; index < end; index++) {
               var region = regions[index];
               if (!region || region.length !== 4)
-                throw new Error("khung preview " + (index + 1) + " khong hop le.");
+                throw new Error(
+                  "khung preview " + (index + 1) + " khong hop le.",
+                );
               var rx = Number(region[0]),
                 ry = Number(region[1]),
                 rw = Number(region[2]),
                 rh = Number(region[3]);
               if (!isFinite(rx) || !isFinite(ry) || !(rw > 0) || !(rh > 0))
-                throw new Error("khung preview " + (index + 1) + " khong hop le.");
+                throw new Error(
+                  "khung preview " + (index + 1) + " khong hop le.",
+                );
               var sx = Math.max(0, Math.floor(rx * imageW)),
                 sy = Math.max(0, Math.floor(ry * imageH)),
                 ex = Math.min(imageW, Math.ceil((rx + rw) * imageW)),
                 ey = Math.min(imageH, Math.ceil((ry + rh) * imageH));
               if (!(ex > sx) || !(ey > sy))
-                throw new Error("khung preview " + (index + 1) + " nam ngoai anh tong.");
+                throw new Error(
+                  "khung preview " + (index + 1) + " nam ngoai anh tong.",
+                );
               signals.push(sheetSignal(image, sx, sy, ex - sx, ey - sy));
             }
             if (index < regions.length) setTimeout(readNextBatch, 0);
@@ -1967,7 +1973,11 @@
           var regions = parseSheetRegions(sheetData.join("|"));
           if (!sheetTag || !sheetPath || !regions) {
             btnHocMau.disabled = false;
-            show(outHocMau, "Preview tổng không hợp lệ. Hãy thử Học mẫu lại.", "warn");
+            show(
+              outHocMau,
+              "Preview tổng không hợp lệ. Hãy thử Học mẫu lại.",
+              "warn",
+            );
             return;
           }
           pendingHocMau = {
@@ -2036,7 +2046,11 @@
           ) {
             btnXacNhanConChuan.disabled = false;
             if (btnHocMau) btnHocMau.disabled = false;
-            show(outHocMau, "Không xác định được con chuẩn. Hãy chọn lại.", "warn");
+            show(
+              outHocMau,
+              "Không xác định được con chuẩn. Hãy chọn lại.",
+              "warn",
+            );
             return;
           }
           var readAngles = pending.sheetPath
@@ -2113,11 +2127,7 @@
       show(outSaveDanMau, "Mở cửa sổ chọn nơi lưu PDF…");
       btnSaveDanMau.disabled = true;
       cs.evalScript(
-        "dcLuuDanTheoMauPDF(" +
-          jsStr(mode) +
-          ", " +
-          jsStr(suffix) +
-          ")",
+        "dcLuuDanTheoMauPDF(" + jsStr(mode) + ", " + jsStr(suffix) + ")",
         function (res) {
           btnSaveDanMau.disabled = false;
           handleRes(outSaveDanMau, res);
@@ -2201,7 +2211,9 @@
 
       function frameArea(frame) {
         if (!frame) return 0;
-        return Math.max(0, frame[2] - frame[0]) * Math.max(0, frame[1] - frame[3]);
+        return (
+          Math.max(0, frame[2] - frame[0]) * Math.max(0, frame[1] - frame[3])
+        );
       }
 
       function frameCoversItem(frame, item) {
@@ -2298,11 +2310,16 @@
 
       function isEditable(item) {
         try {
-          if (item.locked === true || item.hidden === true || item.guides === true)
+          if (
+            item.locked === true ||
+            item.hidden === true ||
+            item.guides === true
+          )
             return false;
         } catch (itemStateError) {}
         try {
-          if (item.layer.locked === true || item.layer.visible === false) return false;
+          if (item.layer.locked === true || item.layer.visible === false)
+            return false;
         } catch (layerStateError) {}
         return true;
       }
@@ -2341,7 +2358,8 @@
           // groups leave that duplicate alive, so remove only a surviving
           // non-raster copy before deleting the original source.
           try {
-            if (duplicate !== raster && duplicate.typename !== "RasterItem") duplicate.remove();
+            if (duplicate !== raster && duplicate.typename !== "RasterItem")
+              duplicate.remove();
           } catch (removeDuplicateError) {}
           try {
             raster.move(source, ElementPlacement.PLACEBEFORE);
@@ -2369,7 +2387,8 @@
       // Snapshot before the first mutation. A live Illustrator selection can
       // otherwise skip items or change to a parent as earlier items are removed.
       var snapshot = [];
-      for (var s = 0; s < liveSelection.length; s++) snapshot.push(liveSelection[s]);
+      for (var s = 0; s < liveSelection.length; s++)
+        snapshot.push(liveSelection[s]);
 
       var unique = [];
       for (var u = 0; u < snapshot.length; u++) {
@@ -3295,78 +3314,85 @@
   var outCatalogue = document.getElementById("outCatalogue");
   // Retain these handlers only if an older CEP-cached HTML file is open.
   if (document.getElementById("selCatA4")) {
-
-  // dropdown chọn khổ -> ẩn/hiện ô nhập kích thước
-  var selCatA4 = document.getElementById("selCatA4");
-  var sizeCatA4 = document.getElementById("sizeCatA4");
-  var selCatA5 = document.getElementById("selCatA5");
-  var sizeCatA5 = document.getElementById("sizeCatA5");
-  function syncSize(sel, box) {
-    if (sel.value === "custom") box.classList.remove("hidden");
-    else box.classList.add("hidden");
-  }
-  selCatA4.addEventListener("change", function () {
-    syncSize(selCatA4, sizeCatA4);
-  });
-  selCatA5.addEventListener("change", function () {
-    syncSize(selCatA5, sizeCatA5);
-  });
-  syncSize(selCatA4, sizeCatA4);
-  syncSize(selCatA5, sizeCatA5);
-
-  function runCat(expr, label, button) {
-    show(outCatalogue, "Đang mở dàn catalogue " + label + "…");
-    button.disabled = true;
-    cs.evalScript(expr, function (res) {
-      button.disabled = false;
-      handleRes(outCatalogue, res);
+    // dropdown chọn khổ -> ẩn/hiện ô nhập kích thước
+    var selCatA4 = document.getElementById("selCatA4");
+    var sizeCatA4 = document.getElementById("sizeCatA4");
+    var selCatA5 = document.getElementById("selCatA5");
+    var sizeCatA5 = document.getElementById("sizeCatA5");
+    function syncSize(sel, box) {
+      if (sel.value === "custom") box.classList.remove("hidden");
+      else box.classList.add("hidden");
+    }
+    selCatA4.addEventListener("change", function () {
+      syncSize(selCatA4, sizeCatA4);
     });
-  }
-  function validSize(w, h) {
-    var pw = parseFloat(String(w).replace(",", "."));
-    var ph = parseFloat(String(h).replace(",", "."));
-    return !isNaN(pw) && !isNaN(ph) && pw > 0 && ph > 0;
-  }
+    selCatA5.addEventListener("change", function () {
+      syncSize(selCatA5, sizeCatA5);
+    });
+    syncSize(selCatA4, sizeCatA4);
+    syncSize(selCatA5, sizeCatA5);
 
-  var btnCatA4 = document.getElementById("btnCatA4");
-  btnCatA4.addEventListener("click", function () {
-    if (selCatA4.value === "a4") {
-      runCat("dcRunCatalogueA4()", "A4", btnCatA4);
-    } else {
-      var w = document.getElementById("wCatA4").value;
-      var h = document.getElementById("hCatA4").value;
-      if (!validSize(w, h)) {
-        show(outCatalogue, "Nhập kích thước hợp lệ (rộng × cao, cm).", "warn");
-        return;
-      }
-      runCat(
-        "dcRunCatalogueCustom(" + jsStr(w) + "," + jsStr(h) + ")",
-        "khổ " + w + "×" + h,
-        btnCatA4,
-      );
+    function runCat(expr, label, button) {
+      show(outCatalogue, "Đang mở dàn catalogue " + label + "…");
+      button.disabled = true;
+      cs.evalScript(expr, function (res) {
+        button.disabled = false;
+        handleRes(outCatalogue, res);
+      });
     }
-  });
-
-  var btnCatA5 = document.getElementById("btnCatA5");
-  btnCatA5.addEventListener("click", function () {
-    if (selCatA5.value === "a5") {
-      runCat("dcRunCatalogueA5()", "A5", btnCatA5);
-    } else {
-      var w = document.getElementById("wCatA5").value;
-      var h = document.getElementById("hCatA5").value;
-      if (!validSize(w, h)) {
-        show(outCatalogue, "Nhập kích thước hợp lệ (rộng × cao, cm).", "warn");
-        return;
-      }
-      runCat(
-        "dcRunCatalogueCustomA5(" + jsStr(w) + "," + jsStr(h) + ")",
-        "khổ A5 " + w + "×" + h,
-        btnCatA5,
-      );
+    function validSize(w, h) {
+      var pw = parseFloat(String(w).replace(",", "."));
+      var ph = parseFloat(String(h).replace(",", "."));
+      return !isNaN(pw) && !isNaN(ph) && pw > 0 && ph > 0;
     }
-  });
 
-  // ---- Dàn CTL Offset (signature 8) ----
+    var btnCatA4 = document.getElementById("btnCatA4");
+    btnCatA4.addEventListener("click", function () {
+      if (selCatA4.value === "a4") {
+        runCat("dcRunCatalogueA4()", "A4", btnCatA4);
+      } else {
+        var w = document.getElementById("wCatA4").value;
+        var h = document.getElementById("hCatA4").value;
+        if (!validSize(w, h)) {
+          show(
+            outCatalogue,
+            "Nhập kích thước hợp lệ (rộng × cao, cm).",
+            "warn",
+          );
+          return;
+        }
+        runCat(
+          "dcRunCatalogueCustom(" + jsStr(w) + "," + jsStr(h) + ")",
+          "khổ " + w + "×" + h,
+          btnCatA4,
+        );
+      }
+    });
+
+    var btnCatA5 = document.getElementById("btnCatA5");
+    btnCatA5.addEventListener("click", function () {
+      if (selCatA5.value === "a5") {
+        runCat("dcRunCatalogueA5()", "A5", btnCatA5);
+      } else {
+        var w = document.getElementById("wCatA5").value;
+        var h = document.getElementById("hCatA5").value;
+        if (!validSize(w, h)) {
+          show(
+            outCatalogue,
+            "Nhập kích thước hợp lệ (rộng × cao, cm).",
+            "warn",
+          );
+          return;
+        }
+        runCat(
+          "dcRunCatalogueCustomA5(" + jsStr(w) + "," + jsStr(h) + ")",
+          "khổ A5 " + w + "×" + h,
+          btnCatA5,
+        );
+      }
+    });
+
+    // ---- Dàn CTL Offset (signature 8) ----
   }
 
   var btnCatalogueAuto = document.getElementById("btnCatalogueAuto");
@@ -3439,7 +3465,8 @@
     }
     show(outOffset, "Đang dàn keo gáy…");
     btnKeo.disabled = true;
-    var expr = loadKeoGayJsx() + "dcRunKeoGay(" + jsStr(w) + ", " + jsStr(h) + ")";
+    var expr =
+      loadKeoGayJsx() + "dcRunKeoGay(" + jsStr(w) + ", " + jsStr(h) + ")";
     cs.evalScript(expr, function (res) {
       btnKeo.disabled = false;
       handleRes(outOffset, res);
@@ -3598,7 +3625,8 @@
       el.addEventListener("change", asUpdatePreview);
     }
   });
-  if (asHopTheoThuTu) asHopTheoThuTu.addEventListener("change", asUpdatePreview);
+  if (asHopTheoThuTu)
+    asHopTheoThuTu.addEventListener("change", asUpdatePreview);
   // Lần ĐẦU focus (Tab tới, hoặc click vào ô chưa focus) -> bôi đen hết
   // để gõ đè nhanh. Click LẦN 2 trong ô đang focus -> đặt con trỏ bình
   // thường để sửa giữa chuỗi.

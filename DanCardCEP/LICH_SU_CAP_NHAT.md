@@ -2,6 +2,182 @@
 
 _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
+## v2.13.20 — Dựng lại lưới, PON và bóp của CTL Offset
+
+- *Khổ artboard cố định, không co theo khổ trang**
+- Trước đây artboard tính từ khổ trang nhập nên nhập 13×20 cm ra artboard 81,27×55,87 cm — một khổ giấy không có thật. Nay chỉ còn ba tờ cố định: **42,8×31,3** (bìa A5), **64,8×41,8** (tự trở 8 A5, TT4), **85,8×63,8** (ruột A5, A4 main).
+- Bài canh giữa theo chiều ngang tờ. Khổ trang chỉ quyết định bài nằm thế nào trên tờ, không đổi khổ tờ.
+- Trang quá lớn không lọt tờ thì báo lỗi rõ (dư bao nhiêu mm theo chiều nào), không âm thầm phình artboard ra.
+- *Lưới họ A5 tì vào mép dưới artboard**
+- Mọi khổ trang từ A5 trở xuống (≤ 15 × 21,15 cm) đều neo lưới vào mép dưới, lề thừa dồn lên trên. PON đáy vì vậy luôn bắt đầu từ đáy tờ với bất kỳ khổ trang nào.
+- Nhờ đó khổ tối đa 15 × 21,15 cm chạy được. Trước đây lề nhíp 24 mm cộng cứng làm bài cao 63,9 cm, dư đúng 1 mm so với tờ 63,8 cm nên bị chặn.
+- Họ A4 giữ nguyên cách treo từ mép trên xuống với lề nhíp cố định.
+- *Hằng số lưới giải lại từ ba khổ form chuẩn**
+- Các số 0,1766805 / 3,351722 / −0,647805 / 13,176 / 24,351972 mm là sai số đo từ file mẫu chứ không phải thiết kế. Giải ngược từ ba khổ chuẩn với trang A5 14,9 × 21,15 cm ra số nguyên: lề hông 0 / 22 / 3 mm, lề trên+dưới 15 / 0 / 27 mm.
+- Bỏ lề âm −0,65 mm của ruột A5 và bỏ luôn `fitLift`. Trước đây lưới lòi khỏi artboard 0,65 mm nên PON đáy vẽ ra ngoài giấy, phải nhấc artwork lên bù.
+- *PON cắt**
+- Thêm mốc ở biên trang bên trong mỗi nửa để cắt ra cụm 2 rồi xếp lại: ruột A5 từ 26 lên **44 nét**, tự trở 8 A5 từ 18 lên **22 nét**.
+- Mọi giao điểm đều là chữ L đủ (nét dọc quay vào rãnh trống kèm chân ngang), kể cả chỗ giao khe giữa với khe hàng 15 mm — trước đây chỗ đó chỉ có chân ngang.
+- Bỏ các số bù lắt nhắt `coverOuterLift` 0,2 mm và `coverBottomOutset` 0,3 mm; dấu nay nằm đúng trên đường cắt.
+- Thêm luật chung: không nét nào được nằm ngoài artboard. Mốc lọt ra ngoài bị kéo về mép và số lượng được báo trong dòng kết quả.
+- Số nét báo ra nay đếm thật, không còn trả số cứng 12 / 10.
+- *PON giấy**
+- Cùng khổ giấy thì cùng kiểu dấu. Trước đây trên cùng tờ 65×86, job A4 vẽ nét dọc 21,091 pt / nét 3,971 còn job A5 vẽ 21,53 pt / nét 1,997. Nay chỉ còn hai bộ: form lớn 18,766 / 21,091 / 3,971, form nhỏ 14,173 / 14,106 / 1,995.
+- *Gọn lại phần code**
+- Năm loại form gom về **một bản mô tả** mỗi loại (số cột, số hàng, khe, lề nhíp, tờ giấy, kiểu neo). Lưới danh định và cả hai loại PON đều sinh ra từ bản mô tả đó, thay cho năm nhánh code riêng.
+- Ba đoạn bóp viết trùng nhau ở ba chỗ gom về một hàm `squeezeAboutCentre`.
+- `dcRunSignature8` từ 2.292 xuống 2.103 dòng.
+- *Phần A4**
+- Topology PON của A4 giữ nguyên: A4 main 20 nét, TT4 10 nét, trùng khớp từng nét so với bản cũ khi cùng lưới; PON giấy không đổi.
+- Riêng khổ artboard A4 nay cũng cố định như A5 (85,8×63,8 và 64,8×41,8) thay vì tính động theo khổ trang.
+
+---
+
+## v2.13.19 — Khóa ruột A5 vào artboard khi bóp tâm
+
+- Sửa riêng ruột A5 16/32 trang: khi bóp từng cụm 2 trang quanh tâm, cụm ruột đầu được nâng đúng phần mép còn vượt (0,147805 mm với tờ 1). Bài không còn tràn đáy artboard.
+- Không đổi kích thước/artboard, không đổi lưới PON giấy hay PON cắt, và không kéo PON theo ruột. Khe đóng ghim vẫn là khe.
+- Giữ nguyên topology PON L của mẫu A5 65×86: mốc ở đầu/cuối cụm 2 trang và khe 15 mm. Không tự ý thêm mốc tại seam từng trang khi chưa đổi quy cách PON.
+
+---
+
+## v2.13.18 — PON đáy A5 65×86 và bóp tâm cụm 2 trang
+
+- PON cắt đáy của form A5 65×86 nay dài đúng 4 mm và kết thúc tại tâm PON giấy/baseline artboard, khớp file mẫu; không còn dừng sớm 0,352 mm trùng với đáy ruột đã bóp.
+- A5 ruột 16/32 trang bóp từng cụm 2 trang quanh tâm cụm. Khe giữa vẫn là khe (không có đường cắt qua), và PON giấy/PON cắt vẫn đứng yên trên lưới khổ gốc.
+- Đã đối chiếu form 43×32.5: giữ nguyên đủ 12 PON cắt của mẫu, không thêm hoặc dịch PON bìa.
+
+---
+
+## v2.13.17 — Khóa PON CTL Offset vào lưới gốc
+
+- Tất cả group/resize/translate của CTL Offset nay ghi thẳng vào layer bài, không còn phụ thuộc `activeLayer` trong lúc ruột đang bóp.
+- Sau khi dàn, bóp và thêm ghi chú xong, tool đối chiếu lại tọa độ PON giấy/PON cắt với lưới danh nghĩa ban đầu, khôi phục nếu có thay đổi bất thường, rồi khóa và đưa hai layer PON lên trên cùng.
+- Giữ nguyên tọa độ/topology PON 65×86 A5 của hai file mẫu: PON không nhận bất kỳ độ bóp nào theo `sheetNo`.
+
+---
+
+## v2.13.16 — Không đưa PON cũ vào ruột khi chạy lại CTL Offset
+
+- Xóa đúng hai layer PON do CTL Offset tạo (`Pon CTL Offset tu dong` và `Pon cat CTL Offset tu dong`) trước khi đọc selection/raster nguồn.
+- Nhờ vậy PON của lần dàn trước không thể bị raster hóa rồi bóp cùng ruột, trong khi PON mới vẫn đứng ở lưới khổ gốc.
+- Tăng mã nạp ExtendScript để Illustrator bắt buộc đọc bản sửa này trong engine đang mở.
+
+---
+
+## v2.13.15 — Sửa lỗi nạp ExtendScript
+
+- Đổi tên đơn vị inch thành `"in"` trong toàn bộ object JavaScript. Illustrator ExtendScript coi `in` không có dấu nháy là từ khóa dành riêng, khiến CTL Offset không thể nạp.
+
+---
+
+## v2.13.14 — Nạp lại lưới CTL Offset sau overwrite
+
+- Tăng mã nạp CTL Offset để Illustrator bắt buộc đọc lại phần dàn bình đã khôi phục, không dùng hàm cũ còn giữ trong bộ nhớ ExtendScript.
+- Giữ nguyên quy tắc v2.13.13: artboard/PON lấy từ lưới khổ gốc; chỉ artwork ruột bóp dần; A5 16/32 trang giữ nguyên khe 15 mm.
+- PON giấy giữ quy tắc CTL Offset: tâm bốn nét nằm trên biên artboard; khổ artboard không đổi.
+
+---
+
+## v2.13.13 — Lưới PON CTL Offset theo khổ gốc
+
+- Thay toàn bộ khổ artboard cố định bằng một lưới danh nghĩa theo đúng kích thước 1 trang nhập. Khổ nhỏ hơn A4/A5 vẫn tự tính artboard, PON giấy và PON cắt theo bố cục tương ứng.
+- Quy tắc luồng được khóa lại: bìa ở đúng khổ gốc; mỗi ruột bóp dần 1 mm/tờ trên artwork; PON cắt, PON giấy và artboard luôn giữ lưới khổ gốc trước bóp.
+- A5 ruột 16/32 trang bóp riêng từng block 2 trang, ghim cạnh trong để khe 15 mm không đổi. Với trang rộng 15 cm, ruột 1 co đúng còn 14.95 cm thay vì 14.9756 cm.
+- A4 TT4/TT8/A-B bỏ hoàn toàn công thức làm PON chạy theo `sheetNo`; TT8/A-B có lại bốn PON ngắn ở hàng giữa, không hề tạo đường cắt dài qua khe đóng ghim.
+- PON cắt A5 bìa/ruột dùng cùng lưới danh nghĩa; form 65×86 giữ đủ topology 36 nét của file mẫu. PON chỉ đảo hướng khi đầu nét chuẩn bị vượt mép artboard.
+- Ghi chú A5 dùng vùng trống đo từ hai file mẫu (bìa và ruột chính); SMALL8 đặt nhãn ngoài giấy vì không có vùng trống an toàn trong lưới.
+
+---
+
+## v2.13.12 — Chốt ba form CTL Offset A5 theo file mẫu
+
+- Khóa artboard theo tâm bốn PON giấy: A5 4 trang = 42.8 × 31.3 cm, A5 8 trang = 64.8 × 41.8 cm, A5 16 trang/A-B = 85.8 × 63.8 cm. Hai form có số lẻ vẫn giữ trị số chính xác trong file để Illustrator hiển thị đúng kích thước mẫu.
+- PON cắt bìa A5 42.8 × 31.3 khớp 12 nét của file mẫu, gồm hai chân ngang ở khe 5 mm và hai mốc đáy lệch ra 0.3 mm; không có đường cắt qua hàng giữa.
+- PON cắt ruột A5 85.8 × 63.8 khớp 34 nét của file mẫu: đủ cả hai chân trái/phải ở tim khe dọc, bảy mốc đầu trên, hai mép khe ngang 15 mm và ba mốc đáy trung tâm. Khe ngang vẫn là khe gấp/xả, không phải đường cắt.
+- A5 8 trang dùng lưới trim 20.9 cm/hàng trong artboard 64.8 × 41.8; nguồn A5 cao 21.15 cm giữ phần bleed chồng 1.25 mm ở hai mép ngoài và 2.5 mm ở khe hàng.
+- Xác nhận A4 riêng biệt: TT4 vẫn 64.8 × 41.8, TT8/A-B vẫn 85.8 × 63.8; PON cắt bám mép bài sau bóp 1 mm/tờ, không thêm PON ở khe ngang đóng ghim.
+
+---
+
+## v2.13.11 — PON bám bài A4 sau bóp
+
+- Giữ nguyên bóp 1 mm/tờ của CTL Offset A4; trang 20 cm thành 19.95 cm ở nửa cụm là đúng quy cách bóp.
+- PON cắt TT4, TT8 và A/B A4 nay tính theo mép thực sau bóp: hai mép ngoài vào squeeze/2, hai mép khe giữa ra squeeze/2. PON không còn lệch tổng 2 mm so với bài.
+- Kích thước artboard và PON giấy không đổi: 65×86 A4 vẫn là 85.8 × 63.8 cm, tâm bốn PON giấy nằm trên biên artboard.
+
+---
+
+## v2.13.10 — Sửa form A4 65×86
+
+- Artboard CTL Offset A4 65×86 là 85.8 × 63.8 cm, không còn dùng chiều cao 62.5 cm của form cũ.
+- Bỏ dịch 2 mm ở hai mốc ngoài của PON cắt A4 65×86: PON nay bám đúng mép cụm bài.
+- Với PON giấy của Dàn Offset và CTL Offset, biên artboard luôn đi qua tâm của cả bốn nét PON, đúng mốc kích thước trong Illustrator.
+
+---
+
+## v2.13.9 — CTL Offset A5 khớp hai form mẫu
+
+- Dàn 65×86 A5 được dựng lại đúng form mẫu: lưới 4×4 xoay, khe dọc 6 mm và khe ngang 15 mm; khe ngang là vùng xả/gấp, không phải đường cắt.
+- PON cắt 65×86 bám đúng 31 mốc của form mẫu: bảy mốc đầu trên, các mốc ở hai phía khe ngang và ba mốc đáy trung tâm; không đánh PON ở đường chia trang không cần cắt.
+- PON cắt 43×32.5 dùng đúng hai dấu L ngoài và ba mốc trong khe 5 mm, không thêm PON vào đường chia hàng.
+- Tách PON giấy hai form: 43×32.5 dùng góc 3 mm/1 pt; 65×86 dùng góc 18.766 × 21.53 pt/1.997 pt. Cả hai lấy biên artboard làm tâm nét PON.
+- Bỏ PON ngang giữa của form A4 65×86 vì đó là khe gấp/đóng ghim, không phải đường cắt.
+
+---
+
+## v2.13.8 — Chuẩn hoá PON cắt CTL Offset theo mép xả
+
+- Tách rõ đường chia bố cục và mép có PON: không còn tự đánh PON cắt ở đường chia hàng của 43×32.5, 65×43 và 65×86 A5.
+- Khôi phục năm mốc dọc của form A4 65×43 (hai mép ngoài và ba mốc khe dọc), không đánh dấu trên khe ngang giữa hai hàng.
+- Form A5 65×86 giữ ba mốc khe giữa, bổ sung hai mốc giữa từng panel ở đầu trên/dưới; bỏ các mốc sai trên mép hàng.
+- PON mặc định hướng ra ngoài; chỉ lật vào trong khi đầu nét sẽ chạm mép artboard.
+
+---
+
+## v2.13.7 — Hoàn thiện PON cắt ngang A5
+
+- A5 có PON ở hai đầu mọi đường cắt ngang của lưới; chỉ đánh dấu, không vẽ đè đường cắt lên bài.
+- Sửa hướng PON góc ngoài phía trên của form 43×32.5 để luôn hướng ra ngoài cụm bài.
+
+---
+
+## v2.13.6 — Hoàn nguyên PON CTL Offset, sửa ghi chú CTL KTS
+
+- Hoàn nguyên kiểu PON CTL Offset sau phần thử theo ảnh KTS; giữ bộ PON trước đó.
+- Ghi chú Catalogue/CTL KTS bám vùng trống ngay phía trên cụm bài, không bám cố định theo mép giấy.
+
+---
+
+## v2.13.5 — Hoàn tất PON cắt ngang CTL Offset
+
+- Mỗi đường cắt ngang giữa hai hàng có dấu PON ở cả mép trái và mép phải của cụm bài.
+- Áp dụng cho 43×32.5, 65×43, 65×86 tự trở và A/B, cho cả nhánh A5 lẫn A4.
+
+---
+
+## v2.13.4 — PON cắt CTL Offset theo kiểu KTS
+
+- Hai biên ngoài của mọi khổ CTL Offset dùng dấu L cùng kích thước và hướng như PON cắt KTS.
+- Mốc cắt ở các khe giữa vẫn theo đúng lưới từng kiểu dàn; PON giấy 4 góc không thay đổi.
+
+---
+
+## v2.13.3 — Rà PON CTL Offset và ghi chú A5
+
+- PON cắt 65×86 A5 (tự trở và A/B) có đủ hai biên ngoài cùng ba mốc khe giữa.
+- PON cắt 43×32.5 có đủ mốc cắt dưới; PON 65×86 A4 bỏ độ lệch 2 mm ở hai biên ngoài.
+- Tất cả ghi chú CTL KTS A5 dùng đúng vị trí trong artboard đã chuẩn hoá ở dàn A4.
+
+---
+
+## v2.13.1 — Bổ sung PON giấy và PON cắt A5
+
+- Dàn Offset tự trở vẽ PON giấy đủ bốn góc trên layer riêng, với mọi khổ giấy nhập.
+- CTL Offset A5 nạp lại bộ vẽ PON; khổ 65×43 có đủ năm mốc cắt ở đầu trên và dưới.
+
+---
+
 ## v2.13.0 — Hoàn chỉnh dàn tự trở
 
 - Hoàn chỉnh dàn tự trở

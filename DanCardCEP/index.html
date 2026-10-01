@@ -453,7 +453,8 @@
               và nén nhiều khổ vào chung nửa tờ bằng bố cục guillotine: mọi cụm đều có
               đường ra cho dao cắt thẳng, không tạo hốc bị khóa. Bóp chỉ dùng khi nhờ đó
               dàn thêm được cặp. Hai nửa tự trở dính sát tim tờ, không có khe giữa. Bóp
-              0 mm là giữ nguyên kích thước bài, không đánh PON.
+              0 mm là giữ nguyên kích thước bài, không sinh PON cắt. Tờ giấy tự sinh luôn có
+              PON giấy ở đủ bốn góc trên layer riêng.
             </p>
             <p class="hint">
               Mỗi cặp ăn một chỗ trên tờ. Tool không ưu tiên thứ tự chọn: khổ nào không
@@ -615,9 +616,10 @@
         <div class="field">
           <div class="label">Dàn CTL Offset (bấm ghim giữa, tự chọn khổ)</div>
           <p class="hint">
-            Chọn các trang theo thứ tự đọc. Tool tự tạo artboard và vẽ PON
-            theo form CTL Offset. Tối đa 15 × 21.15 cm tự dàn kiểu A5; lớn hơn
-            sẽ tự dàn kiểu A4.
+            Chọn các trang theo thứ tự đọc. Khổ nhập là khổ gốc: tool dựng
+            lưới, artboard và PON theo khổ đó trước; sau đó chỉ bóp dần artwork
+            các tờ ruột. Tối đa 15 × 21.15 cm dùng bố cục A5; lớn hơn dùng bố
+            cục A4.
           </p>
         </div>
 
@@ -629,10 +631,10 @@
           </button>
           <div class="acc-body" id="acc-offSig">
             <p class="hint">
-              Bội số của 4, dàn lồng từ ngoài vào trong. Khổ đến 15 × 21.15 cm:
-              4 trang = 43×32.5, 8 trang = 65×43, 16 trang = 65×86, 32 trang =
-              65×86 A/B. Khổ lớn hơn dùng logic A4 hiện có. PON giấy và PON cắt
-              được vẽ tự động; không cần chọn file PON.
+              Bội số của 4, dàn lồng từ ngoài vào trong. Kích thước artboard,
+              PON giấy và PON cắt tự tính theo khổ gốc nhập; PON cắt giữ lưới
+              gốc khi ruột bị bóp dần. PON chỉ quay hướng khi đầu nét chuẩn bị
+              chạm/vượt mép artboard, không vẽ đường cắt dài qua khe đóng ghim.
             </p>
             <div class="field">
               <div class="label">Kích thước 1 trang (cm)</div>
@@ -847,7 +849,7 @@
       </main>
 
       <footer class="foot">
-        <span class="ver">v2.13.0</span>
+          <span class="ver">v2.13.20</span>
       </footer>
     </div>
 
