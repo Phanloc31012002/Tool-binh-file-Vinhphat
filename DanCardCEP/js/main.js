@@ -1374,10 +1374,10 @@
       var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
       var danBeBridgePath = extensionRoot + "/jsx/dan_be_bridge.jsx";
       return (
-        "if (typeof dcDanToiUu !== 'function' || typeof dcCopyToiUuNoteToOddArtboards !== 'function' || typeof dcDanToiUuVersion === 'undefined' || dcDanToiUuVersion < 15) { $.evalFile(" +
+        "if (typeof dcDanToiUu !== 'function' || typeof dcCopyToiUuNoteToOddArtboards !== 'function' || typeof dcDanToiUuVersion === 'undefined' || dcDanToiUuVersion < 16) { $.evalFile(" +
         jsStr(jsxPath) +
         "); } " +
-        "if (typeof dcDanBePrepare !== 'function' || typeof dcDanBeRender !== 'function' || typeof dcDanBeNestingVersion === 'undefined' || dcDanBeNestingVersion < 4) { $.evalFile(" +
+        "if (typeof dcDanBePrepare !== 'function' || typeof dcDanBeRender !== 'function' || typeof dcDanBeNestingVersion === 'undefined' || dcDanBeNestingVersion < 7) { $.evalFile(" +
         jsStr(danBeBridgePath) + "); } "
       );
     } catch (e) {
@@ -1600,7 +1600,7 @@
     });
   }
 
-  // ---- Dàn bế decal: đọc PON AI, dàn biên thật của bài + khuôn ----
+  // ---- Dàn bế decal/tag: tự tạo PON, dàn biên thật của bài + khuôn ----
   var btnDanBe = document.getElementById("btnDanBe");
   var outDanBe = document.getElementById("outDanBe");
   if (btnDanBe && outDanBe) {
@@ -1611,11 +1611,30 @@
       var beGap = beGapEl ? beGapEl.value || "2" : "2";
       var beMargin = beMarginEl ? beMarginEl.value || "4" : "4";
       var bePon = bePonEl ? bePonEl.value || "7.5" : "7.5";
-      show(outDanBe, "Đang chọn file PON và tính dàn bế…");
+      var bePaperWEl = document.getElementById("bePaperW");
+      var bePaperHEl = document.getElementById("bePaperH");
+      var bePonTopEl = document.getElementById("bePonTop");
+      var bePonBottomEl = document.getElementById("bePonBottom");
+      var bePonLeftEl = document.getElementById("bePonLeft");
+      var bePonRightEl = document.getElementById("bePonRight");
+      var bePaperW = bePaperWEl ? bePaperWEl.value || "33" : "33";
+      var bePaperH = bePaperHEl ? bePaperHEl.value || "35.4" : "35.4";
+      var bePonTop = bePonTopEl ? bePonTopEl.value || "10" : "10";
+      var bePonBottom = bePonBottomEl ? bePonBottomEl.value || "10" : "10";
+      var bePonLeft = bePonLeftEl ? bePonLeftEl.value || "10" : "10";
+      var bePonRight = bePonRightEl ? bePonRightEl.value || "10" : "10";
+      var beMultiEl = document.getElementById("beMultiPerArtboard");
+      var beMulti = !!(beMultiEl && beMultiEl.checked);
+      var beTwoEl = document.getElementById("beTwoSided");
+      var beTwo = !!(beTwoEl && beTwoEl.checked);
+      show(outDanBe, "Đang đo khuôn và tạo PON theo khổ giấy nhập…");
       btnDanBe.disabled = true;
       cs.evalScript(
         loadDanToiUuJsx() + "dcDanBePrepare(" + jsStr(beGap) + ", " +
-          jsStr(beMargin) + ", " + jsStr(bePon) + ")",
+          jsStr(beMargin) + ", " + jsStr(bePon) + ", " + (beTwo ? "true" : "false") + ", " +
+          JSON.stringify(String(bePaperW)) + ", " + JSON.stringify(String(bePaperH)) + ", " +
+          JSON.stringify(String(bePonTop)) + ", " + JSON.stringify(String(bePonBottom)) + ", " +
+          JSON.stringify(String(bePonLeft)) + ", " + JSON.stringify(String(bePonRight)) + ")",
         function (prepared) {
           var preparedText = String(prepared || "");
           if (preparedText.indexOf("OKJSON:") !== 0) {
@@ -1638,13 +1657,50 @@
             return;
           }
 
-          show(outDanBe, "Dang tim cach long khuon theo duong bao that...");
-          // Yield once so Chromium can repaint the status before doing the
-          // bounded geometry search. The nesting core never calls Illustrator.
-          window.setTimeout(function () {
+          if (!payload || !payload.types || !payload.types.length) {
+            btnDanBe.disabled = false;
+            show(outDanBe, "ERR: Không có mẫu khuôn hợp lệ để dàn.");
+            return;
+          }
+          var separate = !beMulti && payload.types.length > 1;
+          var planCount = separate ? payload.types.length : 1;
+          var plans = [], planIndex = 0, totalCount = 0, cachedPlans = {};
+
+          function renderPlans() {
+            var layout = separate ? { sheets: plans } : plans[0].slots;
+            var report = { detail: plans[0].detail, mode: plans[0].mode };
+            show(outDanBe, separate ?
+              "Đã tính " + planCount + " tờ riêng" + (beTwo ? " hai mặt" : "") + ", tổng " + totalCount + " con; đang vẽ…" :
+              "Đã tìm " + totalCount + " con; đang vẽ " + (beTwo ? "cặp trước/sau, Khuôn và PON…" : "Khuôn, Bài và PON…"));
+            cs.evalScript(
+              loadDanToiUuJsx() +
+                "dcDanBeRender(" + jsStr(payload.jobId) + ", " +
+                jsStr(JSON.stringify(layout)) + ", " +
+                jsStr(JSON.stringify(report)) + ")",
+              function (rendered) {
+                btnDanBe.disabled = false;
+                showCountResult(outDanBe, rendered);
+              },
+            );
+          }
+
+          function searchPlan() {
             var result;
             try {
-              result = window.DanBeNester.nest(payload);
+              var input = payload, cacheKey = null;
+              if (separate) {
+                input = {};
+                for (var key in payload) {
+                  if (Object.prototype.hasOwnProperty.call(payload, key)) input[key] = payload[key];
+                }
+                input.types = [payload.types[planIndex]];
+                // Reuse only exactly identical cut contours on the same sheet.
+                // Clone before remapping mi; never mutate a cached local plan.
+                cacheKey = JSON.stringify(input.types[0].groups);
+              }
+              result = cacheKey && cachedPlans[cacheKey] ? cachedPlans[cacheKey] :
+                window.DanBeNester.nest(input);
+              if (cacheKey && result && result.ok) cachedPlans[cacheKey] = result;
             } catch (nestError) {
               btnDanBe.disabled = false;
               show(outDanBe, "ERR: " + (nestError && nestError.message ? nestError.message : nestError));
@@ -1655,18 +1711,31 @@
               show(outDanBe, "ERR: " + (result && result.error ? result.error : "Khong tim duoc cach dan hop le."));
               return;
             }
-            show(outDanBe, "Da tim " + result.count + " con; dang ve Khuon, Bai va PON...");
-            cs.evalScript(
-              loadDanToiUuJsx() +
-                "dcDanBeRender(" + jsStr(payload.jobId) + ", " +
-                jsStr(JSON.stringify(result.slots)) + ", " +
-                jsStr(JSON.stringify({ detail: result.detail, mode: result.mode })) + ")",
-              function (rendered) {
-                btnDanBe.disabled = false;
-                showCountResult(outDanBe, rendered);
-              },
-            );
-          }, 20);
+            if (!result.slots || !result.slots.length) {
+              btnDanBe.disabled = false;
+              show(outDanBe, "ERR: Mẫu " + (planIndex + 1) + " không có vị trí dàn hợp lệ.");
+              return;
+            }
+            var slots = JSON.parse(JSON.stringify(result.slots));
+            if (separate) {
+              for (var slotIndex = 0; slotIndex < slots.length; slotIndex++) slots[slotIndex].mi = planIndex;
+            }
+            plans.push({ modelIndex: planIndex, slots: slots, detail: result.detail, mode: result.mode });
+            totalCount += slots.length;
+            planIndex++;
+            if (planIndex < planCount) queuePlan();
+            else renderPlans();
+          }
+
+          function queuePlan() {
+            show(outDanBe, separate ?
+              "Đang dàn mẫu " + (planIndex + 1) + "/" + planCount + " trên tờ riêng…" :
+              "Đang tìm cách lồng khuôn theo đường bao thật…");
+            // Let Chromium repaint between models. No Illustrator objects are
+            // created until every plan has succeeded.
+            window.setTimeout(searchPlan, 20);
+          }
+          queuePlan();
         },
       );
     });
@@ -2068,7 +2137,7 @@
           btnHocMau.disabled = false;
           show(
             outHocMau,
-            "Chọn đúng 1 con mẫu cùng chiều với con nguồn trong Illustrator, rồi bấm Xác nhận con chuẩn.",
+            "Chọn 1 con mẫu cùng chiều nguồn → Xác nhận con chuẩn.",
           );
           return;
         }
@@ -2083,7 +2152,7 @@
           btnHocMau.disabled = false;
           show(
             outHocMau,
-            "Chọn đúng 1 con mẫu cùng chiều với con nguồn trong Illustrator, rồi bấm Xác nhận con chuẩn.",
+            "Chọn 1 con mẫu cùng chiều nguồn → Xác nhận con chuẩn.",
           );
           return;
         } else {

@@ -1,10 +1,10 @@
 // ============================================================
 // DÀN BẾ – CẦU NỐI ILLUSTRATOR <-> nesting_core.js
 //
-// ExtendScript chỉ đọc path / PON và render. Phần tối ưu hình học chạy ở
+// ExtendScript đọc path, tự tạo PON và render. Phần tối ưu hình học chạy ở
 // Chromium của CEP để Illustrator không bị treo khi thử nhiều bố cục.
 // ============================================================
-var dcDanBeNestingVersion = 4;
+var dcDanBeNestingVersion = 7;
 if (typeof dcDanBeJobs === "undefined") var dcDanBeJobs = {};
 if (typeof dcDanBeJobCounter === "undefined") var dcDanBeJobCounter = 1;
 
@@ -88,7 +88,98 @@ var dcDanBeJSON = (function () {
   return { stringify: stringify, parse: parse };
 })();
 
-function dcDanBePrepare(gapText, marginText, ponClearText) {
+// Resolve selected triples by geometry, never by selection/z-order. The roles
+// remain locked for all copies and both faces of the eventual sheet.
+function dcDanBeTripleModels(selection, epsilon) {
+  var EPS = epsilon || 0.01, pending = [], models = [], i, bounds;
+  if (!selection || !selection.length || selection.length % 3)
+    throw new Error("Dàn bế 2 mặt cần chọn đủ bộ 3: Khuôn bên trái → mặt trước → mặt sau, cùng hàng.");
+  for (i = 0; i < selection.length; i++) {
+    bounds = null;
+    try { bounds = selection[i].geometricBounds.slice(0); } catch (geometricError) {}
+    if (!bounds) try { bounds = selection[i].visibleBounds.slice(0); } catch (visibleError) {}
+    if (!bounds || bounds[2] - bounds[0] <= EPS || bounds[1] - bounds[3] <= EPS)
+      throw new Error("Không đo được object " + (i + 1) + " trong bộ Khuôn/trước/sau.");
+    pending.push({ item: selection[i], bounds: bounds,
+      cx: (bounds[0] + bounds[2]) / 2, cy: (bounds[1] + bounds[3]) / 2 });
+  }
+  pending.sort(function (a, b) { return a.cy === b.cy ? a.cx - b.cx : b.cy - a.cy; });
+  while (pending.length) {
+    var anchor = pending.shift(), row = [anchor], high = anchor.cy, low = anchor.cy;
+    var minHeight = anchor.bounds[1] - anchor.bounds[3];
+    for (i = 0; i < pending.length; i++) {
+      var candidate = pending[i], height = Math.min(minHeight, candidate.bounds[1] - candidate.bounds[3]);
+      var nextHigh = Math.max(high, candidate.cy), nextLow = Math.min(low, candidate.cy);
+      if (nextHigh - nextLow <= height * .25 + EPS) {
+        row.push(candidate); pending.splice(i--, 1);
+        high = nextHigh; low = nextLow; minHeight = height;
+      }
+    }
+    if (row.length % 3)
+      throw new Error("Hàng nguồn chưa đủ Khuôn → mặt trước → mặt sau. Hãy canh hàng và chọn đủ 3 object cho mỗi mẫu.");
+    row.sort(function (a, b) { return a.cx - b.cx; });
+    for (i = 0; i < row.length; i += 3) {
+      if (row[i + 1].cx - row[i].cx <= EPS || row[i + 2].cx - row[i + 1].cx <= EPS)
+        throw new Error("Không phân biệt được thứ tự trái/phải. Đặt Khuôn → mặt trước → mặt sau cạnh nhau.");
+      models.push({ khuon: row[i], bai: row[i + 1], sau: row[i + 2] });
+    }
+  }
+  return models;
+}
+
+// Same upper-left, left-to-right canvas allocation as Dàn KTS. Reserve every
+// sheet (or duplex pair) before writing anything into the source document.
+function dcDanBeOutputPositions(paperW, paperH, twoSided, count, scaleFactor, existingRects, sourceBounds, MM) {
+  var EPS = 0.01, halfSize = 7200, pageGap = 10 * MM, occupied = [], positions = [], i;
+  if (isFinite(scaleFactor) && scaleFactor > 0 && scaleFactor < 1) halfSize /= scaleFactor;
+  var left = -halfSize + pageGap, top = halfSize - pageGap;
+  var right = halfSize - pageGap, bottom = -halfSize + pageGap;
+  var bundleW = twoSided ? paperW * 2 + pageGap : paperW;
+  if (!isFinite(paperW) || !isFinite(paperH) || paperW <= 0 || paperH <= 0 ||
+      !isFinite(count) || count < 1 || Math.floor(count) !== count ||
+      bundleW > right - left + EPS || paperH > top - bottom + EPS)
+    throw new Error("Khổ tờ/cặp hai mặt vượt giới hạn canvas. Hãy giảm khổ hoặc mở Large Canvas.");
+  function overlaps(a, b) {
+    return a[0] < b[2] - EPS && a[2] > b[0] + EPS && a[3] < b[1] - EPS && a[1] > b[3] + EPS;
+  }
+  function contains(a, b) {
+    return a[0] <= b[0] + EPS && a[1] >= b[1] - EPS && a[2] >= b[2] - EPS && a[3] <= b[3] + EPS;
+  }
+  for (i = 0; i < existingRects.length; i++) {
+    var existing = existingRects[i];
+    // A whole-canvas work frame is not a printed sheet to avoid (same as KTS).
+    if (existing[2] - existing[0] >= halfSize * 1.84 && existing[1] - existing[3] >= halfSize * 1.84) continue;
+    occupied.push(existing.slice(0));
+  }
+  if (sourceBounds) {
+    var covered = false;
+    for (i = 0; i < occupied.length; i++) if (contains(occupied[i], sourceBounds)) { covered = true; break; }
+    if (!covered) occupied.push(sourceBounds.slice(0));
+  }
+  var cursorLeft = left, cursorTop = top;
+  for (var sheetIndex = 0; sheetIndex < count; sheetIndex++) {
+    var candidateLeft = cursorLeft, candidateTop = cursorTop, reserved = false;
+    for (var attempt = 0; attempt < 5000; attempt++) {
+      if (candidateLeft + bundleW > right + EPS) {
+        candidateLeft = left; candidateTop -= paperH + pageGap; continue;
+      }
+      if (candidateTop - paperH < bottom - EPS)
+        throw new Error("Không còn chỗ trong canvas để tạo đủ tờ. Hãy bớt artboard cũ hoặc mở Large Canvas.");
+      var bundle = [candidateLeft, candidateTop, candidateLeft + bundleW, candidateTop - paperH], blocker = null;
+      for (i = 0; i < occupied.length; i++) if (overlaps(bundle, occupied[i])) { blocker = occupied[i]; break; }
+      if (blocker) { candidateLeft = blocker[2] + pageGap; continue; }
+      occupied.push(bundle);
+      positions.push([candidateLeft, candidateTop, candidateLeft + paperW, candidateTop - paperH]);
+      cursorLeft = candidateLeft + bundleW + pageGap; cursorTop = candidateTop;
+      reserved = true; break;
+    }
+    if (!reserved) throw new Error("Không tìm được vị trí trong canvas để đặt artboard mới.");
+  }
+  return positions;
+}
+
+function dcDanBePrepare(gapText, marginText, ponClearText, twoSidedArg,
+    paperWText, paperHText, ponTopText, ponBottomText, ponLeftText, ponRightText) {
   var oldCoordinateSystem = null, restoreCoordinateSystem = false;
   try {
     if (app.documents.length === 0) return "ERR: Chưa mở tài liệu nào.";
@@ -101,19 +192,45 @@ function dcDanBePrepare(gapText, marginText, ponClearText) {
     } catch (coordinateError) {}
     var doc = app.activeDocument;
     var MM = 2.834645669, EPS = 0.01;
+    var twoSided = twoSidedArg === true;
 
     function fail(message) { throw new Error(message); }
     function numberValue(value, label, min, max, dflt) {
-      var t = String(value === undefined || value === null ? "" : value).replace(",", ".");
+      var t = String(value === undefined || value === null ? "" : value).replace(/^\s+|\s+$/g, "").replace(",", ".");
       if (t === "") return dflt;
-      var n = parseFloat(t);
+      if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(t)) fail(label + " phải là số.");
+      var n = Number(t);
       if (!isFinite(n)) fail(label + " phải là số.");
-      if (n < min - EPS || n > max + EPS) fail(label + " nằm ngoài phạm vi cho phép.");
+      if (n < min || n > max) fail(label + " nằm ngoài phạm vi cho phép.");
       return n;
     }
     var gap = numberValue(gapText, "Khe giữa 2 khuôn", 0, 50, 2) * MM;
     var margin = numberValue(marginText, "Khuôn cách mép tờ", 0, 100, 4) * MM;
     var ponClear = numberValue(ponClearText, "Né PON", 0, 100, 7.5) * MM;
+    // User offsets measure from the artboard edge to the centre of each dot.
+    // The fixed 0.5 cm registration dot has a 2.5 mm radius.
+    var paperW = numberValue(paperWText, "Rộng tờ (cm)", 0.5, 5000, 33) * 10 * MM;
+    var paperH = numberValue(paperHText, "Cao tờ (cm)", 0.5, 5000, 35.4) * 10 * MM;
+    var ponRadius = 2.5 * MM;
+    var ponTop = numberValue(ponTopText, "PON cách trên (mm)", 2.5, 50000, 10) * MM;
+    var ponBottom = numberValue(ponBottomText, "PON cách dưới (mm)", 2.5, 50000, 10) * MM;
+    var ponLeft = numberValue(ponLeftText, "PON cách trái (mm)", 2.5, 50000, 10) * MM;
+    var ponRight = numberValue(ponRightText, "PON cách phải (mm)", 2.5, 50000, 10) * MM;
+    if (paperW - ponLeft - ponRight < ponRadius * 2 - 0.0000001 ||
+        paperH - ponTop - ponBottom < ponRadius * 2 - 0.0000001)
+      fail("Khổ tờ và khoảng PON không hợp lệ: bốn chấm phải nằm trong tờ, không chồng nhau.");
+    if (margin * 2 >= Math.min(paperW, paperH) - EPS)
+      fail("Lề khuôn quá lớn, không còn vùng dàn trong tờ.");
+    var pon = { rect: [0, paperH, paperW, 0], name: "PON tự tạo", dots: [
+      { cx: ponLeft, cy: paperH - ponTop, r: ponRadius },
+      { cx: paperW - ponRight, cy: paperH - ponTop, r: ponRadius },
+      { cx: ponLeft, cy: ponBottom, r: ponRadius },
+      { cx: paperW - ponRight, cy: ponBottom, r: ponRadius }
+    ] };
+    var canvasScale = 1;
+    try { canvasScale = doc.scaleFactor; } catch (canvasScaleError) {}
+    // Reject an oversized sheet before spending time searching a layout.
+    dcDanBeOutputPositions(paperW, paperH, twoSided, 1, canvasScale, [], null, MM);
 
     function geometricBoundsOf(item) {
       try { return item.geometricBounds.slice(0); } catch (e) {}
@@ -242,6 +359,8 @@ function dcDanBePrepare(gapText, marginText, ponClearText) {
         var n = normalise(doc.layers[i].name);
         if (role === "cut" && (n.indexOf("khuon") >= 0 || n.indexOf("die") >= 0 || n.indexOf("cut") >= 0)) return doc.layers[i];
         if (role === "art" && (n.indexOf("bai") >= 0 || n.indexOf("object") >= 0 || n.indexOf("artwork") >= 0 || n.indexOf("hinh") >= 0)) return doc.layers[i];
+        if (role === "front" && (n.indexOf("mat truoc") >= 0 || n.indexOf("front") >= 0)) return doc.layers[i];
+        if (role === "back" && (n.indexOf("mat sau") >= 0 || n.indexOf("back") >= 0)) return doc.layers[i];
       }
       return null;
     }
@@ -260,6 +379,33 @@ function dcDanBePrepare(gapText, marginText, ponClearText) {
     function sourceModels() {
       var models = [], sel = null, si, sb;
       try { sel = doc.selection; } catch (e) {}
+      if (twoSided) {
+        if (sel && sel.length) return dcDanBeTripleModels(sel, EPS);
+        var tripleCutLayer = findLayer("cut"), frontLayer = findLayer("front"), backLayer = findLayer("back");
+        if (!tripleCutLayer || !frontLayer || !backLayer || tripleCutLayer === frontLayer ||
+            tripleCutLayer === backLayer || frontLayer === backLayer)
+          fail("Dàn bế 2 mặt: chọn từng bộ Khuôn → mặt trước → mặt sau, hoặc dùng 3 layer Khuôn bế, Mặt trước, Mặt sau.");
+        var tripleCuts = layerItems(tripleCutLayer, true), fronts = layerItems(frontLayer, false), backs = layerItems(backLayer, false);
+        if (!tripleCuts.length || fronts.length !== tripleCuts.length || backs.length !== tripleCuts.length)
+          fail("Ba layer Khuôn bế, Mặt trước, Mặt sau cần cùng số mẫu, không được thiếu mặt.");
+        var usedFronts = {}, usedBacks = {};
+        function nearestUnused(cut, items, used) {
+          var bestIndex = -1, bestDistance = 1e99;
+          for (var ni = 0; ni < items.length; ni++) {
+            if (used[ni]) continue;
+            var nx = items[ni].cx - cut.cx, ny = items[ni].cy - cut.cy;
+            var distance = nx * nx + ny * ny;
+            if (distance < bestDistance) { bestDistance = distance; bestIndex = ni; }
+          }
+          used[bestIndex] = true; return items[bestIndex];
+        }
+        // Match each side once to its cut, then keep these references fixed.
+        for (var ti = 0; ti < tripleCuts.length; ti++) models.push({
+          khuon: tripleCuts[ti], bai: nearestUnused(tripleCuts[ti], fronts, usedFronts),
+          sau: nearestUnused(tripleCuts[ti], backs, usedBacks)
+        });
+        return models;
+      }
       if (sel && sel.length >= 2) {
         var recs = [];
         for (si = 0; si < sel.length; si++) {
@@ -296,146 +442,7 @@ function dcDanBePrepare(gapText, marginText, ponClearText) {
       }
       return models;
     }
-    function isDirectChild(item, parent) {
-      try { return item.parent === parent; } catch (e) { return true; }
-    }
-    function circleCandidate(item, rect) {
-      var kind = "", b, w, h, r, cx, cy, pts, i, next, dx, dy, distance, tolerance, mx, my, mt;
-      try { kind = item.typename; } catch (kindError) {}
-      if (kind !== "PathItem") return null;
-      try { if (item.closed !== true || item.clipping === true) return null; } catch (stateError) { return null; }
-      try { pts = item.pathPoints; } catch (pointsError) { return null; }
-      if (!pts || pts.length < 4 || pts.length > 12) return null;
-      b = geometricBoundsOf(item); if (!b) return null;
-      w = b[2] - b[0]; h = b[1] - b[3];
-      if (w <= EPS || h <= EPS || w > 40 * MM || Math.abs(w - h) > Math.max(w, h) * 0.05) return null;
-      cx = (b[0] + b[2]) / 2; cy = (b[1] + b[3]) / 2; r = (w + h) / 4;
-      if (cx < rect[0] || cx > rect[2] || cy < rect[3] || cy > rect[1]) return null;
-      // A tiny square used to pass the old 0.15 mm absolute tolerance.  A
-      // real Illustrator ellipse is a four-point Bezier circle, so test both
-      // anchors and Bezier midpoints with a tight relative tolerance.
-      tolerance = Math.max(0.005 * MM, r * 0.02);
-      for (i = 0; i < pts.length; i++) {
-        dx = pts[i].anchor[0] - cx; dy = pts[i].anchor[1] - cy;
-        distance = Math.sqrt(dx * dx + dy * dy);
-        if (Math.abs(distance - r) > tolerance) return null;
-        next = pts[(i + 1) % pts.length]; mt = 0.5;
-        mx = (1 - mt) * (1 - mt) * (1 - mt) * pts[i].anchor[0] +
-          3 * (1 - mt) * (1 - mt) * mt * pts[i].rightDirection[0] +
-          3 * (1 - mt) * mt * mt * next.leftDirection[0] + mt * mt * mt * next.anchor[0];
-        my = (1 - mt) * (1 - mt) * (1 - mt) * pts[i].anchor[1] +
-          3 * (1 - mt) * (1 - mt) * mt * pts[i].rightDirection[1] +
-          3 * (1 - mt) * mt * mt * next.leftDirection[1] + mt * mt * mt * next.anchor[1];
-        dx = mx - cx; dy = my - cy; distance = Math.sqrt(dx * dx + dy * dy);
-        if (Math.abs(distance - r) > tolerance) return null;
-      }
-      return { cx: cx, cy: cy, r: r };
-    }
-    function addPonCandidate(candidates, candidate) {
-      var i, dx, dy;
-      for (i = 0; i < candidates.length; i++) {
-        dx = candidates[i].cx - candidate.cx; dy = candidates[i].cy - candidate.cy;
-        if (dx * dx + dy * dy < 0.01 && Math.abs(candidates[i].r - candidate.r) < 0.01) return;
-      }
-      candidates.push(candidate);
-    }
-    function collectPonPaths(item, rect, candidates) {
-      var kind = "", i, child, candidate;
-      try { if (item.hidden === true) return; } catch (hiddenError) {}
-      try { kind = item.typename; } catch (kindError) {}
-      if (kind === "PathItem") {
-        candidate = circleCandidate(item, rect);
-        if (candidate) addPonCandidate(candidates, candidate);
-        return;
-      }
-      if (kind === "CompoundPathItem") {
-        for (i = 0; i < item.pathItems.length; i++) collectPonPaths(item.pathItems[i], rect, candidates);
-        return;
-      }
-      if (kind === "GroupItem") {
-        for (i = 0; i < item.pageItems.length; i++) {
-          child = item.pageItems[i];
-          if (!isDirectChild(child, item)) continue;
-          collectPonPaths(child, rect, candidates);
-        }
-      }
-    }
-    function collectPonLayer(layer, rect, candidates) {
-      var i, item;
-      try { if (layer.visible === false) return; } catch (layerStateError) {}
-      for (i = 0; i < layer.pageItems.length; i++) {
-        item = layer.pageItems[i];
-        if (!isDirectChild(item, layer)) continue;
-        try { if (item.hidden === true) continue; } catch (itemStateError) {}
-        collectPonPaths(item, rect, candidates);
-      }
-      try {
-        for (i = 0; i < layer.layers.length; i++) collectPonLayer(layer.layers[i], rect, candidates);
-      } catch (subLayerError) {}
-    }
-    function sameFile(left, right) {
-      try {
-        return String(left.fsName).toLowerCase() === String(right.fsName).toLowerCase();
-      } catch (e) { return false; }
-    }
-    function alreadyOpenDocument(file) {
-      var i, candidate;
-      for (i = 0; i < app.documents.length; i++) {
-        candidate = app.documents[i];
-        try {
-          if (sameFile(candidate.fullName, file)) return candidate;
-        } catch (fullNameError) {}
-      }
-      return null;
-    }
-    function readPon() {
-      var file = File.openDialog("Chọn file PON AI – lấy khổ tờ và 4 PON", "*.ai");
-      if (!file) return null;
-      // Opening an AI file that is already open can return that same document.
-      // Never close it here: it belongs to the user, not to this operation.
-      var sourceDoc = doc, ponDoc = alreadyOpenDocument(file), openedHere = false, info = null;
-      try {
-        if (!ponDoc) {
-          var documentCountBefore = app.documents.length;
-          ponDoc = app.open(file);
-          // Count is a second guard for aliases/UNC paths that do not compare
-          // byte-for-byte in fsName: an existing document must never be closed.
-          openedHere = app.documents.length > documentCountBefore;
-        }
-        if (!ponDoc.artboards.length) fail("File PON không có artboard.");
-        var rect = ponDoc.artboards[0].artboardRect.slice(0), candidates = [], i;
-        for (i = 0; i < ponDoc.layers.length; i++) collectPonLayer(ponDoc.layers[i], rect, candidates);
-        if (candidates.length < 4) fail("File PON phải có đủ 4 chấm PON tròn.");
-        var corners = [[rect[0], rect[1]], [rect[2], rect[1]], [rect[0], rect[3]], [rect[2], rect[3]]];
-        var dots = [], used = {}, ci, best, bestD, j, dx, dy;
-        var nearLimit = Math.min(rect[2] - rect[0], rect[1] - rect[3]) * 0.25;
-        for (ci = 0; ci < corners.length; ci++) {
-          best = -1; bestD = 1e99;
-          for (j = 0; j < candidates.length; j++) {
-            if (used[j]) continue;
-            dx = candidates[j].cx - corners[ci][0]; dy = candidates[j].cy - corners[ci][1];
-            if (dx * dx + dy * dy < bestD) { bestD = dx * dx + dy * dy; best = j; }
-          }
-          // When the file contains exactly four dots, use all four at their
-          // real positions. They need not be at hard-coded corner offsets.
-          // With extra circular paths, keep the corner guard to avoid treating
-          // a round decal in the template as a registration dot.
-          if (best < 0 || (candidates.length > 4 && bestD > nearLimit * nearLimit))
-            fail("Không tìm thấy chấm PON tròn gần một trong bốn góc tờ.");
-          used[best] = true; dots.push(candidates[best]);
-        }
-        info = { rect: rect, dots: dots, name: file.name };
-      } finally {
-        if (openedHere && ponDoc && ponDoc !== sourceDoc) {
-          try { ponDoc.close(SaveOptions.DONOTSAVECHANGES); } catch (closeError) {}
-        }
-        try { if (sourceDoc) sourceDoc.activate(); } catch (restoreSourceError) {}
-      }
-      return info;
-    }
-
-    var models = sourceModels(), pon = readPon();
-    if (!pon) return "OK: (đã hủy, chưa chọn file PON)";
+    var models = sourceModels();
     var types = [], mi, groups;
     for (mi = 0; mi < models.length; mi++) {
       groups = [];
@@ -445,15 +452,16 @@ function dcDanBePrepare(gapText, marginText, ponClearText) {
       types.push({ groups: groups });
     }
     var jobId = "danbe_" + (dcDanBeJobCounter++);
-    var paperW = pon.rect[2] - pon.rect[0], paperH = pon.rect[1] - pon.rect[3], dotsMm = [], di;
+    var dotsMm = [], di;
     for (di = 0; di < pon.dots.length; di++) dotsMm.push({
       x: (pon.dots[di].cx - pon.rect[0]) / MM,
       y: (pon.dots[di].cy - pon.rect[3]) / MM,
       r: pon.dots[di].r / MM
     });
-    dcDanBeJobs[jobId] = { doc: doc, models: models, pon: pon, paperW: paperW, paperH: paperH, margin: margin, gap: gap, ponClear: ponClear, MM: MM };
+    dcDanBeJobs[jobId] = { doc: doc, models: models, pon: pon, paperW: paperW, paperH: paperH, margin: margin, gap: gap, ponClear: ponClear, MM: MM, twoSided: twoSided };
     return "OKJSON:" + dcDanBeJSON.stringify({
       jobId: jobId,
+      twoSided: twoSided,
       sheet: { widthMm: paperW / MM, heightMm: paperH / MM, dots: dotsMm },
       types: types,
       gapMm: gap / MM,
@@ -473,7 +481,7 @@ function dcDanBePrepare(gapText, marginText, ponClearText) {
 
 function dcDanBeRender(jobId, slotsText, reportText) {
   var oldCoordinateSystem = null, restoreCoordinateSystem = false;
-  var createdLayers = [], createdArtboard = null, job = null, doc = null;
+  var createdLayers = [], createdArtboards = [], job = null, doc = null;
   try {
     try {
       oldCoordinateSystem = app.coordinateSystem;
@@ -482,20 +490,52 @@ function dcDanBeRender(jobId, slotsText, reportText) {
     } catch (coordinateError) {}
     job = dcDanBeJobs[jobId];
     if (!job) return "ERR: Phiên dàn bế đã hết. Hãy bấm Dàn bế lại.";
-    var slots = dcDanBeJSON.parse(String(slotsText));
-    if (!slots || slots.length === undefined || !slots.length) return "ERR: Bộ tối ưu không tìm được vị trí hợp lệ.";
+    var layout = dcDanBeJSON.parse(String(slotsText));
+    var separate = layout && layout.sheets !== undefined;
+    var sheets = separate ? layout.sheets : [{ slots: layout }];
+    function isArray(value) { return Object.prototype.toString.call(value) === "[object Array]"; }
+    function fail(message) { throw new Error(message); }
+    if (!isArray(sheets) || !sheets.length)
+      fail("Bộ tối ưu không tìm được vị trí hợp lệ.");
     var report = null;
     try { report = dcDanBeJSON.parse(String(reportText || "{}")); } catch (ignore) {}
     doc = job.doc;
-    var MM = job.MM, paperW = job.paperW, paperH = job.paperH, i, s;
-    try { doc.activate(); } catch (activateError) {}
-    for (i = 0; i < slots.length; i++) {
-      s = slots[i];
-      var slotVariant = Number(s.vi);
-      if (s.mi === undefined || s.mi < 0 || s.mi >= job.models.length ||
-          !isFinite(slotVariant) || Math.floor(slotVariant) !== slotVariant || slotVariant < 0 || slotVariant > 3 ||
-          !isFinite(Number(s.x)) || !isFinite(Number(s.y))) return "ERR: Dữ liệu vị trí dàn không hợp lệ.";
+    var MM = job.MM, paperW = job.paperW, paperH = job.paperH, i, s, sheetIndex;
+    var twoSided = job.twoSided === true;
+    var totalCount = 0, counts = [], seenModels = {};
+    // Validate the entire batch before creating any artboard or output layer.
+    if (separate && sheets.length !== job.models.length)
+      fail("Thiếu tờ riêng cho mẫu nguồn. Hãy dàn lại.");
+    for (sheetIndex = 0; sheetIndex < sheets.length; sheetIndex++) {
+      var plan = sheets[sheetIndex];
+      if (!plan || !isArray(plan.slots) || !plan.slots.length)
+        fail("Mẫu " + (sheetIndex + 1) + " không có vị trí dàn hợp lệ.");
+      var modelIndex = plan.modelIndex;
+      if (separate) {
+        if (typeof modelIndex !== "number" || !isFinite(modelIndex) ||
+            Math.floor(modelIndex) !== modelIndex || modelIndex < 0 || modelIndex >= job.models.length || seenModels[modelIndex])
+          fail("Danh sách mẫu/tờ riêng không hợp lệ.");
+        seenModels[modelIndex] = true;
+      }
+      for (i = 0; i < plan.slots.length; i++) {
+        s = plan.slots[i];
+        if (!s || typeof s.mi !== "number" || !isFinite(s.mi) || Math.floor(s.mi) !== s.mi ||
+            s.mi < 0 || s.mi >= job.models.length || (separate && s.mi !== modelIndex) ||
+            typeof s.vi !== "number" || !isFinite(s.vi) || Math.floor(s.vi) !== s.vi || s.vi < 0 || s.vi > 3 ||
+            typeof s.x !== "number" || typeof s.y !== "number" || !isFinite(s.x) || !isFinite(s.y) ||
+            s.x < 0 || s.y < 0 || s.x * MM >= paperW || s.y * MM >= paperH)
+          fail("Dữ liệu vị trí dàn không hợp lệ ở tờ " + (sheetIndex + 1) + ".");
+      }
+      totalCount += plan.slots.length;
+      counts.push("Mẫu " + (Number(modelIndex) + 1) + ": " + plan.slots.length + " con");
     }
+    if (twoSided) {
+      for (i = 0; i < job.models.length; i++) {
+        if (!job.models[i].sau || !job.models[i].sau.item)
+          fail("Thiếu mặt sau của mẫu " + (i + 1) + ". Hãy chọn đủ Khuôn → trước → sau.");
+      }
+    }
+    try { doc.activate(); } catch (activateError) {}
     function geometricBoundsOf(item) {
       try { return item.geometricBounds.slice(0); } catch (e) {}
       try { return item.visibleBounds.slice(0); } catch (e2) {}
@@ -526,61 +566,118 @@ function dcDanBeRender(jobId, slotsText, reportText) {
       try { layer.note = "DANCARD_DANBE_OUTPUT"; } catch (noteError) {}
       return layer;
     }
-    var allRight = -1e99, allTop = 1e99, ai, ar;
+    var pageGap = 10 * MM, existingRects = [], sourceBounds = null, ai;
     for (ai = 0; ai < doc.artboards.length; ai++) {
-      ar = doc.artboards[ai].artboardRect;
-      if (ar[2] > allRight) allRight = ar[2];
-      if (ar[1] < allTop) allTop = ar[1];
+      try { existingRects.push(doc.artboards[ai].artboardRect.slice(0)); } catch (boardBoundsError) {}
     }
-    if (allRight < -1e90) { allRight = 0; allTop = 0; }
-    var sheetLeft = allRight + 20 * MM, sheetTop = allTop, newIndex;
-    createdArtboard = doc.artboards.add([sheetLeft, sheetTop, sheetLeft + paperW, sheetTop - paperH]);
-    newIndex = doc.artboards.length - 1;
-    try { createdArtboard.name = "Dan be"; } catch (nameError) {}
-    var outPon = addLayer("Dàn bế - PON"), outKhuon = addLayer("Dàn bế - Khuôn"), outBai = addLayer("Dàn bế - Bài");
+    function includeSource(item) {
+      var b = visibleBoundsOf(item); if (!b) return;
+      if (!sourceBounds) sourceBounds = b.slice(0);
+      else sourceBounds = [Math.min(sourceBounds[0], b[0]), Math.max(sourceBounds[1], b[1]),
+        Math.max(sourceBounds[2], b[2]), Math.min(sourceBounds[3], b[3])];
+    }
+    for (i = 0; i < job.models.length; i++) {
+      includeSource(job.models[i].khuon.item); includeSource(job.models[i].bai.item);
+      if (twoSided) includeSource(job.models[i].sau.item);
+    }
+    var scaleFactor = 1;
+    try { scaleFactor = doc.scaleFactor; } catch (scaleError) {}
+    var positions = dcDanBeOutputPositions(paperW, paperH, twoSided, sheets.length,
+      scaleFactor, existingRects, sourceBounds, MM);
+    var sheetLeft, sheetTop;
     function drawDot(layer, cx, cy, r) {
       var black = new CMYKColor(); black.cyan = 0; black.magenta = 0; black.yellow = 0; black.black = 100;
       var dot = layer.pathItems.ellipse(cy + r, cx - r, r * 2, r * 2);
       dot.filled = true; dot.fillColor = black; dot.stroked = false;
     }
-    for (i = 0; i < job.pon.dots.length; i++) {
-      var dotIn = job.pon.dots[i];
-      drawDot(outPon, sheetLeft + dotIn.cx - job.pon.rect[0],
-        sheetTop - paperH + (dotIn.cy - job.pon.rect[3]), dotIn.r);
-    }
     function centreArtwork(item, cx, cy) {
       var b = visibleBoundsOf(item);
-      if (b) item.translate(cx - (b[0] + b[2]) / 2, cy - (b[1] + b[3]) / 2);
+      if (!b) fail("Không đo được Bài để canh tâm theo khuôn.");
+      item.translate(cx - (b[0] + b[2]) / 2, cy - (b[1] + b[3]) / 2);
     }
-    function fail(message) { throw new Error(message); }
+    function addFace(rect, suffix, isBack) {
+      var board = doc.artboards.add(rect); createdArtboards.push(board);
+      try { board.name = "Dan be" + suffix; } catch (nameError) {}
+      var ponLayer = addLayer("Dàn bế - PON" + suffix);
+      var cutLayer = addLayer("Dàn bế - Khuôn" + suffix);
+      var artLayer = addLayer("Dàn bế - Bài" + suffix);
+      for (var di = 0; di < job.pon.dots.length; di++) {
+        var dotIn = job.pon.dots[di], dotX = dotIn.cx - job.pon.rect[0];
+        // Back registration follows the same horizontal sheet flip as cuts.
+        if (isBack) dotX = paperW - dotX;
+        drawDot(ponLayer, rect[0] + dotX, rect[3] + dotIn.cy - job.pon.rect[3], dotIn.r);
+      }
+      return { pon: ponLayer, cut: cutLayer, art: artLayer };
+    }
+    function finishFace(face) {
+      try { face.cut.zOrder(ZOrderMethod.SENDTOBACK); } catch (khuonOrderError) {}
+      try { face.pon.zOrder(ZOrderMethod.BRINGTOFRONT); } catch (ponOrderError) {}
+    }
     var angles = [0, 90, 180, 270], model, angle, left, bottom, kCopy, kb, bCopy;
-    for (i = 0; i < slots.length; i++) {
-      s = slots[i]; model = job.models[Number(s.mi)]; angle = angles[Number(s.vi)];
-      doc.activeLayer = outKhuon;
-      kCopy = model.khuon.item.duplicate(outKhuon, ElementPlacement.PLACEATEND);
-      if (angle) kCopy.rotate(angle);
-      // The core packs the actual cut path.  Use geometric bounds here too,
-      // never a stroke/effect-expanded visible box.
-      kb = geometricBoundsOf(kCopy); if (!kb) fail("Không đo được khuôn sau khi xoay.");
-      left = sheetLeft + Number(s.x) * MM;
-      bottom = sheetTop - paperH + Number(s.y) * MM;
-      kCopy.translate(left - kb[0], bottom - kb[3]);
-      kb = geometricBoundsOf(kCopy);
-      doc.activeLayer = outBai;
-      bCopy = model.bai.item.duplicate(outBai, ElementPlacement.PLACEATEND);
-      if (angle) bCopy.rotate(angle);
-      centreArtwork(bCopy, (kb[0] + kb[2]) / 2, (kb[1] + kb[3]) / 2);
+    var firstNewIndex = doc.artboards.length;
+    for (sheetIndex = 0; sheetIndex < sheets.length; sheetIndex++) {
+      var rect = positions[sheetIndex]; sheetLeft = rect[0]; sheetTop = rect[1];
+      var suffix = separate ? " - mẫu " + (sheets[sheetIndex].modelIndex + 1) : "";
+      var frontFace = addFace(rect, suffix + (twoSided ? " - mặt trước" : ""), false);
+      var outKhuon = frontFace.cut, outBai = frontFace.art, lockedFront = [];
+      var slots = sheets[sheetIndex].slots;
+      for (i = 0; i < slots.length; i++) {
+        s = slots[i]; model = job.models[s.mi]; angle = angles[s.vi];
+        doc.activeLayer = outKhuon;
+        kCopy = model.khuon.item.duplicate(outKhuon, ElementPlacement.PLACEATEND);
+        if (angle) kCopy.rotate(angle);
+        // The core packs the actual cut path: do not use stroke-expanded bounds.
+        kb = geometricBoundsOf(kCopy); if (!kb) fail("Không đo được khuôn sau khi xoay.");
+        left = sheetLeft + s.x * MM; bottom = sheetTop - paperH + s.y * MM;
+        kCopy.translate(left - kb[0], bottom - kb[3]);
+        kb = geometricBoundsOf(kCopy);
+        if (!kb) fail("Không đo được khuôn sau khi đặt vào tờ.");
+        doc.activeLayer = outBai;
+        bCopy = model.bai.item.duplicate(outBai, ElementPlacement.PLACEATEND);
+        if (angle) bCopy.rotate(angle);
+        centreArtwork(bCopy, (kb[0] + kb[2]) / 2, (kb[1] + kb[3]) / 2);
+        if (twoSided) lockedFront.push({ model: model, angle: angle, cut: kCopy, bounds: kb.slice(0) });
+      }
+      finishFace(frontFace);
+      if (twoSided) {
+        var backRect = [rect[2] + pageGap, rect[1], rect[2] + pageGap + paperW, rect[3]];
+        var backFace = addFace(backRect, suffix + " - mặt sau", true);
+        var reflection = app.getScaleMatrix(-100, 100);
+        for (i = 0; i < lockedFront.length; i++) {
+          var captured = lockedFront[i], fb = captured.bounds;
+          var backX = backRect[0] + paperW - ((fb[0] + fb[2]) / 2 - rect[0]);
+          var backY = backRect[3] + (fb[1] + fb[3]) / 2 - rect[3];
+          doc.activeLayer = backFace.cut;
+          // Reflect the already-rotated front CUT, not the artwork. This also
+          // handles asymmetric/concave shapes, unlike just rotating -angle.
+          kCopy = captured.cut.duplicate(backFace.cut, ElementPlacement.PLACEATEND);
+          kCopy.transform(reflection, true, true, true, true, 100, Transformation.CENTER);
+          kb = geometricBoundsOf(kCopy); if (!kb) fail("Không đo được khuôn mặt sau.");
+          kCopy.translate(backX - (kb[0] + kb[2]) / 2, backY - (kb[1] + kb[3]) / 2);
+          doc.activeLayer = backFace.art;
+          bCopy = captured.model.sau.item.duplicate(backFace.art, ElementPlacement.PLACEATEND);
+          // Counter-rotation matches the KTS horizontal duplex convention;
+          // text/images keep their handedness and are never reflected.
+          if (captured.angle) bCopy.rotate(-captured.angle);
+          centreArtwork(bCopy, backX, backY);
+        }
+        finishFace(backFace);
+      }
     }
-    try { outKhuon.zOrder(ZOrderMethod.SENDTOBACK); } catch (khuonOrderError) {}
-    try { outPon.zOrder(ZOrderMethod.BRINGTOFRONT); } catch (ponOrderError) {}
-    try { doc.artboards.setActiveArtboardIndex(newIndex); } catch (artboardSelectError) {}
+    try { doc.artboards.setActiveArtboardIndex(firstNewIndex); } catch (artboardSelectError) {}
     try { doc.selection = null; } catch (selectionClearError) {}
-    var detail = report && report.detail ? report.detail : ("Dàn silhouette thật: " + slots.length + " con.");
+    var detail = separate ?
+      ("Đã tạo " + sheets.length + (twoSided ? " cặp artboard trước/sau" : " artboard riêng") + "; tổng " + totalCount + " con. " + counts.join("; ") + ".") :
+      (report && report.detail ? report.detail : ("Dàn silhouette thật: " + totalCount + " con."));
     detail += " Khuôn và Bài nằm ở layer riêng; PON giữ ở layer trên cùng.";
+    if (twoSided) {
+      if (!separate) detail += " Đã tạo " + sheets.length + " cặp artboard trước/sau.";
+      detail += " Hai mặt dùng chung bố cục khuôn, đối xứng lật ngang; không lật gương chữ/hình.";
+    }
     try { delete dcDanBeJobs[jobId]; } catch (clearError) {}
-    return "OK:[[COUNT:" + slots.length + "]] " + detail;
+    return separate ? "OK: " + detail : "OK:[[COUNT:" + totalCount + "]] " + detail;
   } catch (e) {
-    // Never erase source artwork: only these layers and this artboard were
+    // Never erase source artwork: only these layers and these artboards were
     // created by this invocation, so only they are rolled back.
     if (doc) {
       try {
@@ -589,7 +686,9 @@ function dcDanBeRender(jobId, slotsText, reportText) {
       for (var li = createdLayers.length - 1; li >= 0; li--) {
         try { createdLayers[li].remove(); } catch (removeLayerError) {}
       }
-      try { if (createdArtboard) createdArtboard.remove(); } catch (removeArtboardError) {}
+      for (var abi = createdArtboards.length - 1; abi >= 0; abi--) {
+        try { createdArtboards[abi].remove(); } catch (removeArtboardError) {}
+      }
     }
     try { delete dcDanBeJobs[jobId]; } catch (clearFailedJobError) {}
     try { return "ERR: " + dcMoTaLoi(e); } catch (e2) { return "ERR: " + e; }

@@ -2,6 +2,55 @@
 
 _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
+## v2.15.6 — Phát hành bản bế tag, decal
+
+- đã test xong phát hành cho nv dùng
+
+---
+
+## v2.15.5 — Rút gọn hướng dẫn toàn bộ panel (02/10/2026)
+
+- Rút gọn hướng dẫn ở tất cả tab: Dàn file, Dàn tối ưu (KTS/Bế/Offset), Dấu cắt, Dàn theo mẫu, Catalogue, CTL Offset, Đổi tên, Variable và Auto Save.
+- Bỏ giải thích thuật toán và ví dụ dài/lặp; giữ cách chọn nguồn, đơn vị/khoảng đo, ý nghĩa dấu tick và lưu ý về file gốc.
+- Không đổi ô nhập, giá trị mặc định, thuật toán dàn hay ghi chú/nội dung trên artboard.
+
+---
+
+## v2.15.4 — Khổ bế tùy chỉnh và PON tự tạo (02/10/2026)
+
+- Bỏ chọn/import file PON trong Dàn bế. Thêm hai ô khổ giấy (cm), mặc định **33 × 35,4 cm**; bên dưới là bốn ô theo thứ tự **trên / dưới / trái / phải** (mm), mặc định **10 / 10 / 10 / 10**.
+- Tự tạo bốn chấm PON tròn **5 mm** (0,5 × 0,5 cm), đen 100K, không viền. Các khoảng nhập đo từ **mép artboard đến tâm chấm**; né PON vẫn đo từ mép chấm. Khổ giấy và PON áp dụng cho toàn bộ tờ/cặp hai mặt trong lượt chạy.
+- Đặt tờ đầu như Dàn KTS: bắt đầu ở góc trên trái canvas, cách biên canvas 10 mm; đi từ trái sang phải, né artboard và bài nguồn, hết ngang tự xuống hàng. Cặp hai mặt luôn đi cùng hàng, hỗ trợ giới hạn Large Canvas.
+- Kiểm tra toàn bộ vị trí trước khi tạo đầu ra; khổ vượt canvas, PON ra ngoài tờ/chồng nhau hoặc số nhập sai sẽ báo lỗi. Không mở/đóng file PON và không sửa bài gốc.
+- Giữ khe khuôn, lề, né PON, một/hai mặt, tờ riêng/gộp mẫu và lõi nesting hiện tại. Không thay đổi KTS, CTL hay các chức năng khác.
+- Kiểm chứng trực tiếp trong Illustrator bằng tài liệu thử riêng: khổ mặc định 33 × 35,4 cm và khổ đổi 32 × 34 cm với bốn khoảng PON khác nhau; tạo cặp trước/sau, đủ bốn chấm 5 mm mỗi mặt, tâm chấm đúng số nhập và tờ đầu đúng vị trí KTS. Không lưu đè bài gốc.
+
+---
+
+## v2.15.3 — Dàn bế tag hai mặt (02/10/2026)
+
+- Thêm tick **Dàn bế 2 mặt (tag)**. Nguồn được chọn theo từng hàng, thứ tự trái → phải: **Khuôn → mặt trước → mặt sau**. Nếu không chọn object, dùng ba layer **Khuôn bế**, **Mặt trước**, **Mặt sau** cùng số mẫu.
+- Khóa từng bộ ba trước khi dàn; thiếu mặt, hàng không rõ hoặc vị trí trái/phải trùng nhau sẽ báo lỗi, không đoán ghép sang mẫu khác.
+- Chỉ tối ưu bố cục khuôn một lần. Mỗi tờ tạo cặp artboard trước/sau để **lật ngang như KTS**; mặt sau dùng đúng mẫu, vị trí đối xứng và góc xoay ngược. Không lật gương chữ/hình.
+- Khuôn mặt sau là ảnh phản chiếu hình học của khuôn mặt trước đã xoay, kể cả hình lõm/bất đối xứng. PON cũng đối xứng theo tờ và giữ nguyên kích thước chấm. Mỗi mặt giữ layer Khuôn, Bài và PON riêng.
+- Giữ chế độ một mặt mặc định, mỗi mẫu một tờ riêng hoặc tick gộp nhiều mẫu. Hai mặt dùng chung số con/tờ, không đếm đôi; file PON chỉ hỏi một lần cho cả lượt.
+- Không đổi lõi nesting, khe/lề/né PON, KTS hay CTL. Có kiểm thử bộ ba, nguồn ba layer, bốn góc xoay, đúng mẫu trước/sau, biên khuôn/PON đối xứng và thu hồi đầu ra khi lỗi ở bất kỳ mặt nào.
+- Kiểm chứng trong Illustrator trên tài liệu thử riêng: hai mẫu khuôn lõm/bất đối xứng, tám tag với đủ bốn góc xoay; chế độ riêng tạo bốn artboard, chế độ gộp tạo hai. Kiểm tra từng đỉnh khuôn, hướng artwork mặt sau và PON lệch vị trí giữa các góc. Không sửa/lưu đè bài gốc.
+
+---
+
+## v2.15.2 — Khóa cặp KTS và tờ riêng cho từng mẫu bế (02/10/2026)
+
+- Dàn KTS hai mặt: gom hàng nguồn theo kích thước object rồi khóa trái = trước, phải = sau. Lệch Y rất nhỏ không còn đảo vai hai mặt; nguồn không rõ cặp sẽ báo lỗi trước khi dàn.
+- Mặt trước và mặt sau dùng chung danh sách mẫu/vị trí đã khóa, giữ nguyên xoay và đối xứng in hai mặt. Không cần khóa layer nguồn bằng tay.
+- Dàn bế mặc định mỗi mẫu một artboard, nhân bản đầy tờ riêng. Thêm tick **Dàn nhiều mẫu vào một tờ** để dùng lại cách gộp/luân phiên các mẫu.
+- Chỉ chọn file PON một lần cho cả lượt; mỗi tờ giữ đủ bốn chấm, layer Khuôn và Bài riêng. Tái dùng kết quả tính khi biên khuôn giống hệt, cập nhật trạng thái giữa các mẫu.
+- Kiểm tra toàn bộ bố cục trước khi vẽ; nếu tạo tờ/layer/bản sao bị lỗi, chỉ thu hồi đầu ra vừa tạo trong lượt đó, không xóa bài nguồn.
+- Không đổi lõi dàn biên khuôn, khe/lề/né PON, CTL hay Dàn Offset. Bổ sung kiểm thử đảo mặt, vị trí đối xứng, tờ riêng/tờ gộp và phục hồi khi lỗi.
+- Kiểm chứng trực tiếp trong Illustrator trên tài liệu thử riêng: 7 cặp KTS qua cả hai chế độ (147 vị trí đối xứng khi tách mẫu, 21 khi gộp); Dàn bế hai mẫu tròn tạo tờ riêng 42/108 con hoặc tờ gộp 47 con, đúng tâm khuôn và đủ PON. Không lưu đè bài gốc.
+
+---
+
 ## v2.15.1 — Dọn Dàn bế cũ và tách nạp script (02/10/2026)
 
 - Bỏ bộ tính Dàn bế cũ `dcDanBe()` và mã phiên bản `dcDanBeVersion` khỏi `dan_card_lib.jsx`; nút Dàn bế chỉ dùng luồng mới.

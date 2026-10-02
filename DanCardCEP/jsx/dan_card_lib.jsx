@@ -3624,7 +3624,7 @@ function dcDanToiUuV2(pageWidthText, pageHeightText) {
 //  - Artboard moi tu xep theo luoi canvas, trai sang phai roi xuong hang.
 //  - Tach hinh chu nhat de tan dung khoang trong chu L, van cat dao duoc.
 // ============================================================
-var dcDanToiUuVersion = 15;
+var dcDanToiUuVersion = 16;
 
 // Ghi chu duoc dat tren artboard mat truoc dau tien. Nhan ban giu nguyen
 // dinh dang, chi doi toa do de khoang cach voi mep artboard luon giong nhau.
@@ -3825,6 +3825,42 @@ function dcCopyToiUuNoteToOddArtboards(prefixListText) {
   }
 }
 
+// Pure geometry: lock left/right roles before packing. Do not use the tiny
+// numerical EPS as a row-alignment tolerance or pair consecutive Y-sorted items.
+function dcKtsPairSourceRecords(records, epsilon) {
+  var pending = records.slice(0), pairs = [], EPS = epsilon || 0.01;
+  pending.sort(function (a, b) {
+    if (a.cy !== b.cy) return b.cy - a.cy;
+    return a.cx - b.cx;
+  });
+  while (pending.length) {
+    var anchor = pending.shift(), row = [anchor];
+    var high = anchor.cy, low = anchor.cy;
+    var minHeight = anchor.bounds[1] - anchor.bounds[3];
+    for (var i = 0; i < pending.length; i++) {
+      var candidate = pending[i];
+      var nextHeight = Math.min(minHeight, candidate.bounds[1] - candidate.bounds[3]);
+      var nextHigh = Math.max(high, candidate.cy), nextLow = Math.min(low, candidate.cy);
+      // Up to one quarter of the shorter frame: tolerates small shifts but
+      // cannot chain adjacent rows into one through a succession of near ties.
+      if (nextHigh - nextLow <= nextHeight * 0.25 + EPS) {
+        row.push(candidate); pending.splice(i--, 1);
+        high = nextHigh; low = nextLow; minHeight = nextHeight;
+      }
+    }
+    if (row.length % 2 !== 0)
+      throw new Error("Không ghép rõ cặp trước/sau: mỗi hàng cần đủ object trái và phải. Hãy canh lại hàng nguồn.");
+    row.sort(function (a, b) { return a.cx - b.cx; });
+    for (var r = 0; r < row.length; r += 2) {
+      if (row[r].bounds[2] > row[r + 1].bounds[0] + EPS ||
+          row[r + 1].cx - row[r].cx <= EPS)
+        throw new Error("Hai mặt nguồn đang chồng ngang hoặc không phân biệt được trái/phải. Hãy đặt mỗi cặp cạnh nhau.");
+      pairs.push({ front: row[r], back: row[r + 1] });
+    }
+  }
+  return pairs;
+}
+
 function dcDanToiUu(
   pageWidthText,
   pageHeightText,
@@ -3902,22 +3938,20 @@ function dcDanToiUu(
     if (raw.length === 0 || !sourceBounds)
       return "ERR: Selection hien tai khong co artwork hop le de dan.";
 
-    // Thu tu on dinh: theo tung hang tu tren xuong, trong hang tu trai qua.
-    // Khi dan 2 mat, moi cap lien nhau la [mat truoc, mat sau].
-    raw.sort(function (a, b) {
-      if (Math.abs(a.cy - b.cy) > EPS) return b.cy - a.cy;
-      return a.cx - b.cx;
-    });
-
     if (twoSided && (raw.length < 2 || raw.length % 2 !== 0))
       return "ERR: Dan 2 mat can chon so object chan: tung cap trai = truoc, phai = sau.";
 
     var models = [];
     var mi;
     if (twoSided) {
-      for (mi = 0; mi < raw.length; mi += 2)
-        models.push({ front: raw[mi].item, back: raw[mi + 1].item });
+      var lockedPairs = dcKtsPairSourceRecords(raw, EPS);
+      for (mi = 0; mi < lockedPairs.length; mi++)
+        models.push({ front: lockedPairs[mi].front.item, back: lockedPairs[mi].back.item });
     } else {
+      raw.sort(function (a, b) {
+        if (Math.abs(a.cy - b.cy) > EPS) return b.cy - a.cy;
+        return a.cx - b.cx;
+      });
       for (mi = 0; mi < raw.length; mi++)
         models.push({ front: raw[mi].item, back: null });
     }
@@ -4693,12 +4727,17 @@ function dcDanToiUu(
         return "ERR: Loi tao vi tri dan. Hay thu lai.";
       slots = orderSlotsForBatch(slots, batch);
 
+      // Both faces consume exactly the same captured model-to-slot mapping.
+      var slotModels = [];
+      for (var mappedSlot = 0; mappedSlot < slots.length; mappedSlot++)
+        slotModels.push(batch[mappedSlot % batch.length]);
+
       var frontItems = [];
       var backItems = [];
       var slotIndex;
       prepareOutputLayer(frontLayer);
       for (slotIndex = 0; slotIndex < slots.length; slotIndex++) {
-        var model = batch[slotIndex % batch.length];
+        var model = slotModels[slotIndex];
         var frontItem = copyAt(
           model.front,
           frontLayer,
@@ -4715,7 +4754,7 @@ function dcDanToiUu(
         var backSafeTop = backRect[1] - MARGIN;
         prepareOutputLayer(backLayer);
         for (slotIndex = 0; slotIndex < slots.length; slotIndex++) {
-          model = batch[slotIndex % batch.length];
+          model = slotModels[slotIndex];
           var slot = slots[slotIndex];
           var relativeX = slot.x - frontSafeLeft;
           var relativeY = frontSafeTop - slot.y;

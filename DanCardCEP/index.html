@@ -26,7 +26,7 @@
             id="btnResize"
             class="header-raster header-resize"
             type="button"
-            title="Resize object đang chọn theo kích thước nhập vào"
+            title="Resize theo kích thước nhập"
           >
             Resize
           </button>
@@ -34,7 +34,7 @@
             id="btnClip"
             class="header-raster header-clip"
             type="button"
-            title="Clip object đang chọn thành khung KT nhập vào (canh giữa)"
+            title="Clip canh giữa theo kích thước nhập"
           >
             Clip
           </button>
@@ -221,10 +221,7 @@
             <div class="field">
               <div class="label">Dàn tối ưu không pon</div>
               <p class="hint">
-                Chọn một hoặc nhiều bài (mỗi bài nên là một group), nhập khổ giấy rồi dàn.
-                Tool ưu tiên dàn một chiều đồng nhất (toàn bộ ngang hoặc toàn bộ dọc).
-                Chỉ dùng bố cục xoay/trộn hoặc chữ L khi được nhiều con hơn.
-                Nếu cùng số con, tool chọn phương án cần ít đường cắt guillotine nhất và giữ các cụm cùng chiều liền nhau.
+                Chọn các bài, nhập khổ giấy rồi dàn.
               </p>
             </div>
             <div class="field-row">
@@ -242,23 +239,18 @@
               <span>Dàn 2 mặt đối xứng</span>
             </label>
             <p class="hint">
-              Khi bật: chọn từng cặp theo hàng, object bên trái là mặt trước và bên phải
-              là mặt sau. Mặt sau được dàn đối xứng theo mặt trước.
+              Xếp theo hàng: trái = trước, phải = sau.
             </p>
             <label class="check">
               <input type="checkbox" id="autoSheetMultiPerArtboard" />
               <span>Dàn nhiều mẫu vào một tờ</span>
             </label>
             <p class="hint">
-              Mặc định: mỗi mẫu tạo một tờ riêng và được dàn đầy. Tick: các mẫu cùng
-              kích thước được dàn luân phiên trên một tờ; nếu số chỗ không chia đều,
-              tool sẽ hỏi trước khi dàn.
+              Không tick: mỗi mẫu một tờ. Tick: gộp các mẫu cùng khổ.
             </p>
             <div class="field">
               <p class="hint">
-                Lề an toàn cố định: 3 mm mỗi cạnh. Khe giữa bài: 0 mm. Tool tạo
-                artboard mới, không đặt pon; bài dàn xong được canh giữa và chọn sẵn.
-                Các tờ mới được xếp từ trái sang phải, hết chỗ sẽ tự xuống hàng.
+                Lề 3 mm, khe 0 mm; không PON.
               </p>
             </div>
             <div class="field-row toiuu-actions">
@@ -272,13 +264,13 @@
                 class="note-copy-input"
                 type="text"
                 placeholder="F1, F2, F3..."
-                title="Nội dung theo thứ tự artboard 1, 3, 5, 7...; ngăn cách bằng dấu phẩy"
+                title="Nội dung cho artboard 1, 3, 5…; ngăn bằng dấu phẩy"
               />
               <button
                 id="btnCopyToiUuNote"
                 class="btn"
                 type="button"
-                title="Chọn ghi chú ở artboard mặt trước đầu tiên để copy sang các artboard mặt trước tiếp theo"
+                title="Copy ghi chú đã chọn sang các mặt trước"
               >
                 Copy ghi chú
               </button>
@@ -287,7 +279,7 @@
           </div>
         </div>
 
-        <!-- Accordion: DÀN BẾ (decal 1 mặt, né PON của file khuôn) -->
+        <!-- Accordion: DÀN BẾ (decal/tag 1 hoặc 2 mặt, tự tạo PON theo khổ giấy) -->
         <div class="acc">
           <button class="acc-head" data-acc="toiuuDie">
             <span class="acc-arrow">&#9654;</span>
@@ -295,18 +287,42 @@
           </button>
           <div class="acc-body" id="acc-toiuuDie">
             <div class="field">
-              <div class="label">Dàn decal theo khuôn bế</div>
+              <div class="label">Dàn decal / tag theo khuôn bế</div>
               <p class="hint">
-                Nguồn có 2 layer: <b>Khuôn bế</b> và <b>Bài</b>. Tool ghép khuôn với bài
-                gần tâm nhất, rồi hỏi chọn file PON AI ở mỗi lần chạy. Khổ tờ và 4 PON
-                tròn được đọc trực tiếp từ file đó.
-              </p>
-              <p class="hint">
-                Khuôn bế là biên dàn thực: mặc định cách nhau 2 mm và né mép PON 7,5 mm.
-                Khuôn cách mép tờ ít nhất 4 mm. Tool xoay 0° / 90° / 180° / 270°, luân
-                phiên đều các loại và giữ khuôn dưới bài trên artboard mới.
+                Chọn từng mẫu: <b>Khuôn → Bài</b>; hai mặt: <b>Khuôn → Trước → Sau</b>.
               </p>
             </div>
+            <div class="field-row">
+              <label class="field half" for="bePaperW">
+                <span class="label">Ngang giấy (cm)</span>
+                <input id="bePaperW" class="num" type="text" value="33" inputmode="decimal" />
+              </label>
+              <label class="field half" for="bePaperH">
+                <span class="label">Cao giấy (cm)</span>
+                <input id="bePaperH" class="num" type="text" value="35.4" inputmode="decimal" />
+              </label>
+            </div>
+            <div class="field-row">
+              <label class="field half" for="bePonTop" style="min-width: 0">
+                <span class="label">Trên (mm)</span>
+                <input id="bePonTop" class="num" type="text" value="10" inputmode="decimal" />
+              </label>
+              <label class="field half" for="bePonBottom" style="min-width: 0">
+                <span class="label">Dưới (mm)</span>
+                <input id="bePonBottom" class="num" type="text" value="10" inputmode="decimal" />
+              </label>
+              <label class="field half" for="bePonLeft" style="min-width: 0">
+                <span class="label">Trái (mm)</span>
+                <input id="bePonLeft" class="num" type="text" value="10" inputmode="decimal" />
+              </label>
+              <label class="field half" for="bePonRight" style="min-width: 0">
+                <span class="label">Phải (mm)</span>
+                <input id="bePonRight" class="num" type="text" value="10" inputmode="decimal" />
+              </label>
+            </div>
+            <p class="hint">
+              PON tròn <b>5 mm</b>. Bốn khoảng đo từ <b>mép tờ đến tâm chấm</b>.
+            </p>
             <div class="field-row">
               <label class="field half" for="beGap">
                 <span class="label">Khe giữa 2 khuôn (mm)</span>
@@ -325,13 +341,26 @@
               <div class="field half"></div>
             </div>
             <p class="hint">
-              Khe đo trực tiếp giữa hai <b>đường bế</b>; tool không tự cộng phần tràn
-              của Bài. Né PON đo từ <b>mép chấm</b>.
+              Khe tính giữa <b>đường bế</b>; né PON tính từ <b>mép chấm</b>.
+            </p>
+            <label class="check">
+              <input type="checkbox" id="beTwoSided" />
+              <span>Dàn bế 2 mặt (tag)</span>
+            </label>
+            <p class="hint">
+              Lật ngang như KTS, không lật gương chữ/hình.
+            </p>
+            <label class="check">
+              <input type="checkbox" id="beMultiPerArtboard" />
+              <span>Dàn nhiều mẫu vào một tờ</span>
+            </label>
+            <p class="hint">
+              Mặc định mỗi mẫu một tờ; tick để gộp.
             </p>
             <button id="btnDanBe" class="btn btn-primary" type="button">
-              <span class="btn-label">Chọn PON AI &amp; Dàn bế</span>
+              <span class="btn-label">Dàn bế</span>
             </button>
-            <div id="outDanBe" class="out">Chuẩn bị layer Khuôn bế + Bài rồi bấm Dàn bế.</div>
+            <div id="outDanBe" class="out">Chọn mẫu rồi bấm Dàn bế.</div>
           </div>
         </div>
 
@@ -343,9 +372,7 @@
           </button>
           <div class="acc-body" id="acc-toiuuOffset">
             <p class="hint">
-              Tự trở: mặt trước và mặt sau nằm chung một artboard, đối xứng qua tim
-              dọc tờ giấy. In xong lật ngang tờ giấy rồi in lại bằng chính bản kẽm
-              đó, cắt ra là mỗi con đủ 2 mặt.
+              Tự trở: hai mặt chung tờ, in lật ngang.
             </p>
             <div class="field-row">
               <label class="field half" for="offsetSheetWidth">
@@ -368,36 +395,24 @@
               </label>
             </div>
             <p class="hint">
-              Dùng cho mọi khổ thành phẩm, không riêng card: chọn từng cặp theo hàng,
-              object bên trái là mặt trước, bên phải là mặt sau. Các cặp được phép khác
-              khổ nhau; riêng hai mặt của cùng một cặp phải cùng khung. Mỗi mặt chỉ cần
-              là một object hoàn chỉnh, không bắt buộc phải group. Tool tự thử xoay 90°
-              và nén nhiều khổ vào chung nửa tờ bằng bố cục guillotine: mọi cụm đều có
-              đường ra cho dao cắt thẳng, không tạo hốc bị khóa. Bóp chỉ dùng khi nhờ đó
-              dàn thêm được cặp. Hai nửa tự trở dính sát tim tờ, không có khe giữa. Bóp
-              0 mm là giữ nguyên kích thước bài, không sinh PON cắt. Tờ giấy tự sinh luôn có
-              PON giấy ở đủ bốn góc trên layer riêng.
+              Xếp từng cặp: trái = trước, phải = sau; hai mặt cùng khung.
+              Bóp 0 mm: giữ kích thước, không PON cắt.
             </p>
             <p class="hint">
-              Mỗi cặp ăn một chỗ trên tờ. Tool không ưu tiên thứ tự chọn: khổ nào không
-              vừa sẽ được bỏ qua để thử các khổ khác, rồi chọn phương án có nhiều cặp
-              nhất. Tool chỉ xóa đúng các cặp đã dàn; cặp chưa vào được tờ vẫn ở nguyên
-              chỗ cũ để chạy tờ sau. Chỉ tạo đúng 1 artboard.
+              Chỉ xóa cặp đã dàn; cặp chưa vừa được giữ lại.
             </p>
             <label class="check">
               <input type="checkbox" id="offsetRepeatFill" />
               <span>Lặp lại 1 cặp cho đầy tờ</span>
             </label>
             <p class="hint">
-              Tắt: mỗi cặp chỉ dàn một lần. Bật chỉ có tác dụng khi chọn đúng 1 cặp.
-              Khi chọn nhiều cặp, tool luôn giữ từng cặp riêng để còn biết cặp nào chưa
-              dàn và không xóa nhầm nguồn.
+              Chỉ lặp khi chọn đúng một cặp.
             </p>
             <button id="btnDanOffset" class="btn btn-primary" type="button">
               <span class="btn-label">Dàn Offset</span>
             </button>
             <div id="outDanOffset" class="out">
-              Chọn cặp mặt trước + mặt sau rồi bấm Dàn Offset.
+              Chọn cặp rồi bấm Dàn Offset.
             </div>
           </div>
         </div>
@@ -407,7 +422,7 @@
       <main class="body tabpane" id="pane-cutmarks">
         <div class="field">
           <div class="label">Dấu cắt tự động</div>
-          <p class="hint">Chọn các bài, hoặc group bài đã dàn, trong Illustrator.</p>
+          <p class="hint">Chọn bài hoặc group đã dàn.</p>
         </div>
         <div class="field-row">
           <label class="field half" for="cutMarkLength">
@@ -434,18 +449,8 @@
         <div class="field">
           <div class="label">Dàn theo mẫu (học bố cục → gán nhiều mẫu nguồn)</div>
           <p class="hint">
-            <b>Bước 1 — Học mẫu:</b> chọn TẤT CẢ bản đã dàn tay của 1 con mẫu →
-            bấm <b>Học mẫu</b>, rồi bấm <b>Học 1 mặt</b>; với mẫu hai mặt đối
-            xứng, bấm <b>Học 2 mặt - Mặt sau đối xứng</b> để chỉ học một lần.<br />
-            <b>Bước 2 — Áp mẫu:</b> chọn các CON NGUỒN theo thứ tự trái→phải,
-            trên→dưới → bấm <b>Áp mẫu</b>. Không tick chế độ nhiều mẫu: mỗi con
-            nguồn tạo 1 artboard và được nhân vào các slot. Tick chế độ nhiều mẫu:
-            nếu mẫu học có 5 slot thì 5 nguồn lần lượt vào 5 slot; thiếu nguồn thì
-            tool bù bằng con cuối và gần cuối.
-            Tool đọc hướng artwork, raster từng nguồn một lần, xoay/resize/cắt đúng
-            từng slot. Hỗ trợ path, compound path (có lỗ), group có clipping mask,
-            hình tròn, tim, đa giác và path tự vẽ. 2 mặt: đặt nguồn 2 cột
-            (trái=trước, phải=sau). Hỏi chọn pon (.ai) cho artboard.
+            1. Chọn bài đã dàn tay → <b>Học mẫu</b>.<br />
+            2. Chọn nguồn → <b>Áp mẫu</b>. Hai mặt: trái = trước, phải = sau.
           </p>
         </div>
 
@@ -460,9 +465,7 @@
           <span>Dàn nhiều mẫu nguồn khác nhau vào 1 artboard</span>
         </label>
         <p class="hint" style="margin-top: 2px">
-          Không tick: mỗi con nguồn tạo 1 artboard riêng và được nhân vào toàn bộ slot mẫu.
-          Tick: nhiều con lần lượt vào các slot của cùng 1 artboard; thiếu slot thì tool bù
-          bằng con cuối, rồi gần cuối.
+          Không tick: mỗi nguồn một artboard. Tick: gộp nguồn; thiếu thì bù từ nguồn cuối.
         </p>
 
         <button id="btnApMau" class="btn btn-primary" style="margin-top: 10px">
@@ -497,7 +500,7 @@
               <span class="btn-label">Lưu PDF</span>
             </button>
             <div id="outSaveDanMau" class="out">
-              Áp mẫu xong rồi bấm Lưu PDF để chọn thư mục.
+              Áp mẫu xong rồi bấm Lưu PDF.
             </div>
           </div>
         </div>
@@ -508,8 +511,7 @@
         <div class="field">
           <div class="label">Dàn trang catalogue đóng gáy giữa</div>
           <p class="hint">
-            Chọn các trang theo thứ tự đọc (trái → phải, trên → dưới). Số trang
-            phải là bội số của 4. Nhập kích thước thành phẩm của một trang.
+            Chọn trang theo thứ tự đọc; số trang chia hết cho 4.
           </p>
         </div>
 
@@ -521,15 +523,14 @@
             <input type="text" id="hCatalogueAuto" class="num" value="29.9" placeholder="cao" />
           </div>
           <p class="hint">
-            Tool ưu tiên 2 cuốn giống nhau trên một tờ, xả một dao ở chính giữa.
-            Nếu không vừa, tool tự chuyển sang 1 cuốn/tờ. PON được vẽ theo bố cục đã chọn.
+            Tự chọn 2 cuốn/tờ; không vừa thì 1 cuốn/tờ.
           </p>
         </div>
 
         <button id="btnCatalogueAuto" class="btn btn-primary"><span class="btn-label">Dàn Catalogue</span></button>
 
         <div id="outCatalogue" class="out">
-          Chọn trang, nhập kích thước một trang rồi bấm Dàn Catalogue.
+          Chọn trang rồi bấm Dàn Catalogue.
         </div>
       </main>
 
@@ -538,10 +539,7 @@
         <div class="field">
           <div class="label">Dàn CTL Offset (bấm ghim giữa, tự chọn khổ)</div>
           <p class="hint">
-            Chọn các trang theo thứ tự đọc. Khổ nhập là khổ gốc: tool dựng
-            lưới, artboard và PON theo khổ đó trước; sau đó chỉ bóp dần artwork
-            các tờ ruột. Tối đa 15 × 21.15 cm dùng bố cục A5; lớn hơn dùng bố
-            cục A4.
+            Chọn trang theo thứ tự đọc; nhập khổ một trang.
           </p>
         </div>
 
@@ -553,10 +551,7 @@
           </button>
           <div class="acc-body" id="acc-offSig">
             <p class="hint">
-              Bội số của 4, dàn lồng từ ngoài vào trong. Kích thước artboard,
-              PON giấy và PON cắt tự tính theo khổ gốc nhập; PON cắt giữ lưới
-              gốc khi ruột bị bóp dần. PON chỉ quay hướng khi đầu nét chuẩn bị
-              chạm/vượt mép artboard, không vẽ đường cắt dài qua khe đóng ghim.
+              Số trang chia hết cho 4. Chỉ bóp ruột, giữ nguyên PON.
             </p>
             <div class="field">
               <div class="label">Kích thước 1 trang (cm)</div>
@@ -590,9 +585,7 @@
           </button>
           <div class="acc-body" id="acc-offKeo">
             <p class="hint">
-              Dán keo gáy (tuần tự, không bóp, không khe). Mỗi tay 16 trang liên
-              tiếp, dàn AB. Phần dư cuối tự trở (TT8/TT4). Bìa tự dàn tay. Bội
-              số của 4; dư 0/4/8/12.
+              Số trang chia hết cho 4; mỗi tay 16 trang. Bìa dàn tay.
             </p>
             <div class="field">
               <div class="label">Kích thước 1 trang (cm)</div>
@@ -648,7 +641,7 @@
         <div class="field">
           <div class="label">Số layer lặp mỗi nhãn</div>
           <input type="text" id="rnRepeat" class="inp" value="1" />
-          <div class="hint">1 = bình thường; 2 → s1,s1,s2,s2</div>
+          <div class="hint">Lặp 2: s1, s1, s2, s2…</div>
         </div>
         <div class="field">
           <div class="label">Hướng đếm</div>
@@ -673,8 +666,7 @@
       <main class="body tabpane" id="pane-variable">
         <div class="field">
           <p class="hint">
-            Công cụ nhập dữ liệu biến (Variable Importer) — tạo nhiều bản từ 1
-            template + file dữ liệu. Bấm nút để mở công cụ.
+            Tạo nhiều bản từ mẫu và file dữ liệu.
           </p>
         </div>
         <button id="btnVariable" class="btn btn-primary">
@@ -687,9 +679,8 @@
       <main class="body tabpane" id="pane-autosave">
         <div class="field">
           <p class="hint">
-            Xếp object theo hàng: cột trái = mặt trước, cột phải = mặt sau.
-            Hàng đủ 2 cột sẽ lưu PDF 2 trang; hàng chỉ có cột trái sẽ lưu PDF 1
-            trang và thêm “1 mat” vào tên file trước cm/km. File gốc KHÔNG bị sửa.
+            Xếp hàng: trái = trước, phải = sau. Một mặt lưu PDF 1 trang; hai mặt lưu 2 trang.
+            Không sửa file gốc.
           </p>
         </div>
 
@@ -708,7 +699,7 @@
             <input type="text" id="asPad" class="inp" value="2" />
           </div>
         </div>
-        <div class="hint">Đệm 2 → 01, 02, 03… ; 0 → 1, 2, 3…</div>
+        <div class="hint">Đệm 2: 01, 02…; đệm 0: 1, 2…</div>
 
         <div class="field">
           <div class="label">Số hộp</div>
@@ -716,7 +707,7 @@
             <input type="text" id="asHop" class="num" value="5" style="text-align:left" />
             <span class="times">hộp</span>
           </div>
-          <div class="hint">Mỗi số hộp = 1 file. Nhập nhiều số cách nhau dấu phẩy → mỗi con card xuất 1 file cho mỗi số (vd chọn 1 con, nhập 100, 200, 300 → 3 file 100/200/300 hộp).</div>
+          <div class="hint">Ngăn nhiều số bằng dấu phẩy. Mặc định: mỗi con × mỗi số.</div>
         </div>
 
         <label class="check">
@@ -724,13 +715,13 @@
           <span>Ghép số hộp theo thứ tự từng con (thay vì mỗi con × mỗi số)</span>
         </label>
         <p class="hint" style="margin-top: 2px">
-          Bật: số hộp thứ mấy gán đúng cho con thứ đó theo thứ tự đã chọn — vd chọn 5 con, nhập "5, 10, 20, 2, 100" → đúng 5 file, con 1 = 5 hộp, con 2 = 10 hộp... Số lượng số hộp phải bằng đúng số con đã chọn, không thì báo lỗi. Không tick: giữ như cũ (nhân chéo mỗi con × mỗi số).
+          Tick: một số cho một con theo thứ tự; số lượng phải bằng nhau.
         </p>
 
         <div class="field">
           <div class="label">Ghi chú (tuỳ chọn)</div>
           <input type="text" id="asNote" class="inp" value="" placeholder="để trống nếu không cần" />
-          <div class="hint">Có điền thì chèn vào tên file, giữa số hộp và cán màng.</div>
+          <div class="hint">Thêm vào tên file nếu có nhập.</div>
         </div>
 
         <div class="field">
@@ -771,7 +762,7 @@
       </main>
 
       <footer class="foot">
-          <span class="ver">v2.15.1</span>
+          <span class="ver">v2.15.6</span>
       </footer>
     </div>
 

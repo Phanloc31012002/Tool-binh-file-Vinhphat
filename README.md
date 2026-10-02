@@ -54,7 +54,7 @@ Panel gồm 9 tab:
 | Tab | Chức năng |
 |---|---|
 | **Dàn file** | **Dàn Card** (6 loại card, hỗ trợ card đôi 18.4×5.6, voucher ghép card). Mục Dàn Decal cũ đã bỏ; dùng **Dàn tối ưu → Dàn bế** để xếp decal theo khuôn. |
-| **Dàn tối ưu** | Dàn KTS/Offset và **Dàn bế** theo biên khuôn thật: xoay bốn hướng, tận dụng chỗ lõm, đọc tờ và bốn chấm từ file PON AI, giữ khuôn/bài ở layer riêng. |
+| **Dàn tối ưu** | Dàn KTS/Offset và **Dàn bế** theo biên khuôn thật: xoay bốn hướng, tận dụng chỗ lõm, nhập khổ giấy và tự tạo bốn chấm PON, giữ khuôn/bài ở layer riêng. Dàn bế mặc định mỗi mẫu một tờ; tick **Dàn nhiều mẫu vào một tờ** để gộp. Thêm **Dàn bế 2 mặt (tag)**: chọn Khuôn → trước → sau theo hàng; mỗi tờ tạo cặp artboard đối xứng lật ngang, không lật gương chữ/hình. KTS hai mặt khóa từng cặp trái/trước và phải/sau theo hàng nguồn. |
 | **Dấu cắt** | Tạo dấu cắt theo các thiết lập trên panel. |
 | **Dàn theo mẫu** | **Học mẫu**: học bố cục từ 1 bản đã dàn tay (1 hoặc 2 mặt), gồm vị trí, kích thước và góc xoay của từng ô. **Áp mẫu** có hai chế độ: mặc định mỗi nguồn tạo một artboard và nhân vào các ô; tick chọn nhiều mẫu thì các nguồn lần lượt vào từng ô, thiếu nguồn bù bằng con cuối rồi gần cuối. Dùng được với hình tròn và artwork xoay khác nhau. |
 | **Catalogue** | Dàn trang catalogue đóng gáy giữa, khổ A4 hoặc A5 (hoặc khổ tùy chỉnh nhỏ hơn), tự nhớ pon riêng theo từng khổ. |
@@ -86,7 +86,7 @@ DanCard_Setup_23/
 │   ├── css/style.css              # Style
 │   ├── js/main.js                  # Logic giao diện (gọi ExtendScript qua CSInterface)
 │   ├── js/dan_be_nester.js           # Lõi tối ưu Dàn bế theo biên khuôn (CEP)
-│   ├── jsx/dan_be_bridge.jsx         # Đọc khuôn/PON và vẽ kết quả Dàn bế
+│   ├── jsx/dan_be_bridge.jsx         # Đọc khuôn, tạo PON và vẽ kết quả Dàn bế
 │   ├── jsx/dan_card_lib.jsx          # Thư viện các chức năng dàn bình còn lại
 │   ├── assets/, fonts/                # Ảnh & font dùng trong panel
 │   └── LICH_SU_CAP_NHAT.md             # Changelog chi tiết từng bản
@@ -107,7 +107,24 @@ Ví dụ chạy bằng Node.js từ thư mục dự án:
 node tests/dan_be_panel.test.js
 node tests/dan_be_nester.test.js
 node tests/dan_be_cleanup.test.js
+node tests/dan_be_sheets.test.js
+node tests/dan_be_duplex.test.js
+node tests/dan_be_custom_sheet.test.js
+node tests/dan_be_canvas.test.js
+node tests/kts_pairing.test.js
 ```
+
+Với tag hai mặt, chuẩn bị từng hàng **Khuôn → mặt trước → mặt sau**, chọn đủ
+các bộ ba và tick **Dàn bế 2 mặt (tag)**. Mỗi mẫu tạo cặp artboard trước/sau;
+tick gộp mẫu vẫn dùng được. Hai mặt in theo kiểu lật ngang. Với khuôn bất đối
+xứng, artwork mặt sau nguồn cần đúng dáng nhìn từ phía sau; tool canh tâm và
+xoay ngược theo vị trí, không lật gương chữ/hình của artwork.
+
+Dàn bế không cần file PON: hai ô khổ giấy mặc định **33 × 35,4 cm**;
+bốn ô bên dưới là **trên / dưới / trái / phải**, mặc định **10 mm**. Các
+khoảng này đo từ mép artboard đến tâm chấm; chấm tròn có đường kính cố định
+**5 mm**. Né PON vẫn tính từ mép chấm. Tờ đầu bắt đầu ở góc trên trái canvas
+như KTS, các tờ/cặp tiếp theo tự né vùng bận và xuống hàng trong giới hạn canvas.
 
 `tmp/`, các thư mục `_BAN_SUA_*`, `QuanLyNoiBo/`, bộ cài nhân viên sinh tại
 máy, cache và log được ignore. Các file AI/ảnh/PDF thử và bản sao khôi phục

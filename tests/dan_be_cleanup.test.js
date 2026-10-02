@@ -23,9 +23,13 @@ assert(bridge.includes('function dcDanBePrepare(') && bridge.includes('function 
 for (const kept of ['dcDan', 'dcDanToiUu', 'dcDanTuTro', 'dcRasterizeSelection', 'dcRename', 'dcResizeSelectionToSize']) {
   assert(library.includes('function ' + kept + '('), 'Unrelated function retained: ' + kept);
 }
-assert(/<span class="ver">v2\.15\.1<\/span>/.test(html));
-assert(read('DanCardCEP/CSXS/manifest.xml').includes('ExtensionBundleVersion="2.15.1"'));
-assert(read('DanCardCEP/LICH_SU_CAP_NHAT.md').includes('## v2.15.1'));
+const version = /ExtensionBundleVersion="([\d.]+)"/.exec(read('DanCardCEP/CSXS/manifest.xml'))[1];
+assert(html.includes('<span class="ver">v' + version + '</span>'));
+assert(read('DanCardCEP/LICH_SU_CAP_NHAT.md').includes('## v' + version));
+assert(html.includes('id="beMultiPerArtboard"'));
+assert(!/id="beMultiPerArtboard"[^>]*checked/.test(html), 'Separate-model sheets are the default.');
+assert(html.includes('id="beTwoSided"'));
+assert(!/id="beTwoSided"[^>]*checked/.test(html), 'Single-sided mode remains the default.');
 for (const [filename, source] of [['main.js', main], ['dan_card_lib.jsx', library], ['dan_be_bridge.jsx', bridge]]) {
   new vm.Script(source, { filename });
 }
