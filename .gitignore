@@ -16,10 +16,12 @@ QuanLyNoiBo/
 cloudflare-worker/generated/
 .wrangler/
 
-# Local Dàn bế experiments and rollback copies; keep regression tests in Git.
-_BAN_SUA_v32/
-tmp/dan_be_*
-tmp/pdfs/dan_be_binh/
-tmp_binh.png
-tmp_leaf_source.png
-tmp_pon trang.png
+# Temporary renders, native test output and local rollback copies.
+# Regression test source stays in tests/ and is intentionally tracked.
+/tmp/
+/_BAN_SUA_*/
+/tmp_*.png
+
+# Dependencies and generated test reports are not source code.
+node_modules/
+coverage/

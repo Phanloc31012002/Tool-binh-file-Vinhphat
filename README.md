@@ -94,6 +94,30 @@ DanCard_Setup_23/
 └── updater/                    # Script cập nhật tự động (dùng khi cài qua bộ cài đóng gói)
 ```
 
+## Kiểm thử và file chỉ giữ ở máy
+
+`tests/` chứa mã kiểm thử hồi quy: số con, khoảng cách giữa khuôn, lề, né PON,
+luồng gọi script và phục hồi khi lỗi. Giữ thư mục này trên GitHub để kiểm tra
+khi phát triển; ZIP cập nhật chỉ đóng gói `DanCardCEP/` và `updater/`, không
+đưa `tests/` vào bộ cài.
+
+Ví dụ chạy bằng Node.js từ thư mục dự án:
+
+```sh
+node tests/dan_be_panel.test.js
+node tests/dan_be_nester.test.js
+node tests/dan_be_cleanup.test.js
+```
+
+`tmp/`, các thư mục `_BAN_SUA_*`, `QuanLyNoiBo/`, bộ cài nhân viên sinh tại
+máy, cache và log được ignore. Các file AI/ảnh/PDF thử và bản sao khôi phục
+không đưa lên GitHub. Các script kiểm tra Illustrator trực tiếp trong
+`tests/` dùng kết quả riêng ở `tmp/` và không phải các bài kiểm thử độc lập.
+
+Giữ `online/` vì chứa ZIP và thông tin phát hành phục vụ cập nhật; giữ
+`cloudflare-worker/` và `updater/` vì thuộc hệ thống cập nhật. Các bản phát hành
+cũ không bị xóa trong lần dọn này.
+
 ## Xử lý sự cố
 
 - **Cài xong vẫn thấy bản cũ**: đóng hẳn Illustrator (không chỉ đóng panel)
