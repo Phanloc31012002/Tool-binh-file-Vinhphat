@@ -1,9 +1,9 @@
 {
     "product":  "com.locdev.dancard",
-    "version":  "2.14.0",
-    "title":  "vá lại \"in\"",
-    "description":  "vá lại \"in\"",
-    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.14.0.zip",
-    "sha256":  "3E84054A52CC072EC8410EDD875FC5FEB25CEC0D86C08273F70883CD98BAA318",
-    "publishedUtc":  "2026-10-01T07:05:40.8512200Z"
+    "version":  "2.15.1",
+    "title":  "Dàn bế theo biên khuôn và dọn chức năng cũ",
+    "description":  "Dàn bế tự thử xoay và tận dụng chỗ lõm, đọc khổ tờ/PON từ file AI, giữ khuôn và bài ở layer riêng. Bỏ Dàn Decal cũ trong Dàn file và bộ tính Dàn bế cũ; tách nạp script, bổ sung lịch sử cập nhật và kiểm thử. Giữ nguyên CTL và các công cụ khác.",
+    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.15.1.zip",
+    "sha256":  "B5C783329BAB92A2B28A473FAD8894E7EE4C56FA326E7B0F00C8A0E726558C55",
+    "publishedUtc":  "2026-10-02T04:35:09.3944913Z"
 }

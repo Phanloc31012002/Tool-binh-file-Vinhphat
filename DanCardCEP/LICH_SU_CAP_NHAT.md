@@ -2,6 +2,29 @@
 
 _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
+## v2.15.1 — Dọn Dàn bế cũ và tách nạp script (02/10/2026)
+
+- Bỏ bộ tính Dàn bế cũ `dcDanBe()` và mã phiên bản `dcDanBeVersion` khỏi `dan_card_lib.jsx`; nút Dàn bế chỉ dùng luồng mới.
+- Tách kiểm tra/nạp thư viện chung và cầu nối Dàn bế: chỉ nạp lại JSX đang thiếu hoặc cũ, không phụ thuộc hàm Dàn bế đã bỏ.
+- Bỏ mục **Dàn Decal** cũ trong tab Dàn file, handler nút và bảng tọa độ/hàm JSX chỉ phục vụ mục đó. Dàn decal theo khuôn tiếp tục dùng **Dàn tối ưu → Dàn bế**.
+- Giữ nguyên các phần CTL, Dàn KTS/Offset, Raster, Clip, Resize và các chức năng khác. Không xóa file ghi nhớ PON của người dùng.
+- Bổ sung kiểm thử nạp script độc lập và chạy lại bộ kiểm thử Dàn bế. Không xóa bản sao lưu, file AI thử hoặc dữ liệu nguồn.
+
+---
+
+## v2.15.0 — Dàn bế theo biên khuôn thật (02/10/2026)
+
+- Tách thành `js/dan_be_nester.js` (tính bố cục trong CEP) và `jsx/dan_be_bridge.jsx` (đọc/vẽ trong Illustrator). Luồng mới: đọc khuôn/PON → tìm cách xếp → tạo kết quả.
+- Tự thử xoay 0°/90°/180°/270°, xếp xen kẽ, tận dụng chỗ lõm và vùng trống; kiểm tra giao nhau và khoảng cách theo đường khuôn, không chỉ theo hình chữ nhật bao ngoài.
+- Giữ các ô nhập: khe giữa hai khuôn mặc định **2 mm**, khuôn cách mép tờ **4 mm**, né PON **7,5 mm tính từ mép chấm**. Khe không tự cộng phần tràn artwork.
+- Mỗi lần chạy hỏi file PON AI, đọc khổ artboard và vị trí bốn chấm. Giữ khuôn và bài ở layer riêng; artwork đã tràn được nhân bản, xoay và canh tâm theo khuôn.
+- Cải thiện tìm bố cục hình tròn và hình dạng bất quy tắc, cân bằng nhiều loại bài; thử xoay/đổi vị trí cụm sát mép để tăng lề mà không giảm số con.
+- Đã thử trực tiếp trên bản sao trong Illustrator: mẫu thìa **10 con**, lề nhỏ nhất khoảng **14,79 mm** sau chỉnh bố cục; tròn 5 cm **42 con** trên tờ PON 33 × 35,4 cm với khe 1 mm, lề 4 mm và né PON 7,5 mm. Mẫu lá đạt **50 con** trong kiểm thử hồi quy.
+- Kiểm thử thêm khuôn giả lập mèo, thỏ, sao lõm, hình có lỗ, hình L và nhiều loại trộn chung; có kiểm tra khe, lề, né PON độc lập.
+- Giới hạn: đây là bộ tìm kiếm nhiều phương án, chưa bảo đảm số con lớn nhất tuyệt đối với mọi khuôn. Cần đường khuôn vector đóng hợp lệ; đường cong được lấy mẫu để tính hình học.
+
+---
+
 ## v2.14.0 — vá lại "in"
 
 - vá lại "in"

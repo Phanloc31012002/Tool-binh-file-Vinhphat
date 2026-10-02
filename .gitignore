@@ -15,3 +15,11 @@ QuanLyNoiBo/
 # Generated from online/latest.json immediately before a Worker deployment.
 cloudflare-worker/generated/
 .wrangler/
+
+# Local Dàn bế experiments and rollback copies; keep regression tests in Git.
+_BAN_SUA_v32/
+tmp/dan_be_*
+tmp/pdfs/dan_be_binh/
+tmp_binh.png
+tmp_leaf_source.png
+tmp_pon trang.png

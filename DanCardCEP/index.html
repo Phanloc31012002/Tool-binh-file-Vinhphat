@@ -182,7 +182,7 @@
         <button class="tab" data-tab="autosave">Auto Save</button>
       </div>
 
-      <!-- TAB: DÀN FILE (accordion Card + Decal) -->
+      <!-- TAB: DÀN FILE (Card) -->
       <main class="body tabpane active" id="pane-danfile">
         <!-- Accordion: Card -->
         <div class="acc">
@@ -207,132 +207,6 @@
           </div>
         </div>
 
-        <!-- Accordion: Decal -->
-        <div class="acc">
-          <button class="acc-head" data-acc="decal">
-            <span class="acc-arrow">&#9654;</span>
-            <span>Dàn Decal</span>
-          </button>
-          <div class="acc-body" id="acc-decal">
-            <div class="field">
-              <div class="label">Cỡ decal</div>
-              <div class="radio-list">
-                <label class="radio-row"
-                  ><input type="radio" name="decalSize" value="1.5" /><span
-                    >1.5 cm (464 chỗ)</span
-                  ></label
-                >
-                <label class="radio-row"
-                  ><input type="radio" name="decalSize" value="2" /><span
-                    >2 cm (268 chỗ)</span
-                  ></label
-                >
-
-                <label class="radio-row"
-                  ><input type="radio" name="decalSize" value="2.5" /><span
-                    >2.5 cm (162 chỗ)</span
-                  ></label
-                >
-                <label class="radio-row"
-                  ><input type="radio" name="decalSize" value="3" /><span
-                    >3 cm (114 chỗ)</span
-                  ></label
-                >
-                <label class="radio-row"
-                  ><input type="radio" name="decalSize" value="3.5" /><span
-                    >3.5 cm (83 chỗ)</span
-                  ></label
-                >
-                <label class="radio-row"
-                  ><input type="radio" name="decalSize" value="4" /><span
-                    >4 cm (63 chỗ)</span
-                  ></label
-                >
-                <label class="radio-row"
-                  ><input type="radio" name="decalSize" value="4.5" /><span
-                    >4.5 cm (54 chỗ)</span
-                  ></label
-                >
-                <label class="radio-row"
-                  ><input type="radio" name="decalSize" value="5" /><span
-                    >5 cm (42 chỗ)</span
-                  ></label
-                >
-                <label class="radio-row"
-                  ><input type="radio" name="decalSize" value="5.5" /><span
-                    >5.5 cm (33 chỗ)</span
-                  ></label
-                >
-                <label class="radio-row"
-                  ><input
-                    type="radio"
-                    name="decalSize"
-                    value="6"
-                    checked
-                  /><span>6 cm (27 chỗ)</span></label
-                >
-                <label class="radio-row"
-                  ><input type="radio" name="decalSize" value="6.5" /><span
-                    >6.5 cm (23 chỗ)</span
-                  ></label
-                >
-                <label class="radio-row"
-                  ><input type="radio" name="decalSize" value="7" /><span
-                    >7 cm (20 chỗ)</span
-                  ></label
-                >
-                <label class="radio-row"
-                  ><input type="radio" name="decalSize" value="7.5" /><span
-                    >7.5 cm (18 chỗ)</span
-                  ></label
-                >
-                <label class="radio-row"
-                  ><input type="radio" name="decalSize" value="8" /><span
-                    >8 cm (14 chỗ)</span
-                  ></label
-                >
-                <label class="radio-row"
-                  ><input type="radio" name="decalSize" value="8.5" /><span
-                    >8.5 cm (14 chỗ)</span
-                  ></label
-                >
-                <label class="radio-row"
-                  ><input type="radio" name="decalSize" value="9" /><span
-                    >9 cm (12 chỗ)</span
-                  ></label
-                >
-                <label class="radio-row"
-                  ><input type="radio" name="decalSize" value="9.5" /><span
-                    >9.5 cm (10 chỗ)</span
-                  ></label
-                >
-              </div>
-            </div>
-            <div class="field">
-              <div class="label">Khổ pon</div>
-              <div class="radio-list">
-                <label class="radio-row"
-                  ><input
-                    type="radio"
-                    name="decalPon"
-                    value="33x35.4"
-                    checked
-                  /><span>33 × 35.4</span></label
-                >
-                <label class="radio-row"
-                  ><input type="radio" name="decalPon" value="33x35" /><span
-                    >33 × 35</span
-                  ></label
-                >
-              </div>
-            </div>
-            <p class="hint">
-              Chọn object → chọn cỡ + khổ → bấm Dàn. Nhiều object sẽ chia đều.
-            </p>
-            <button id="btnDecal" class="btn btn-primary"><span class="btn-label">Dàn Decal</span></button>
-            <div id="outDecal" class="out">Chọn object rồi bấm Dàn.</div>
-          </div>
-        </div>
       </main>
 
       <!-- TAB: DÀN TỐI ƯU (không pon) -->
@@ -428,11 +302,32 @@
                 tròn được đọc trực tiếp từ file đó.
               </p>
               <p class="hint">
-                Bài tràn là biên dàn thực: cách nhau tối thiểu 1 mm và né mép PON 7,5 mm.
+                Khuôn bế là biên dàn thực: mặc định cách nhau 2 mm và né mép PON 7,5 mm.
                 Khuôn cách mép tờ ít nhất 4 mm. Tool xoay 0° / 90° / 180° / 270°, luân
                 phiên đều các loại và giữ khuôn dưới bài trên artboard mới.
               </p>
             </div>
+            <div class="field-row">
+              <label class="field half" for="beGap">
+                <span class="label">Khe giữa 2 khuôn (mm)</span>
+                <input id="beGap" class="num" type="text" value="2" inputmode="decimal" />
+              </label>
+              <label class="field half" for="beMargin">
+                <span class="label">Khuôn cách mép tờ (mm)</span>
+                <input id="beMargin" class="num" type="text" value="4" inputmode="decimal" />
+              </label>
+            </div>
+            <div class="field-row">
+              <label class="field half" for="bePonClear">
+                <span class="label">Né PON (mm)</span>
+                <input id="bePonClear" class="num" type="text" value="7.5" inputmode="decimal" />
+              </label>
+              <div class="field half"></div>
+            </div>
+            <p class="hint">
+              Khe đo trực tiếp giữa hai <b>đường bế</b>; tool không tự cộng phần tràn
+              của Bài. Né PON đo từ <b>mép chấm</b>.
+            </p>
             <button id="btnDanBe" class="btn btn-primary" type="button">
               <span class="btn-label">Chọn PON AI &amp; Dàn bế</span>
             </button>
@@ -876,11 +771,12 @@
       </main>
 
       <footer class="foot">
-          <span class="ver">v2.14.0</span>
+          <span class="ver">v2.15.1</span>
       </footer>
     </div>
 
     <script src="./js/CSInterface.js"></script>
+    <script src="./js/dan_be_nester.js"></script>
     <script src="./js/main.js"></script>
   </body>
 </html>

@@ -1,4 +1,4 @@
-/* main.js — Công cụ bình: Dàn file (Card+Decal), Đổi tên, Variable. */
+/* main.js — Công cụ bình: Dàn Card, Dàn tối ưu/Dàn bế, Đổi tên, Variable. */
 (function () {
   "use strict";
   var cs = new CSInterface();
@@ -1251,7 +1251,7 @@
     });
   });
 
-  // ---- accordion (Card / Decal) ----
+  // ---- accordion cho các nhóm chức năng ----
   document.querySelectorAll(".acc-head").forEach(function (h) {
     h.addEventListener("click", function () {
       var body = h.nextElementSibling;
@@ -1372,10 +1372,13 @@
         .getSystemPath(SystemPath.EXTENSION)
         .replace(/\\/g, "/");
       var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
+      var danBeBridgePath = extensionRoot + "/jsx/dan_be_bridge.jsx";
       return (
-        "if (typeof dcDanToiUu !== 'function' || typeof dcCopyToiUuNoteToOddArtboards !== 'function' || typeof dcDanToiUuVersion === 'undefined' || dcDanToiUuVersion < 15 || typeof dcDanBe !== 'function' || typeof dcDanBeVersion === 'undefined' || dcDanBeVersion < 1) { $.evalFile(" +
+        "if (typeof dcDanToiUu !== 'function' || typeof dcCopyToiUuNoteToOddArtboards !== 'function' || typeof dcDanToiUuVersion === 'undefined' || dcDanToiUuVersion < 15) { $.evalFile(" +
         jsStr(jsxPath) +
-        "); } "
+        "); } " +
+        "if (typeof dcDanBePrepare !== 'function' || typeof dcDanBeRender !== 'function' || typeof dcDanBeNestingVersion === 'undefined' || dcDanBeNestingVersion < 4) { $.evalFile(" +
+        jsStr(danBeBridgePath) + "); } "
       );
     } catch (e) {
       return "";
@@ -1602,12 +1605,70 @@
   var outDanBe = document.getElementById("outDanBe");
   if (btnDanBe && outDanBe) {
     btnDanBe.addEventListener("click", function () {
+      var beGapEl = document.getElementById("beGap");
+      var beMarginEl = document.getElementById("beMargin");
+      var bePonEl = document.getElementById("bePonClear");
+      var beGap = beGapEl ? beGapEl.value || "2" : "2";
+      var beMargin = beMarginEl ? beMarginEl.value || "4" : "4";
+      var bePon = bePonEl ? bePonEl.value || "7.5" : "7.5";
       show(outDanBe, "Đang chọn file PON và tính dàn bế…");
       btnDanBe.disabled = true;
-      cs.evalScript(loadDanToiUuJsx() + "dcDanBe()", function (res) {
-        btnDanBe.disabled = false;
-        showCountResult(outDanBe, res);
-      });
+      cs.evalScript(
+        loadDanToiUuJsx() + "dcDanBePrepare(" + jsStr(beGap) + ", " +
+          jsStr(beMargin) + ", " + jsStr(bePon) + ")",
+        function (prepared) {
+          var preparedText = String(prepared || "");
+          if (preparedText.indexOf("OKJSON:") !== 0) {
+            btnDanBe.disabled = false;
+            showCountResult(outDanBe, preparedText);
+            return;
+          }
+
+          var payload;
+          try {
+            payload = JSON.parse(preparedText.substring(7));
+          } catch (parseError) {
+            btnDanBe.disabled = false;
+            show(outDanBe, "ERR: Khong doc duoc du lieu bien dang tu Illustrator.");
+            return;
+          }
+          if (!window.DanBeNester || typeof window.DanBeNester.nest !== "function") {
+            btnDanBe.disabled = false;
+            show(outDanBe, "ERR: Chua nap duoc loi dan be silhouette.");
+            return;
+          }
+
+          show(outDanBe, "Dang tim cach long khuon theo duong bao that...");
+          // Yield once so Chromium can repaint the status before doing the
+          // bounded geometry search. The nesting core never calls Illustrator.
+          window.setTimeout(function () {
+            var result;
+            try {
+              result = window.DanBeNester.nest(payload);
+            } catch (nestError) {
+              btnDanBe.disabled = false;
+              show(outDanBe, "ERR: " + (nestError && nestError.message ? nestError.message : nestError));
+              return;
+            }
+            if (!result || !result.ok) {
+              btnDanBe.disabled = false;
+              show(outDanBe, "ERR: " + (result && result.error ? result.error : "Khong tim duoc cach dan hop le."));
+              return;
+            }
+            show(outDanBe, "Da tim " + result.count + " con; dang ve Khuon, Bai va PON...");
+            cs.evalScript(
+              loadDanToiUuJsx() +
+                "dcDanBeRender(" + jsStr(payload.jobId) + ", " +
+                jsStr(JSON.stringify(result.slots)) + ", " +
+                jsStr(JSON.stringify({ detail: result.detail, mode: result.mode })) + ")",
+              function (rendered) {
+                btnDanBe.disabled = false;
+                showCountResult(outDanBe, rendered);
+              },
+            );
+          }, 20);
+        },
+      );
     });
   }
 
@@ -3304,26 +3365,6 @@
       });
   }
 
-  // ---- Dàn Decal ----
-  var btnDecal = document.getElementById("btnDecal");
-  var outDecal = document.getElementById("outDecal");
-  btnDecal.addEventListener("click", function () {
-    var ponSize = "33x35.4",
-      pc = document.querySelector('input[name="decalPon"]:checked');
-    if (pc) ponSize = pc.value;
-    var decalSize = "6",
-      dc = document.querySelector('input[name="decalSize"]:checked');
-    if (dc) decalSize = dc.value;
-    show(outDecal, "Đang dàn decal…");
-    btnDecal.disabled = true;
-    cs.evalScript(
-      "dcDanDecal(" + jsStr(decalSize) + ", " + jsStr(ponSize) + ")",
-      function (res) {
-        btnDecal.disabled = false;
-        handleRes(outDecal, res);
-      },
-    );
-  });
 
   // ---- Dàn Catalogue ----
   var outCatalogue = document.getElementById("outCatalogue");

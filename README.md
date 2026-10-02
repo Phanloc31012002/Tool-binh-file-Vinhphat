@@ -49,11 +49,13 @@ Xem các thay đổi của từng bản tại
 
 ## Tính năng
 
-Panel gồm 7 tab:
+Panel gồm 9 tab:
 
 | Tab | Chức năng |
 |---|---|
-| **Dàn file** | Accordion gồm **Dàn Card** (6 loại card, hỗ trợ card đôi 18.4×5.6, voucher ghép card) và **Dàn Decal** (17 khổ: 1.5, 2, 2.5, rồi 3–9.5 cm mỗi 0.5 cm), tự raster/clip/resize theo khung. |
+| **Dàn file** | **Dàn Card** (6 loại card, hỗ trợ card đôi 18.4×5.6, voucher ghép card). Mục Dàn Decal cũ đã bỏ; dùng **Dàn tối ưu → Dàn bế** để xếp decal theo khuôn. |
+| **Dàn tối ưu** | Dàn KTS/Offset và **Dàn bế** theo biên khuôn thật: xoay bốn hướng, tận dụng chỗ lõm, đọc tờ và bốn chấm từ file PON AI, giữ khuôn/bài ở layer riêng. |
+| **Dấu cắt** | Tạo dấu cắt theo các thiết lập trên panel. |
 | **Dàn theo mẫu** | **Học mẫu**: học bố cục từ 1 bản đã dàn tay (1 hoặc 2 mặt), gồm vị trí, kích thước và góc xoay của từng ô. **Áp mẫu** có hai chế độ: mặc định mỗi nguồn tạo một artboard và nhân vào các ô; tick chọn nhiều mẫu thì các nguồn lần lượt vào từng ô, thiếu nguồn bù bằng con cuối rồi gần cuối. Dùng được với hình tròn và artwork xoay khác nhau. |
 | **Catalogue** | Dàn trang catalogue đóng gáy giữa, khổ A4 hoặc A5 (hoặc khổ tùy chỉnh nhỏ hơn), tự nhớ pon riêng theo từng khổ. |
 | **CTL Offset** | Dàn bình cho in offset khổ lớn 65×86: **Đóng ghim giữa** (bìa TT4 + ruột AB tự trở) và **Keo gáy** (mỗi tay 16 trang, dàn AB tuần tự). |
@@ -83,7 +85,9 @@ DanCard_Setup_23/
 │   ├── index.html                # Giao diện panel
 │   ├── css/style.css              # Style
 │   ├── js/main.js                  # Logic giao diện (gọi ExtendScript qua CSInterface)
-│   ├── jsx/dan_card_lib.jsx          # Toàn bộ logic dàn bình (ExtendScript)
+│   ├── js/dan_be_nester.js           # Lõi tối ưu Dàn bế theo biên khuôn (CEP)
+│   ├── jsx/dan_be_bridge.jsx         # Đọc khuôn/PON và vẽ kết quả Dàn bế
+│   ├── jsx/dan_card_lib.jsx          # Thư viện các chức năng dàn bình còn lại
 │   ├── assets/, fonts/                # Ảnh & font dùng trong panel
 │   └── LICH_SU_CAP_NHAT.md             # Changelog chi tiết từng bản
 ├── online/                     # Gói bản phát hành + latest.json
