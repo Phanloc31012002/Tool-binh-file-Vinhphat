@@ -2,6 +2,32 @@
 
 _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
+## v2.16.3 — PHÁT HÀNH BẢN SAVE PDF CTL
+
+- PHÁT HÀNH BẢN SAVE PDF CTL
+
+---
+
+## v2.16.2 — Keo gáy A4 tối đa 21,2 × 30 cm (03/10/2026)
+
+- **Tờ 65 × 86**: khung A4 tối đa **21,2 × 30 cm**. Phóng/thu đồng đều hai trục cho bài nằm vừa khung, canh giữa phần dư; không kéo méo để ép tỷ lệ nguồn vào khung. Giữ thứ tự trang và đăng ký A/B.
+- **Tờ 65 × 43 / 43 × 32,5**: dùng khung riêng, thu đều cạnh tương ứng về tối đa **20,9 cm** nếu cần; không thu các trang nằm trên tờ lớn. A4 khung 21,2 × 30 xuống tờ nhỏ thành khoảng **20,9 × 29,575 cm**, không bóp riêng ngang. PON cắt và vị trí trang theo đúng khung của từng tờ; giữ kích thước giấy thực 64,8 × 41,8 / 42,8 × 31,3 cm.
+- Tự trở 4 trang canh theo tâm ô cố định, không theo bounds tổng của hai bài có tỷ lệ khác nhau. Dấu cắt ở sát biên giấy vẫn có chiều dài, không biến thành điểm. Kiểm tra giới hạn khung/khổ giấy trước khi raster; nạp engine phiên bản 11. Chỉ cài local, chưa phát hành GitHub.
+- Kiểm chứng: 30 bộ kiểm thử tự động qua; native Illustrator chạy bài mẫu A4 20 trang gồm A/B + tự trở 4 với bốn tỷ lệ nguồn khác nhau, đo cùng scale X/Y, đúng tâm ô, A/B và PON, nguồn không chọn giữ nguyên. Chạy thêm A5 tự trở 4 ở khổ nhập 15 × 21,15 cm, thu đều cạnh dài xuống 20,9 cm và kiểm tra ghi chú/PON nằm trong tờ nhỏ.
+
+---
+
+## v2.16.1 — CTL lưu bộ AI/JPG/ZIP, Keo gáy không bóp, raster 500 ppi (03/10/2026)
+
+- **Lưu CTL Offset**: thêm ô **Nội dung sau RUỘT N / BÌA**. Mỗi tờ xuất `.ai`, `.jpg` và `.zip` cùng tên vào thư mục đã chọn; ZIP chứa đúng hai file AI + JPG, vẫn giữ hai file rời. A/B chung một AI hai artboard và một JPG toàn bài (**Use Artboards tắt**). Giữ các nút theo khổ vừa dàn, không đổi lưu PDF ở tab khác.
+- JPG dùng Export As native: **CMYK, Quality 10 Maximum, Baseline Standard, 300 ppi, Type Optimized (Hinted), Embed ICC Profile**. Kiểm tra native trên máy hiện tại nhúng **U.S. Web Coated (SWOP) v2**. JPG giữ 300 ppi theo xác nhận riêng, không tăng cùng raster xử lý bài.
+- Nén ZIP chạy nền sau khi xuất, không chặn Illustrator trong lúc nén. Tên tiếng Việt/ký tự hợp lệ được truyền như dữ liệu, không ghép vào lệnh shell; lệnh không dài theo số ruột. Không ghi đè AI/JPG/ZIP có sẵn. Xuất JPG/nén lỗi thì giữ AI đã lưu và các JPG hoàn tất, báo rõ lỗi; ZIP chỉ đổi sang tên cuối sau khi kiểm tra đủ hai file. Chỉ copy/group/dịch nguyên cụm trên bản sao, không thay đổi tài liệu nguồn.
+- **Keo gáy**: bỏ ép ngang/dọc riêng. Phóng/thu đồng đều hai trục, giữ tỷ lệ; kiểm tra toàn bộ trang trước khi tạo artboard/raster. Sai tỷ lệ với khổ nhập thì báo số trang và giữ nguồn; kiểm tra khung nguồn với dung sai 0,2 mm, không tự thêm viền trắng lớn. Sau raster vẫn dùng cùng tỷ lệ hai trục, tính đến làm tròn pixel, không báo sai giữa chừng khi phóng nguồn nhỏ. Không thu nhỏ thêm để vừa tờ, không đổi thứ tự trang, A/B hay khổ PON. Nạp engine phiên bản 10.
+- **Raster xử lý bài**: thống nhất **500 ppi** cho nút Raster, logic raster/clip và các bước raster khi dàn card, catalogue, CTL, keo gáy, theo mẫu; cập nhật thông báo/tooltip. Helper chung ép 500 ppi cả với caller cũ. Ảnh có sẵn ở luồng vốn bỏ qua raster vẫn được giữ, không nội suy lại để giả tăng chất lượng.
+- Kiểm chứng native Illustrator 28: lưu/mở lại AI bìa và ruột A/B, đủ vector/raster/PON/ghi chú, nguồn không đổi; đọc JPG xác nhận CMYK, Baseline, 300 ppi, chất lượng tối đa và ICC SWOP. Nén/mở ZIP, so hai nội dung byte-for-byte với file rời; thử tên Unicode/ký tự đặc biệt, trùng file, thiếu JPG và lỗi xử lý. Đo nút Raster/entry JSX/helper chung đều 500 ppi, Keo gáy giữ hai trục đồng đều và từ chối tỷ lệ sai trước raster. Chỉ cài local, chưa phát hành GitHub.
+
+---
+
 ## v2.16.0 — phát hanh test ok
 
 - phát hanh test ok

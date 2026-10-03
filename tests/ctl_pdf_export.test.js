@@ -252,6 +252,7 @@ function fixture(failName) {
   function File(path) {
     this.fsName = path;
     Object.defineProperty(this, "exists", { get: () => files.has(path) });
+    Object.defineProperty(this, "length", { get: () => files.has(path) ? 100 : -1 });
     this.remove = () => files.delete(path);
   }
   const context = {
@@ -264,6 +265,12 @@ function fixture(failName) {
     IllustratorSaveOptions: function () {
       this.typename = "IllustratorSaveOptions";
     },
+    Folder: {system:{fsName:'SYSTEM'},temp:{fsName:'TEMP'}},
+    dcCtlExportJpeg(d,file) {
+      assert.strictEqual(app.activeDocument,d);
+      files.add(file.fsName);
+      if(file.fsName.includes(failName || 'NEVER_FAIL')) throw Error('injected JPEG failure');
+    },
     PDFCompatibility: { ACROBAT5: 5 },
     ElementPlacement: { PLACEATEND: 1 },
     SaveOptions: { DONOTSAVECHANGES: 0 },
@@ -273,6 +280,7 @@ function fixture(failName) {
   return {
     run: (jobs) => context.dcLuuCtlOffsetPDF("3", jobs),
     runAI: (jobs, total = "3") => context.dcLuuCtlOffsetAI(total, jobs),
+    runPackage: (jobs,suffix='') => context.dcLuuCtlOffsetAIPackage('3',jobs,suffix),
     files,
     saves,
     source,
@@ -395,6 +403,45 @@ assert.match(aiInvalid.runAI("BIA=1@310x200"), /^ERR:.*lưu AI/);
 assert.match(aiInvalid.runAI("invalid"), /^ERR:.*lưu AI/);
 assert.strictEqual(aiInvalid.files.size, 0);
 aiInvalid.unchanged();
+const packaged = fixture();
+const suffix = "CATALOGUE thử ' & $ = @ (1)";
+const packageResult = packaged.runPackage(jobs,suffix);
+assert.match(packageResult,/^OK:.*2 AI \+ JPG/);
+const manifest = JSON.parse(packageResult.split('||CTLPACK:')[1]);
+assert.strictEqual(manifest.jobs.length,2);
+assert.deepStrictEqual(manifest.jobs.map(j=>j.baseName),['BIA '+suffix,'RUOT 1 '+suffix]);
+for(const job of manifest.jobs) {
+  assert.strictEqual(job.ai,'OUTPUT/'+job.baseName+'.ai');
+  assert.strictEqual(job.jpg,'OUTPUT/'+job.baseName+'.jpg');
+  assert.strictEqual(job.zip,'OUTPUT/'+job.baseName+'.zip');
+  assert(packaged.files.has(job.ai));assert(packaged.files.has(job.jpg));
+  assert(!packaged.files.has(job.zip),'ZIP is created after host export completes');
+}
+assert.strictEqual(packaged.batchTranslations(),3);
+packaged.unchanged();
+for(const badSuffix of ['bad/name','bad:name','bad\\name','bad\nname','bad.']) {
+  const invalid=fixture();
+  assert.match(invalid.runPackage(jobs,badSuffix),/^ERR:.*tên file|^ERR: Tên file/);
+  assert.strictEqual(invalid.files.size,0);
+  invalid.unchanged();
+}
+for(const ext of ['ai','jpg','zip']) {
+  const collision=fixture();
+  collision.files.add('OUTPUT/BIA.'+ext);
+  assert.match(collision.runPackage(jobs),/^ERR: File đã tồn tại/);
+  assert.deepStrictEqual([...collision.files],['OUTPUT/BIA.'+ext]);
+  collision.unchanged();
+}
+const jpegFailure=fixture('.jpg');
+assert.match(jpegFailure.runPackage(jobs),/^ERR:.*AI đã lưu; xuất JPG lỗi/);
+assert.deepStrictEqual([...jpegFailure.files],['OUTPUT/BIA.ai','OUTPUT/RUOT 1.ai']);
+jpegFailure.unchanged();
+const partial=fixture('RUOT 1.jpg');
+const partialResult=partial.runPackage(jobs);
+assert.match(partialResult,/^OK:.*1 AI \+ JPG.*Lỗi 1 file/);
+assert.deepStrictEqual([...partial.files],['OUTPUT/BIA.ai','OUTPUT/BIA.jpg','OUTPUT/RUOT 1.ai']);
+assert.strictEqual(JSON.parse(partialResult.split('||CTLPACK:')[1]).jobs.length,1);
+partial.unchanged();
 console.log(
   "CTL AI/PDF: format isolation, native A/B boards, active-document guards, locked PON, layers, coordinates, source preservation and failure cleanup passed.",
 );

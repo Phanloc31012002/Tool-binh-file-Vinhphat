@@ -24,7 +24,7 @@ function fixture(
   f.doc.pageOrigin = [-4831.75, 0];
   f.doc.artboards.remove = (i) => f.doc.artboards[i].remove();
   for (let i = 0; i < n; i++)
-    f.source([left + i * 70, top, left + i * 70 + 60, top - 90], i + 1);
+    f.source([left + i * 70, top, left + i * 70 + 60, top - (kind === "keo" ? 60*20.7/14.5 : 90)], i + 1);
   f.doc.selection = f.originals.slice();
   f.sourceLayer.parent = f.doc;
   f.sourceLayer.typename = "Layer";
@@ -142,7 +142,7 @@ const main = fs.readFileSync(
   "utf8",
 );
 assert.match(main, /dcSignature8AutoPonVersion < 38/);
-assert.match(main, /dcKeoGayAutoPonVersion < 9/);
+assert.match(main, /dcKeoGayAutoPonVersion < 11/);
 console.log(
   "CTL: shifted saved canvas, exact source anchor, genuine-edge preflight without source/PON mutation, creation rollback and coordinate restoration passed.",
 );

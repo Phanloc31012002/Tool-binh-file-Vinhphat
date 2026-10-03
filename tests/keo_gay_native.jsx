@@ -3,7 +3,7 @@
 // only modal answers and icon-file IO are replaced with an isolated vector.
 (function () {
   var root = "C:/Users/ADMIN/Downloads/DanCard_Setup_23";
-  var out = new Folder(root + "/tmp/keo_gay_paper_2.15.20_20261003");
+  var out = new Folder(root + "/tmp/keo_gay_paper_2.16.2_" + new Date().getTime());
   if (!out.exists) out.create();
   function log(phase) {
     var progress = File(out.fsName + "/phase.txt");
@@ -50,6 +50,11 @@
       types: ["TT8", "TT4"],
     },
   ];
+  cases.push({ n:4, w:2, h:3, name:"Uniform_500ppi", types:["TT4"], exact:true });
+  cases.push({ n:20, w:21.2, h:30, name:"A4_max_AB_and_TT4", types:["AB","AB","TT4"],
+    sourceSizes:[[21,29.7],[20,29.7],[21.2,30],[21,28]] });
+  cases.push({ n:4, w:21.2, h:30, name:"A4_max_TT4_only", types:["TT4"],
+    sourceSizes:[[21,29.7],[20,29.7],[21.2,30],[21,28]] });
   var spec = cases[ci],
     previous = app.documents.length ? app.activeDocument : null;
   var previousCoordinates = app.coordinateSystem,
@@ -164,6 +169,7 @@
     log("LOAD v" + dcKeoGayAutoPonVersion + " " + spec.name);
     previousFlatten = dcFlattenForImposition;
     dcFlattenForImposition = function (d, item, frame, dpi) {
+      assert(dpi===500,"All new Keo Gay rasters must use 500ppi");
       var page = parseInt(item.name.replace("SOURCE_PAGE_", ""), 10);
       var flat = previousFlatten(d, item, frame, dpi);
       flat.name = "KEO_TEST_PAGE_" + page;
@@ -197,7 +203,9 @@
         y = 600 - Math.floor(pi / 8) * 250;
       var g = doc.groupItems.add();
       g.name = "SOURCE_PAGE_" + (pi + 1);
-      var path = g.pathItems.rectangle(y, x, 60, 90);
+      var sourceWidth=spec.exact ? spec.w*10*2.834645669 : 60;
+      var sourceSize=spec.sourceSizes ? spec.sourceSizes[pi%spec.sourceSizes.length] : [spec.w,spec.h];
+      var path = g.pathItems.rectangle(y, x, sourceWidth, sourceWidth*sourceSize[1]/sourceSize[0]);
       path.stroked = false;
       path.filled = true;
       var ink = new CMYKColor();
@@ -267,6 +275,7 @@
           small,
       );
       var ns = numbers(faces[bi]);
+      var frameScale=paperSize[0]<650 ? Math.min(1,20.9/(small?Math.max(spec.w,spec.h):spec.w)) : 1;
       var packed = faces[bi].blocks
         ? dcKeoGayPackedGrid(
             faces[bi],
@@ -280,6 +289,24 @@
         var item = pages[ns[ni] - 1];
         assert(!!item, "Missing page " + ns[ni]);
         assert(inside(r, bounds(item)), "Page outside paper " + ns[ni]);
+        var pageBounds=bounds(item), sortedSize=[pageBounds[2]-pageBounds[0],pageBounds[1]-pageBounds[3]].sort(function(a,b){return a-b;});
+        // Small synthetic source pages are enlarged after rasterization;
+        // account for a rounded source pixel, not an independent X/Y scale.
+        var pixelTolerance=(spec.exact?0.2:0.15*spec.w*10/(60/MM))*MM;
+        var inputSize=spec.sourceSizes ? spec.sourceSizes[(ns[ni]-1)%spec.sourceSizes.length] : [spec.w,spec.h];
+        var fitScale=Math.min(spec.w/inputSize[0],spec.h/inputSize[1])*frameScale;
+        assert(Math.abs(sortedSize[0]-Math.min(inputSize[0],inputSize[1])*fitScale*10*MM)<pixelTolerance &&
+          Math.abs(sortedSize[1]-Math.max(inputSize[0],inputSize[1])*fitScale*10*MM)<pixelTolerance,"Page dimensions changed or squeezed");
+        var pageMatrix=item.matrix;
+        assert(Math.abs(Math.sqrt(pageMatrix.mValueA*pageMatrix.mValueA+pageMatrix.mValueB*pageMatrix.mValueB)-
+          Math.sqrt(pageMatrix.mValueC*pageMatrix.mValueC+pageMatrix.mValueD*pageMatrix.mValueD))<0.00001,"X/Y page scale differs");
+        if(spec.exact) {
+          var mx=item.matrix;
+          var nativePpi=[72/Math.sqrt(mx.mValueA*mx.mValueA+mx.mValueB*mx.mValueB),72/Math.sqrt(mx.mValueC*mx.mValueC+mx.mValueD*mx.mValueD)];
+          assert(Math.abs(nativePpi[0]-nativePpi[1])<0.01,"X/Y raster scale differs");
+          assert(Math.abs(nativePpi[0]-500)<2,"Output raster not 500ppi");
+          report.effectivePpi=nativePpi;
+        }
         if (packed) {
           var cell = packed.cells[ni];
           var expectedAngle =
@@ -291,7 +318,19 @@
             ((((actualAngle - expectedAngle) % 360) + 540) % 360) - 180;
           assert(Math.abs(delta) < 0.01, "Raster rotation mismatch " + ns[ni]);
         }
-        captures.push({ page: ns[ni], face: bi, bounds: bounds(item) });
+        if(spec.sourceSizes) {
+          var expectedX=(r[0]+r[2])/2, expectedY;
+          if(faces[bi].type==="TT4") {
+            expectedX+=(ni<2?-1:1)*(spec.h*frameScale*10+6)*MM/2;
+            expectedY=(r[1]+r[3])/2+(ni%2===0?1:-1)*spec.w*frameScale*10*MM/2;
+          } else {
+            expectedX+=(ni%4-1.5)*spec.w*frameScale*10*MM;
+            expectedY=r[1]-23.7*MM-(ni<4?.5:1.5)*spec.h*frameScale*10*MM;
+          }
+          assert(Math.abs((pageBounds[0]+pageBounds[2])/2-expectedX)<.08 &&
+            Math.abs((pageBounds[1]+pageBounds[3])/2-expectedY)<.08,"Page not centred in nominal frame "+ns[ni]);
+        }
+        captures.push({ page: ns[ni], face: bi, bounds: bounds(item), frameCm:[spec.w*frameScale,spec.h*frameScale] });
       }
     }
     // Native PON endpoints, including stroke bounds, must remain on paper;
@@ -437,6 +476,7 @@
       pages: captures,
       alerts: alerts,
     };
+    if(spec.exact) report.effectivePpi=nativePpi;
     var imageRect = [rects[0][0], rects[0][1], rects[0][2], rects[0][3]];
     for (bi = 1; bi < rects.length; bi++) {
       imageRect[0] = Math.min(imageRect[0], rects[bi][0]);

@@ -1,9 +1,9 @@
 {
     "product":  "com.locdev.dancard",
-    "version":  "2.16.0",
-    "title":  "phát hanh test ok",
-    "description":  "phát hanh test ok",
-    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.16.0.zip",
-    "sha256":  "7B3724392C7E11C2791B711EF13BCD6E9964CFAA6BACB4036DA13E8FFE99045C",
-    "publishedUtc":  "2026-10-03T08:01:01.2556005Z"
+    "version":  "2.16.3",
+    "title":  "PHÁT HÀNH BẢN SAVE PDF CTL",
+    "description":  "PHÁT HÀNH BẢN SAVE PDF CTL",
+    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.16.3.zip",
+    "sha256":  "4A8ECD6567F52DA03E588CDE27F1E02CFF2699D5F1A5B25107097E8DE28D9D34",
+    "publishedUtc":  "2026-10-03T11:22:22.1077296Z"
 }

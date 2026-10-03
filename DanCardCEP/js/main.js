@@ -1465,7 +1465,7 @@
         .replace(/\\/g, "/");
       var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
       return (
-        "if (typeof dcRunKeoGay !== 'function' || typeof dcKeoGayAutoPonVersion === 'undefined' || dcKeoGayAutoPonVersion < 9) { $.evalFile(" +
+        "if (typeof dcRunKeoGay !== 'function' || typeof dcKeoGayAutoPonVersion === 'undefined' || dcKeoGayAutoPonVersion < 11) { $.evalFile(" +
         jsStr(jsxPath) +
         "); } "
       );
@@ -1480,7 +1480,7 @@
         .replace(/\\/g, "/");
       var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
       return (
-        "if (typeof dcLuuCtlOffsetAI !== 'function' || typeof dcCtlOffsetPdfVersion === 'undefined' || dcCtlOffsetPdfVersion < 4) { $.evalFile(" +
+        "if (typeof dcLuuCtlOffsetAIPackage !== 'function' || typeof dcCtlOffsetPdfVersion === 'undefined' || dcCtlOffsetPdfVersion < 5) { $.evalFile(" +
         jsStr(jsxPath) +
         "); } "
       );
@@ -2322,7 +2322,7 @@
   function rasterizeSelectionInHost() {
     function rasterizeExactSelection(doc, liveSelection) {
       var options = new RasterizeOptions();
-      options.resolution = 450;
+      options.resolution = 500;
       options.transparency = true;
       options.antiAliasingMethod = AntiAliasingMethod.ARTOPTIMIZED;
       // clipBounds already crops the pixels. Asking Illustrator to create one
@@ -2628,7 +2628,7 @@
       return (
         "OK: Da raster " +
         rasters.length +
-        " object doc lap - CMYK, 450 ppi, nen trong suot."
+        " object doc lap - CMYK, 500 ppi, nen trong suot."
       );
     }
 
@@ -2645,7 +2645,7 @@
       return rasterizeExactSelection(doc, selection);
 
       var options = new RasterizeOptions();
-      options.resolution = 450;
+      options.resolution = 500;
       options.transparency = true;
       options.antiAliasingMethod = AntiAliasingMethod.ARTOPTIMIZED;
       options.clippingMask = false;
@@ -3314,7 +3314,7 @@
       return (
         "OK: Đã clip rồi raster " +
         rasters.length +
-        " object theo khung card — CMYK, 450 ppi, nền trong suốt."
+        " object theo khung card — CMYK, 500 ppi, nền trong suốt."
       );
     } catch (e) {
       return "ERR: " + e;
@@ -3594,6 +3594,7 @@
   var offsetPdfBox = document.getElementById("offsetPdfBox");
   var offsetPdfButtons = document.getElementById("offsetPdfButtons");
   var outOffsetPdf = document.getElementById("outOffsetPdf");
+  var offsetFileSuffix = document.getElementById("offsetFileSuffix");
   var OFFSET_PDF_LABELS = {
     BIA: "Bìa",
     TT4: "Tự trở 4 trang",
@@ -3614,22 +3615,42 @@
     offsetPdfButtons.innerHTML = "";
   }
   function saveOffsetPdf(total, jobsText, label) {
+    if(!window.DanCardCtlPackage || !window.DanCardCtlPackage.supported()) {
+      show(outOffsetPdf,"Không có bộ nén ZIP; chưa xuất file. Hãy mở lại panel.","warn");
+      return;
+    }
     var buttons = offsetPdfButtons.querySelectorAll("button");
     function setDisabled(disabled) {
       for (var i = 0; i < buttons.length; i++) buttons[i].disabled = disabled;
+      if(offsetFileSuffix) offsetFileSuffix.disabled = disabled;
     }
     setDisabled(true);
-    show(outOffsetPdf, "Mở cửa sổ chọn nơi lưu AI " + label + "…");
+    show(outOffsetPdf, "Chọn nơi lưu AI + JPG + ZIP " + label + "…");
     cs.evalScript(
       loadOffsetPdfJsx() +
-        "dcLuuCtlOffsetAI(" +
+        "dcLuuCtlOffsetAIPackage(" +
         jsStr(total) +
         ", " +
         jsStr(jobsText) +
+        ", " + jsStr(offsetFileSuffix ? offsetFileSuffix.value : "") +
         ")",
       function (res) {
-        setDisabled(false);
-        handleRes(outOffsetPdf, res);
+        var at=typeof res==="string" ? res.indexOf("||CTLPACK:") : -1;
+        if(at<0) {setDisabled(false);handleRes(outOffsetPdf,res);return;}
+        var text=res.substring(0,at),plan;
+        try {plan=JSON.parse(res.substring(at+10));}
+        catch(e) {setDisabled(false);show(outOffsetPdf,text+" Không đọc được danh sách ZIP; AI/JPG đã giữ nguyên.","warn");return;}
+        window.DanCardCtlPackage.pack(plan,function(status){show(outOffsetPdf,status);},function(error,result) {
+          setDisabled(false);
+          if(error) {show(outOffsetPdf,text+" Nén ZIP lỗi: "+error.message,"warn");return;}
+          var files=result.files||[],errors=result.errors||[];
+          var message=text+" Đã nén "+files.length+" ZIP.";
+          if(errors.length) {
+            message+=" AI/JPG được giữ lại. Lỗi: ";
+            for(var i=0;i<errors.length;i++) message+=(i?" | ":"")+errors[i].name+": "+errors[i].error;
+            show(outOffsetPdf,message,"warn");
+          }else handleRes(outOffsetPdf,message);
+        });
       },
     );
   }
@@ -3641,7 +3662,7 @@
       var first = group.jobs[0];
       var label = OFFSET_PDF_LABELS[group.key] || group.key;
       var text =
-        "Lưu AI " +
+        "Lưu AI + JPG + ZIP " +
         label +
         " — " +
         offsetPdfCm(first.w) +

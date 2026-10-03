@@ -4,14 +4,14 @@ const fs = require("fs");
 const path = require("path");
 
 // Word baseline is from v2.15.4. Control/navigation snapshots include the
-// requested note relocation into a new template accordion in v2.15.17. No dependency on
+// requested note relocation (v2.15.17) and CTL filename field/package script (v2.16.1). No dependency on
 // the installed extension or on a Windows user path when run in CI.
 const baseline = {
   controlHash:
-    "c12abce0927b49f3b19add966c7c3ca7bb33a272f2332c95a9538b649484a1a1",
+    "2b9df988d5c48a2a7ff6ac50dc795df1e11622515a444ee05f1718a677e2e338",
   navigationHash:
     "d4487d9056941ac67e4b8d77215a663f0be6ad08d8a8f23a4d47da4e7561c3cc",
-  controlCount: 116,
+  controlCount: 118,
   staticHintWords: 1293,
 };
 

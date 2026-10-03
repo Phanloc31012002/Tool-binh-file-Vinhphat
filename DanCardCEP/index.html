@@ -18,7 +18,7 @@
             id="btnRaster"
             class="header-raster"
             type="button"
-            title="Raster CMYK · 450 ppi · nền trong suốt"
+            title="Raster CMYK · 500 ppi · nền trong suốt"
           >
             Raster
           </button>
@@ -608,7 +608,7 @@
           </button>
           <div class="acc-body" id="acc-offKeo">
             <p class="hint">
-              A4: 16 trang/tờ AB. A5: 32 trang/tờ AB (2 tay 16). Phần dư tự trở; bìa dàn tay.
+              A4: 16 trang/tờ AB, tối đa 21,2 × 30 cm trên 65 × 86. Tờ nhỏ thu đều về cạnh 20,9 cm. A5: 32 trang/tờ AB; phần dư tự trở. Bìa dàn tay.
             </p>
             <div class="field">
               <div class="label">Kích thước 1 trang (cm)</div>
@@ -624,12 +624,16 @@
 
         <div id="outOffset" class="out">Nhập kích thước rồi bấm Dàn.</div>
 
-        <!-- Lưu AI theo khổ: chỉ hiện sau khi dàn xong; bài có khổ nào thì có nút của khổ đó -->
+        <!-- Lưu bộ AI/JPG/ZIP theo khổ: chỉ hiện sau khi dàn xong -->
         <div id="offsetPdfBox" class="field hidden">
-          <div class="label">Lưu AI theo khổ vừa dàn</div>
+          <div class="label">Lưu AI + JPG + ZIP theo khổ vừa dàn</div>
           <p class="hint">
-            Mỗi tờ một file; tờ AB gồm 2 trang A + B.
+            Mỗi tờ một bộ; A/B chung một JPG và ZIP.
           </p>
+          <label class="field" for="offsetFileSuffix">
+            <span class="label">Nội dung sau RUỘT N / BÌA</span>
+            <input id="offsetFileSuffix" class="inp" type="text" placeholder="CATALOGUE KMC -- IN 1.100 tờ…" />
+          </label>
           <div id="offsetPdfButtons" class="field"></div>
           <div id="outOffsetPdf" class="out">Bấm nút của khổ cần lưu.</div>
         </div>
@@ -795,12 +799,13 @@
       </main>
 
       <footer class="foot">
-          <span class="ver">v2.16.0</span>
+          <span class="ver">v2.16.3</span>
       </footer>
     </div>
 
     <script src="./js/CSInterface.js"></script>
     <script src="./js/dan_be_nester.js"></script>
+    <script src="./js/ctl_package.js"></script>
     <script src="./js/main.js"></script>
   </body>
 </html>

@@ -31,12 +31,13 @@ function numbers(face) {
     ? face.blocks.flatMap((b) => [...b.top, ...b.bottom])
     : face.row || [...face.top, ...face.bottom];
 }
-function fixture(n, w = 14, h = 20, left = 100) {
+function fixture(n, w = 14, h = 20, left = 100, sourceHeight = 60 * h / w) {
   const f = illustrator({ rect: [0, 700, 500, 0] });
   const labels = [],
     flatCalls = [];
   f.doc.artboards.remove = (i) => f.doc.artboards[i].remove();
   function resize(sx, sy) {
+    assert.equal(sx,sy,"Keo gay must never squeeze X/Y independently");
     const b = this.geometricBounds,
       cx = (b[0] + b[2]) / 2,
       cy = (b[1] + b[3]) / 2;
@@ -49,7 +50,7 @@ function fixture(n, w = 14, h = 20, left = 100) {
   for (let i = 0; i < n; i++) {
     const x = left + (i % 8) * 100,
       y = 600 - Math.floor(i / 8) * 250;
-    const item = f.source([x, y, x + 60, y - 90], i + 1);
+    const item = f.source([x, y, x + 60, y - sourceHeight], i + 1);
     item.resize = resize;
     item.move = function (parent) {
       this.parent.pageItems.splice(this.parent.pageItems.indexOf(this), 1);
@@ -103,7 +104,8 @@ function fixture(n, w = 14, h = 20, left = 100) {
     },
   };
   f.doc.selection = f.originals.slice().reverse(); // host selection order is not page order
-  f.context.dcFlattenForImposition = (_, item) => {
+  f.context.dcFlattenForImposition = (_, item, frame, ppi) => {
+    assert.equal(ppi,500);
     flatCalls.push(item.identity);
     return item;
   };
@@ -265,12 +267,13 @@ for (const [w, h] of [
             b[3] >= r[3] - 0.01,
           `Page ${page} escapes ${plan[bi].type}`,
         );
+        const smallerScale = sheet[0] < 650 ? Math.min(1, 20.9 / Math.max(w, h)) : 1;
         near(
           b[2] - b[0],
           (plan[bi].blocks || plan[bi].type === "TT4"
             ? Math.max(w, h)
             : Math.min(w, h)) *
-            10 *
+            smallerScale * 10 *
             MM,
         );
       }
@@ -399,13 +402,14 @@ near(
 );
 assert.ok(fixture(4).run().includes("||CTLPDF:"));
 const tooTall4 = fixture(4, 21, 29.7);
-assert.match(tooTall4.run(), /^ERR:.*không vừa tờ tự trở 4 trang/);
-assert.equal(
-  tooTall4.flatCalls.length,
-  0,
-  "Reject oversized TT4 before touching source pages",
-);
+assert.match(tooTall4.run(), /^OK:/);
+assert.equal(tooTall4.flatCalls.length, 4);
 assert.equal(tooTall4.doc.artboards.length, 1);
+for (const page of tooTall4.originals) {
+  const b = page.geometricBounds;
+  near(b[1] - b[3], 209 * MM);
+  near(b[2] - b[0], 297 * 209 / 210 * MM);
+}
 // Preflight canvas exhaustion must not rasterize sources or delete frames.
 const failed = fixture(32, 14, 20, 7100);
 assert.match(failed.run(), /^ERR:/);
@@ -438,8 +442,79 @@ const main = fs.readFileSync(
   require.resolve("../DanCardCEP/js/main.js"),
   "utf8",
 );
-assert.match(main, /dcKeoGayAutoPonVersion < 9/);
+assert.match(main, /dcKeoGayAutoPonVersion < 11/);
 assert.match(main, /TT16: "Tự trở 16 trang"/);
+const squeeze = fixture(4,14,20,100,90);
+const beforeSqueeze = JSON.stringify(squeeze.originals.map(p=>p.geometricBounds));
+assert.match(squeeze.run(),/^ERR:.*Trang ruột 1:.*không bóp bài/);
+assert.equal(squeeze.flatCalls.length,0,"mismatch must be rejected before rasterizing any page");
+assert.equal(squeeze.doc.artboards.length,1);
+assert.equal(squeeze.doc.layers.length,1);
+assert.equal(JSON.stringify(squeeze.originals.map(p=>p.geometricBounds)),beforeSqueeze);
+const laterMismatch=fixture(4);
+laterMismatch.originals[3]._points.forEach(p=>{p[1]*=1.1;});
+laterMismatch.originals[3]._updateBounds();
+const laterBefore=JSON.stringify(laterMismatch.originals.map(p=>p.geometricBounds));
+assert.match(laterMismatch.run(),/^ERR:.*không bóp bài/);
+assert.equal(laterMismatch.flatCalls.length,0,"scan every source before consuming the first");
+assert.equal(laterMismatch.doc.artboards.length,1);
+assert.equal(JSON.stringify(laterMismatch.originals.map(p=>p.geometricBounds)),laterBefore);
+assert.throws(()=>c.dcKeoGayPageScale(0,90,140,200));
+assert.throws(()=>c.dcKeoGayPageScale(60,90,140,200),/không bóp/);
+near(c.dcKeoGayPageScale(70,100,140,200),200);
+near(c.dcKeoGayPageScale(210,297,212,300,true),212/210*100);
+near(c.dcKeoGayPageScale(200,297,212,300,true),300/297*100);
+assert.throws(()=>c.dcKeoGayPageScale(200,297,212,300),/không bóp/);
+// A4 max applies only to the large form; small forms use a proportional
+// 20.9 cm limit. Mixed source aspects retain their own ratio and slot centre.
+for (const n of [4,8,12,16,20,32,84]) {
+  const f = fixture(n,21.2,30);
+  const before=[];
+  f.originals.forEach((p,i)=>{
+    const b=p.geometricBounds, heights=[60*297/210,60*297/200,90,75];
+    p._points=[[b[0],b[1]],[b[2],b[1]],[b[2],b[1]-heights[i%4]],[b[0],b[1]-heights[i%4]]];
+    p._updateBounds();
+    before.push({w:60,h:heights[i%4]});
+  });
+  const result=f.run();
+  assert.match(result,/^OK:/);
+  const faces=plain(f.c.dcKeoGayPlan(n,false));
+  assert.equal(f.doc.artboards.length,faces.length);
+  const metadata=JSON.parse(result.split("||CTLPDF:")[1]);
+  assert.equal(metadata.total,faces.length);
+  faces.forEach((face,fi)=>{
+    const r=f.doc.artboards[fi].artboardRect;
+    const small=face.type==="TT4", W=small?209:212, H=small?300*209/212:300;
+    near(r[2]-r[0],(small?648:858)*MM);
+    near(r[1]-r[3],(small?418:638)*MM);
+    numbers(face).forEach((pn,slot)=>{
+      const b=f.originals[pn-1].geometricBounds, src=before[pn-1];
+      const scale=Math.min(W*MM/src.w,H*MM/src.h);
+      const expectedW=(small?src.h:src.w)*scale;
+      const expectedH=(small?src.w:src.h)*scale;
+      near(b[2]-b[0],expectedW); near(b[1]-b[3],expectedH);
+      assert.ok(b[0]>=r[0]-.01 && b[1]<=r[1]+.01 && b[2]<=r[2]+.01 && b[3]>=r[3]-.01);
+      const cx=(r[0]+r[2])/2, cy=(r[1]+r[3])/2;
+      const expectedX=small?cx+(slot<2?-1:1)*(H*MM+6*MM)/2:cx+(slot%4-1.5)*W*MM;
+      const expectedY=small?cy+(slot%2===0?1:-1)*W*MM/2:r[1]-23.7*MM-(slot<4?.5:1.5)*H*MM;
+      near((b[0]+b[2])/2,expectedX); near((b[1]+b[3])/2,expectedY);
+    });
+  });
+  const marks=f.doc.layers.find(l=>l.name==="Pon cat CTL Keo Gay tu dong").pageItems;
+  for (const mark of marks) {
+    const [p,q]=mark._points;
+    assert.ok(Math.hypot(p[0]-q[0],p[1]-q[1])>.1,"Crop stroke must not collapse on the 20.9 cm sheet edge");
+    assert.ok(f.doc.artboards.some(ab=>mark._points.every(pt=>pt[0]>=ab.artboardRect[0]+.49 && pt[0]<=ab.artboardRect[2]-.49 && pt[1]<=ab.artboardRect[1]-.49 && pt[1]>=ab.artboardRect[3]+.49)),"Crop endpoints outside paper");
+    const x=(p[0]+q[0])/2,y=(p[1]+q[1])/2;
+    assert.ok(!f.originals.some(item=>{const b=item.geometricBounds;return x>b[0]+.01&&x<b[2]-.01&&y<b[1]-.01&&y>b[3]+.01;}),"Crop intrudes into fitted artwork");
+  }
+}
+for (const [w,h] of [[21.21,30],[21.2,30.01],[30,21.2]]) {
+  const f=fixture(16,w,h), before=JSON.stringify(f.originals.map(p=>p.geometricBounds));
+  assert.match(f.run(),/^ERR:.*Khung A4 tối đa 21,2 × 30/);
+  assert.equal(f.flatCalls.length,0); assert.equal(f.doc.artboards.length,1);
+  assert.equal(JSON.stringify(f.originals.map(p=>p.geometricBounds)),before);
+}
 console.log(
   "Keo gay: same physical paper/corner PON as staple, A5 TT4 small sheet, 4 new panel cuts, SIG16/duplex/remainders, AI plan and A4 regression passed.",
 );

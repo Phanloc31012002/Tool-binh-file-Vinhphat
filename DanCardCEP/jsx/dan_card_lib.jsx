@@ -1519,11 +1519,11 @@ function _dcDanCore(SEL_LAYOUT_KEY, VOUCHER_WITH_CARD_ARG) {
     return null;
   }
 
-  // Tạo RasterizeOptions chuẩn (400ppi, trong suốt, Art Optimized, giữ spot).
+  // Tạo RasterizeOptions chuẩn (500ppi, trong suốt, Art Optimized, giữ spot).
   function makeRasterOptions() {
     var ro = new RasterizeOptions();
     try {
-      ro.resolution = 400; // ppi
+      ro.resolution = 500; // ppi
     } catch (e) {}
     try {
       ro.transparency = true; // nền trong suốt
@@ -7314,7 +7314,7 @@ function dcRasterizeSelection() {
     }
 
     var options = new RasterizeOptions();
-    options.resolution = 400;
+    options.resolution = 500;
     options.transparency = true;
     options.antiAliasingMethod = AntiAliasingMethod.ARTOPTIMIZED;
     options.clippingMask = false;
@@ -7471,7 +7471,7 @@ function dcRasterizeSelection() {
     return (
       "OK: Đã raster " +
       rasters.length +
-      " object — CMYK, 400 ppi, nền trong suốt."
+      " object — CMYK, 500 ppi, nền trong suốt."
     );
   } catch (e) {
     return "ERR: " + dcMoTaLoi(e);
@@ -14121,7 +14121,7 @@ function dcFlattenForImposition(doc, item, frame, resolution) {
     throw new Error("Không xác định được khung để raster.");
   var ro = new RasterizeOptions();
   try {
-    ro.resolution = resolution > 0 ? resolution : 400;
+    ro.resolution = 500; // All new imposition rasters; retain argument for old callers.
   } catch (e) {}
   try {
     ro.transparency = true;
@@ -14566,11 +14566,11 @@ function dcRunCatalogueA4() {
         }
       }
 
-      // Rasterize object (làm phẳng) ở 300ppi
+      // Rasterize object (làm phẳng) ở 500ppi
       function rasterize(item) {
         var ro = new RasterizeOptions();
         try {
-          ro.resolution = 400;
+          ro.resolution = 500;
         } catch (e) {}
         try {
           ro.transparency = true;
@@ -14640,7 +14640,7 @@ function dcRunCatalogueA4() {
         var frame = s0.b.slice(0); // [l,t,r,b]
 
         // Raster làm phẳng theo đúng khung (KHÔNG clip lại - object đã clip sẵn)
-        var flat = dcFlattenForImposition(doc, item, frame, 400);
+        var flat = dcFlattenForImposition(doc, item, frame, 500);
 
         // TĂNG kích thước lên đúng 21.1 x 29.9 (cách A - ép đúng số)
         var gb = flat.geometricBounds; // [l,t,r,b]
@@ -15357,11 +15357,11 @@ function dcRunCatalogueA5() {
         }
       }
 
-      // Rasterize object (làm phẳng) ở 300ppi
+      // Rasterize object (làm phẳng) ở 500ppi
       function rasterize(item) {
         var ro = new RasterizeOptions();
         try {
-          ro.resolution = 400;
+          ro.resolution = 500;
         } catch (e) {}
         try {
           ro.transparency = true;
@@ -15431,7 +15431,7 @@ function dcRunCatalogueA5() {
         var frame = s0.b.slice(0); // [l,t,r,b]
 
         // Raster làm phẳng theo đúng khung (KHÔNG clip lại - object đã clip sẵn)
-        var flat = dcFlattenForImposition(doc, item, frame, 400);
+        var flat = dcFlattenForImposition(doc, item, frame, 500);
 
         // TĂNG kích thước lên đúng 21.1 x 29.9 (cách A - ép đúng số)
         var gb = flat.geometricBounds; // [l,t,r,b]
@@ -16291,7 +16291,7 @@ function dcRunCatalogueCustom(wCm, hCm) {
         var s0 = sizeMM(item);
         var frame = s0.b.slice(0);
 
-        var flat = dcFlattenForImposition(doc, item, frame, 400);
+        var flat = dcFlattenForImposition(doc, item, frame, 500);
 
         // Phóng lên đúng PAGE_W x PAGE_H (cách A - ép đúng số, không méo với raster)
         var gb = flat.geometricBounds;
@@ -17028,7 +17028,7 @@ function dcRunCatalogueCustomA5(wCm, hCm) {
         var s0 = sizeMM(item);
         var frame = s0.b.slice(0);
 
-        var flat = dcFlattenForImposition(doc, item, frame, 400);
+        var flat = dcFlattenForImposition(doc, item, frame, 500);
 
         var gb = flat.geometricBounds;
         var curW = (gb[2] - gb[0]) / MM,
@@ -17598,7 +17598,7 @@ function dcRunCatalogueAuto(wCm, hCm) {
     var processed = [];
     for (var pi = 0; pi < source.length; pi++) {
       var frame = getBounds(source[pi].item);
-      var flat = dcFlattenForImposition(doc, source[pi].item, frame, 400);
+      var flat = dcFlattenForImposition(doc, source[pi].item, frame, 500);
       try {
         flat.move(layoutLayer, ElementPlacement.PLACEATEND);
       } catch (moveError) {}
@@ -18203,7 +18203,7 @@ function dcRunSignature8(wCm, hCm, coBia) {
         var s0 = sizeMM(item); // do kich thuoc that (xu ly clip neu co)
         var frame = s0.b.slice(0); // khung để raster
 
-        var flat = dcFlattenForImposition(doc, item, frame, 400);
+        var flat = dcFlattenForImposition(doc, item, frame, 500);
 
         // phong ve dung PAGE_W x PAGE_H
         var gb;
@@ -20209,7 +20209,59 @@ function dcRunSignature8(wCm, hCm, coBia) {
 //  liệu tạm rồi lưu AI (entry PDF cũ vẫn dùng chung cơ chế an toàn).
 //  Không group/undo hay mở khoá trong tài liệu nguồn.
 // ============================================================
-var dcCtlOffsetPdfVersion = 4;
+var dcCtlOffsetPdfVersion = 5;
+
+// Native Export As action, not the RGB-only Save-for-Web scripting exporter.
+// JPEG raw fields: quality/method/scans/AA/fixed-point DPI/color/map/profile.
+// Protocol tested in Illustrator 28; see tests/ctl_package_native.jsx.
+function dcCtlJpegActionText(path, setName) {
+  function hexByte(n) { return ("0" + (n & 255).toString(16)).slice(-2); }
+  function utf8Hex(s) {
+    var bytes = unescape(encodeURIComponent(s)), result = "";
+    for(var i=0;i<bytes.length;i++) result += hexByte(bytes.charCodeAt(i));
+    return "[ " + bytes.length + " " + result + " ]";
+  }
+  var bytes = [], values = [10,0,3,3,300*65536,2,0,1], i;
+  for(i=0;i<100;i++) bytes.push(0);
+  for(i=0;i<values.length;i++) for(var j=0;j<4;j++) bytes[i*4+j]=(values[i] >>> (8*j)) & 255;
+  var mapLabel="imagemap";
+  for(i=0;i<mapLabel.length;i++) bytes[32+i*2]=mapLabel.charCodeAt(i);
+  bytes[98]=1; // embed ICC profile
+  var raw="";
+  for(i=0;i<bytes.length;i++) raw+=hexByte(bytes[i]);
+  function param(key,type,value) {
+    return "/parameter-" + (++count) + " { /key " + key + " /showInPalette -1 /type (" + type + ") /value " + value + " }\n";
+  }
+  var count=1;
+  return "/version 3\n/name " + utf8Hex(setName) + "\n/isOpen 0\n/actionCount 1\n" +
+    "/action-1 { /name " + utf8Hex("Export") + " /keyIndex 0 /colorIndex 0 /isOpen 0 /eventCount 1\n" +
+    "/event-1 { /useRulersIn1stQuadrant 0 /internalName (adobe_exportDocument) /isOpen 0 /isOn 1 /hasDialog 1 /showDialog 0 /parameterCount 7\n" +
+    "/parameter-1 { /key 1885434477 /showInPalette 0 /type (raw) /value < 100 " + raw + " > /size 100 }\n" +
+    param(1851878757,"ustring",utf8Hex(path)) +
+    param(1718775156,"ustring",utf8Hex("JPEG file format")) +
+    param(1702392942,"ustring",utf8Hex("jpg,jpe,jpeg")) +
+    param(1936548194,"boolean","0") + // Use Artboards OFF: single combined JPG
+    param(1935764588,"boolean","1") +
+    param(1936875886,"ustring","[ 0 ]") + "} }\n";
+}
+function dcCtlExportJpeg(doc, file) {
+  var setName="CTL_JPG_"+new Date().getTime()+"_"+Math.floor(Math.random()*1000000);
+  var actionFile=new File(Folder.temp.fsName+"/"+setName+".aia"), loaded=false;
+  if(actionFile.exists) throw new Error("Trung file action tam; hay thu lai.");
+  try {
+    actionFile.encoding="UTF-8";
+    if(!actionFile.open("w")) throw new Error("Khong ghi duoc action JPG tam.");
+    actionFile.write(dcCtlJpegActionText(file.fsName,setName)); actionFile.close();
+    doc.activate();
+    app.loadAction(actionFile); loaded=true;
+    app.doScript("Export",setName,false);
+    if(!file.exists || file.length<=0) throw new Error("Illustrator chua tao duoc JPG.");
+  } finally {
+    if(loaded) { try { app.unloadAction(setName,""); } catch(unloadError) {} }
+    try { actionFile.close(); } catch(closeError) {}
+    if(actionFile.exists) actionFile.remove();
+  }
+}
 
 // Gọi ở cuối lượt dàn. Trả về đuôi "||CTLPDF:{...}" để gắn sau chuỗi OK;
 // panel đọc đuôi này để biết bài có những khổ nào, mỗi khổ gồm những tờ nào
@@ -20315,13 +20367,21 @@ function dcLuuCtlOffsetPDF(totalText, jobsText) {
 function dcLuuCtlOffsetAI(totalText, jobsText) {
   return dcLuuCtlOffsetFiles(totalText, jobsText, "AI");
 }
-function dcLuuCtlOffsetFiles(totalText, jobsText, format) {
+function dcLuuCtlOffsetAIPackage(totalText, jobsText, suffixText) {
+  return dcLuuCtlOffsetFiles(totalText, jobsText, "AI_PACKAGE", suffixText);
+}
+function dcLuuCtlOffsetFiles(totalText, jobsText, format, suffixText) {
   var originalCoordinates = app.coordinateSystem;
   try {
     app.coordinateSystem = CoordinateSystem.DOCUMENTCOORDINATESYSTEM;
-    var isAI = format === "AI";
-    var formatLabel = isAI ? "AI" : "PDF";
+    var isPackage = format === "AI_PACKAGE";
+    var isAI = format === "AI" || isPackage;
+    var formatLabel = isPackage ? "AI + JPG" : (isAI ? "AI" : "PDF");
     var extension = isAI ? ".ai" : ".pdf";
+    var suffix = isPackage ? String(suffixText === undefined || suffixText === null ? "" : suffixText).replace(/^\s+|\s+$/g,"") : "";
+    if(/[\\\/:*?"<>|\x00-\x1f]/.test(suffix))
+      return "ERR: Nội dung tên file không được chứa \\ / : * ? \" < > | hoặc xuống dòng.";
+    if(/[. ]$/.test(suffix)) return "ERR: Tên file không được kết thúc bằng dấu chấm.";
     if (app.documents.length === 0) return "ERR: Chưa mở tài liệu nào.";
     var sourceDoc = app.activeDocument;
     var CHANGED = " Tài liệu đã khác lúc dàn — hãy dàn lại rồi lưu " + formatLabel + ".";
@@ -20347,6 +20407,7 @@ function dcLuuCtlOffsetFiles(totalText, jobsText, format) {
       var baseName = m[1]
         .replace(/^\s+|\s+$/g, "")
         .replace(/[\\\/:*?"<>|]/g, "-");
+      if(suffix) baseName += " " + suffix;
       var wantW = parseFloat(m[3]);
       var wantH = parseFloat(m[4]);
       var numbers = m[2].split(",");
@@ -20372,7 +20433,7 @@ function dcLuuCtlOffsetFiles(totalText, jobsText, format) {
       for (var duplicateJob = 0; duplicateJob < jobs.length; duplicateJob++)
         if (jobs[duplicateJob].name.toLowerCase() === (baseName + extension).toLowerCase())
           return "ERR: Hai tờ trùng tên " + formatLabel + ": " + baseName + ".";
-      jobs.push({ name: baseName + extension, indices: indices, pages: pages, file: null });
+      jobs.push({ baseName:baseName, name: baseName + extension, indices: indices, pages: pages, file: null });
     }
     if (jobs.length === 0) return "ERR: Không có tờ nào để lưu.";
 
@@ -20382,6 +20443,13 @@ function dcLuuCtlOffsetFiles(totalText, jobsText, format) {
       jobs[jf].file = new File(folder.fsName + "/" + jobs[jf].name);
       if (jobs[jf].file.exists)
         return "ERR: File đã tồn tại: " + jobs[jf].name + ".";
+      if(isPackage) {
+        var jobBase=folder.fsName+"/"+jobs[jf].baseName;
+        if(jobBase.length>245) return "ERR: Tên/đường dẫn quá dài; hãy rút ngắn nội dung hoặc chọn thư mục ngắn hơn.";
+        jobs[jf].jpg=new File(jobBase+".jpg");jobs[jf].zip=new File(jobBase+".zip");
+        if(jobs[jf].jpg.exists || jobs[jf].zip.exists)
+          return "ERR: File đã tồn tại: " + jobs[jf].baseName + " (.jpg hoặc .zip).";
+      }
     }
 
     // ---------- Ghi lại trạng thái để trả về như cũ ----------
@@ -20548,6 +20616,7 @@ function dcLuuCtlOffsetFiles(totalText, jobsText, format) {
       }
       var workDoc = null;
       var completed = false;
+      var aiSaved = false;
       try {
         // Tạo đủ trang ngay từ đầu. Không gán artboardRect hay gọi
         // artboards.add ở tài liệu tạm: cả hai gây lỗi 1200 trên một số file.
@@ -20581,6 +20650,11 @@ function dcLuuCtlOffsetFiles(totalText, jobsText, format) {
         }
         workDoc.activate();
         workDoc.saveAs(job.file, isAI ? makeAiOptions() : makePdfOptions(pages.length));
+        aiSaved = true;
+        if(isPackage) {
+          try { dcCtlExportJpeg(workDoc,job.jpg); }
+          catch(jpegError) { throw new Error("AI đã lưu; xuất JPG lỗi: " + jpegError); }
+        }
         completed = true;
       } finally {
         try {
@@ -20592,19 +20666,22 @@ function dcLuuCtlOffsetFiles(totalText, jobsText, format) {
         sourceDoc.activate();
         if (!completed) {
           try {
-            if (job.file.exists) job.file.remove();
+            if (!(isPackage && aiSaved) && job.file.exists) job.file.remove();
+            if (isPackage && job.jpg.exists) job.jpg.remove();
           } catch (removeError) {}
         }
       }
     }
 
     var saved = [];
+    var packages = [];
     var saveErrors = [];
     try {
       for (var ji = 0; ji < jobs.length; ji++) {
         try {
           exportJob(jobs[ji]);
           saved.push(jobs[ji].name);
+          if(isPackage) packages.push(jobs[ji]);
         } catch (saveError) {
           saveErrors.push(
             jobs[ji].name +
@@ -20639,6 +20716,15 @@ function dcLuuCtlOffsetFiles(totalText, jobsText, format) {
       "OK: Đã lưu " + saved.length + " " + formatLabel + " vào " + folder.fsName + ": " + saved.join(", ") + ".";
     if (saveErrors.length)
       message += " Lỗi " + saveErrors.length + " file: " + saveErrors.join(" | ");
+    if(isPackage) {
+      function quotePack(s) { return '"'+String(s).replace(/\\/g,'\\\\').replace(/"/g,'\\"').replace(/\r/g,'\\r').replace(/\n/g,'\\n').replace(/\t/g,'\\t')+'"'; }
+      var packTexts=[];
+      for(var pk=0;pk<packages.length;pk++) {
+        var packaged=packages[pk];
+        packTexts.push('{"baseName":'+quotePack(packaged.baseName)+',"ai":'+quotePack(packaged.file.fsName)+',"jpg":'+quotePack(packaged.jpg.fsName)+',"zip":'+quotePack(packaged.zip.fsName)+'}');
+      }
+      message+='||CTLPACK:{"folder":'+quotePack(folder.fsName)+',"system":'+quotePack(Folder.system.fsName)+',"temp":'+quotePack(Folder.temp.fsName)+',"jobs":['+packTexts.join(',')+']}';
+    }
     return message;
   } catch (e) {
     return (
@@ -20679,7 +20765,28 @@ function dcLuuCtlOffsetFiles(totalText, jobsText, format) {
 //   5. Nhập ghi chú (RUỘT N + chữ thêm).
 // ============================================================
 
-var dcKeoGayAutoPonVersion = 9;
+var dcKeoGayAutoPonVersion = 11;
+
+// mm throughout. A4 uses the entered size as a containing frame: any spare
+// space is centred, never filled by stretching X/Y independently. Keep the
+// existing exact-aspect policy (0.2 mm allowance) for the A5 folding forms.
+function dcKeoGayPageScale(w, h, targetW, targetH, fitFrame) {
+  if (!(w > 0 && h > 0 && targetW > 0 && targetH > 0) ||
+      !isFinite(w) || !isFinite(h) || !isFinite(targetW) || !isFinite(targetH))
+    throw new Error("Không đo được kích thước trang ruột.");
+  var scale = Math.min(targetW / w, targetH / h);
+  if (!fitFrame && (targetW - w * scale > 0.2 || targetH - h * scale > 0.2))
+    throw new Error("Tỷ lệ nguồn không khớp khổ nhập; Keo gáy không bóp bài. Hãy kiểm tra khổ/khung trang.");
+  return scale * 100;
+}
+
+// Apply the smaller-paper allowance to the whole frame, preserving aspect.
+// A4 TT4 puts its short edge along half of the 41.8 cm sheet height; A5
+// TT4 puts its long edge along half of the 42.8 cm sheet width.
+function dcKeoGayFrameForPaper(w, h, smallA5, smallPaper) {
+  var scale = smallPaper ? Math.min(1, 209 / (smallA5 ? h : w)) : 1;
+  return { w: w * scale, h: h * scale, scale: scale };
+}
 
 // A5 packs TWO unchanged A4-style 16-page signatures on one A/B sheet.
 // This is not a new 32-page folding signature. B reverses the block order
@@ -20842,6 +20949,8 @@ function dcRunKeoGay(wCm, hCm) {
       PAGE_W = SOURCE_PAGE_H;
       PAGE_H = SOURCE_PAGE_W;
     }
+    if (!IS_SMALL_A5 && (PAGE_W > 212 + 0.000001 || PAGE_H > 300 + 0.000001))
+      throw new Error("Khung A4 tối đa 21,2 × 30 cm (rộng × cao). Keo gáy không bóp bài.");
 
     var TOP_GAP = 23.7 * MM; // mép trên bài dàn cách mép trên artboard 2.37cm
 
@@ -21023,19 +21132,34 @@ function dcRunKeoGay(wCm, hCm) {
     }
 
     // ============================================================
-    //  BƯỚC 1: raster từng trang + phóng về PAGE_W x PAGE_H
+    //  BƯỚC 1: kiểm tra tất cả trang trước khi raster/tạo khung.
+    //  A4 fit trong khung nhập; A5 giữ kiểm tra tỷ lệ của form gấp cũ.
     // ============================================================
     var processed = [];
+    var sourcePageSizes = [];
+    for (var checkPage = 0; checkPage < pages.length; checkPage++) {
+      var sourceSize = sizeMM(pages[checkPage]);
+      try { dcKeoGayPageScale(sourceSize.w, sourceSize.h, SOURCE_PAGE_W, SOURCE_PAGE_H, !IS_SMALL_A5); }
+      catch (ratioError) { throw new Error("Trang ruột " + (checkPage + 1) + ": " + ratioError.message); }
+      sourcePageSizes.push(sourceSize);
+    }
     function prepareKeoGayPages() {
       for (var p = 0; p < pages.length; p++) {
         var item = pages[p];
-        var s0 = sizeMM(item);
-        var flat = dcFlattenForImposition(doc, item, s0.b.slice(0), 300);
-        var gb = flat.geometricBounds;
-        var cw = (gb[2] - gb[0]) / MM, ch = (gb[1] - gb[3]) / MM;
+        var s0 = sourcePageSizes[p];
+        var flat = dcFlattenForImposition(doc, item, s0.b.slice(0), 500);
+        var flatSize = sizeMM(flat);
+        var cw = flatSize.w, ch = flatSize.h;
         if (!(cw > 0 && ch > 0))
           throw new Error("Khong do duoc kich thuoc trang ruot " + (p + 1));
-        flat.resize((SOURCE_PAGE_W / cw) * 100, (SOURCE_PAGE_H / ch) * 100);
+        // Source/frame policy was validated for EVERY page before mutation. A new
+        // bitmap can gain a rounded edge pixel; do not reject half-way through
+        // a batch because that pixel grows when a small source is enlarged.
+        var targetFrame = pageFrames[p];
+        var targetW = SMALL_SOURCE_IS_LANDSCAPE ? targetFrame.h : targetFrame.w;
+        var targetH = SMALL_SOURCE_IS_LANDSCAPE ? targetFrame.w : targetFrame.h;
+        var uniformScale = Math.min(targetW / cw, targetH / ch) * 100;
+        flat.resize(uniformScale, uniformScale);
         if (SMALL_SOURCE_IS_LANDSCAPE) flat.rotate(90);
         processed.push(flat);
       }
@@ -21072,12 +21196,28 @@ function dcRunKeoGay(wCm, hCm) {
       if (face.type === "TT4") return IS_SMALL_A5 ? ponSmall4 : ponTT4;
       return face.smallSelfTurn && smallTT8Fits ? ponTT4 : ponMain;
     }
-    var tt4Paper = IS_SMALL_A5 ? ponSmall4 : ponTT4;
-    for (var paperCheck = 0; paperCheck < faces.length; paperCheck++)
-      if (faces[paperCheck].type === "TT4" &&
-          (2 * pageHpt + MID_GAP_TT4 > tt4Paper.W + 0.01 ||
-           2 * pageWpt + 4 * MM + 1 > tt4Paper.H))
+    var faceFrames = [], pageFrames = [];
+    for (var paperCheck = 0; paperCheck < faces.length; paperCheck++) {
+      var checkedFace = faces[paperCheck], checkedPaper = ponFor(checkedFace);
+      var frame = dcKeoGayFrameForPaper(PAGE_W, PAGE_H, IS_SMALL_A5, checkedPaper !== ponMain);
+      faceFrames.push(frame);
+      var framePages = [];
+      if (checkedFace.blocks) {
+        for (var blockCheck = 0; blockCheck < checkedFace.blocks.length; blockCheck++)
+          framePages = framePages.concat(checkedFace.blocks[blockCheck].top,
+            checkedFace.blocks[blockCheck].bottom);
+      } else framePages = checkedFace.row || checkedFace.top.concat(checkedFace.bottom);
+      for (var framePage = 0; framePage < framePages.length; framePage++)
+        pageFrames[framePages[framePage] - 1] = frame;
+      if (checkedFace.type === "TT4" &&
+          (2 * frame.h * MM + MID_GAP_TT4 > checkedPaper.W + 0.01 ||
+           2 * frame.w * MM + (IS_SMALL_A5 ? 4 * MM + 1 : 0) > checkedPaper.H + 0.01))
         throw new Error("Khổ trang không vừa tờ tự trở 4 trang; hãy giảm khổ trang.");
+    }
+    function useFaceFrame(index) {
+      pageWpt = faceFrames[index].w * MM;
+      pageHpt = faceFrames[index].h * MM;
+    }
     if (IS_SMALL_A5 && (pageHpt * 4 + 4 * MM + 1 > ponMain.W ||
         pageWpt * 4 + TOP_GAP + 2 * MM + 1 > ponMain.H))
       throw new Error("Kho trang A5 khong vua to AB 65 x 86; hay giam kho trang.");
@@ -21228,8 +21368,13 @@ function dcRunKeoGay(wCm, hCm) {
         var top4 = acy4 + pageWpt;
         var bottom4 = acy4 - pageWpt;
         for (var a4 = 0; a4 < axes4.length; a4++) {
-          draw([axes4[a4], top4 + markLength], [axes4[a4], top4]);
-          draw([axes4[a4], bottom4], [axes4[a4], bottom4 - markLength]);
+          // A4 at 20.9 cm reaches the 41.8 cm paper edges. Its offset axes
+          // are outside the artwork, so turn the crop strokes inward there
+          // instead of collapsing both endpoints into a zero-length dot.
+          var topDirection = top4 + markLength > rect[1] - 0.5 ? -1 : 1;
+          var bottomDirection = bottom4 - markLength < rect[3] + 0.5 ? 1 : -1;
+          draw([axes4[a4], top4 + topDirection * markLength], [axes4[a4], top4]);
+          draw([axes4[a4], bottom4], [axes4[a4], bottom4 + bottomDirection * markLength]);
         }
         return axes4.length * 2;
       }
@@ -21453,70 +21598,24 @@ function dcRunKeoGay(wCm, hCm) {
         centerItem(it, cell.cx, cell.cy);
       }
     }
-    //  TT4 (65x43): 2 cụm 2-trang, xoay 90 (trái CCW, phải CW), căn giữa, khe 0.76cm.
-    function buildPair(pageL, pageR) {
-      var itL = processed[pageL - 1],
-        itR = processed[pageR - 1];
-      if (!itL || !itR) return null;
-      var bl = itL.geometricBounds;
-      var lcx = (bl[0] + bl[2]) / 2,
-        lcy = (bl[1] + bl[3]) / 2;
-      var br = itR.geometricBounds;
-      var rcx = (br[0] + br[2]) / 2,
-        rcy = (br[1] + br[3]) / 2;
-      itR.translate(lcx + pageWpt - rcx, lcy - rcy);
-      var grp = null;
-      try {
-        grp = doc.activeLayer.groupItems.add();
-        itL.move(grp, ElementPlacement.PLACEATEND);
-        itR.move(grp, ElementPlacement.PLACEATEND);
-      } catch (e) {
-        grp = null;
-      }
-      return grp;
-    }
-    function centerGroup(grp, cx, cy) {
-      if (!grp) return;
-      var gb;
-      try {
-        gb = grp.geometricBounds;
-      } catch (e) {
-        return;
-      }
-      var gcx = (gb[0] + gb[2]) / 2,
-        gcy = (gb[1] + gb[3]) / 2;
-      try {
-        grp.translate(cx - gcx, cy - gcy);
-      } catch (e) {}
-    }
+    // TT4: use the nominal slot centres, not the union of the fitted artwork.
+    // Differently shaped A4 pages must still register to the same cut grid.
     function placeFace4(face, pos) {
       var acx = (pos[0] + pos[2]) / 2,
         acy = (pos[1] + pos[3]) / 2;
-      // row = [trái-trên, trái-dưới, phải-trên, phải-dưới]
-      // Cụm TRÁI xoay 90 CCW: buildPair(L,R) đặt L-trái R-phải, sau CCW -> L xuống dưới,
-      //   R lên trên. Muốn (trái-trên=row[0], trái-dưới=row[1]) => truyền (row[1], row[0]).
-      // Cụm PHẢI xoay 90 CW: sau CW -> L lên trên, R xuống dưới.
-      //   Muốn (phải-trên=row[2], phải-dưới=row[3]) => truyền (row[2], row[3]).
-      var gL = buildPair(face.row[1], face.row[0]); // đảo cho CCW
-      var gR = buildPair(face.row[2], face.row[3]);
-      if (gL) {
-        try {
-          gL.rotate(90);
-        } catch (e) {}
-      } // trái CCW
-      if (gR) {
-        try {
-          gR.rotate(-90);
-        } catch (e) {}
-      } // phải CW
-      var cumW = pageHpt; // bề rộng 1 cụm sau xoay
-      var totalW = cumW * 2 + MID_GAP_TT4;
-      var leftEdge = acx - totalW / 2;
-      centerGroup(gL, leftEdge + cumW / 2, acy);
-      centerGroup(gR, leftEdge + cumW + MID_GAP_TT4 + cumW / 2, acy);
+      for (var cell4 = 0; cell4 < 4; cell4++) {
+        var page4 = processed[face.row[cell4] - 1];
+        if (!page4) throw new Error("Thieu trang ruot " + face.row[cell4]);
+        var leftPair = cell4 < 2;
+        page4.rotate(leftPair ? 90 : -90);
+        centerItem(page4,
+          acx + (leftPair ? -1 : 1) * (pageHpt + MID_GAP_TT4) / 2,
+          acy + (cell4 % 2 === 0 ? 1 : -1) * pageWpt / 2);
+      }
     }
 
     for (var ff = 0; ff < numFaces; ff++) {
+      useFaceFrame(ff);
       if (faces[ff].blocks) placePackedFace(faces[ff], abPos[ff]);
       else if (faces[ff].type === "TT4") placeFace4(faces[ff], abPos[ff]);
       else placeFace48(faces[ff], abPos[ff]);
@@ -21525,6 +21624,7 @@ function dcRunKeoGay(wCm, hCm) {
     // ---- Ve PON tu dong tren hai layer rieng, dung loai theo face. ----
     var cutPonCount = 0;
     for (var kp = 0; kp < numFaces; kp++) {
+      useFaceFrame(kp);
       var posP = abPos[kp];
       var isTT4Pon = ponFor(faces[kp]) !== ponMain;
       addAutoPaperPon(paperPonLayer, posP, isTT4Pon);
@@ -21789,6 +21889,7 @@ function dcRunKeoGay(wCm, hCm) {
       noteIconTemplate = loadNoteIconTemplate();
       for (var ni = 0; ni < numFaces; ni++) {
         var face = faces[ni];
+        useFaceFrame(ni);
         // AB: chỉ điền MẶT A (label kết thúc "-A"); mặt B bỏ qua.
         if (face.type === "AB" && face.label.indexOf("-B") >= 0) continue;
         var specificText = "";
@@ -23081,7 +23182,7 @@ function dcApMauCore(multiSourcePerArtboard) {
   function makeRO() {
     var ro = new RasterizeOptions();
     try {
-      ro.resolution = 400;
+      ro.resolution = 500;
     } catch (e) {}
     try {
       ro.transparency = true;
