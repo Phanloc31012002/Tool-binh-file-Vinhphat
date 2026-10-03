@@ -112,7 +112,12 @@ node tests/dan_be_duplex.test.js
 node tests/dan_be_custom_sheet.test.js
 node tests/dan_be_canvas.test.js
 node tests/kts_pairing.test.js
+node tests/kts_mixed_sizes.test.js
 ```
+
+Dàn KTS: chọn các mẫu và tick **Dàn nhiều mẫu vào một tờ** để ghép chung
+các kích thước khác nhau, tự nhân bản với số con chênh tối đa 1. Giữ nguyên
+kích thước bài; hai mặt xếp từng hàng **trái = trước, phải = sau**.
 
 Với tag hai mặt, chuẩn bị từng hàng **Khuôn → mặt trước → mặt sau**, chọn đủ
 các bộ ba và tick **Dàn bế 2 mặt (tag)**. Mỗi mẫu tạo cặp artboard trước/sau;

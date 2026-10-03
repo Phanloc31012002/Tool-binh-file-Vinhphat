@@ -3,7 +3,12 @@
   var root = "C:/Users/ADMIN/Downloads/DanCard_Setup_23";
   // Set $.global.dcCtlExportAuditFormat = "AI" for the editable AI roundtrip.
   var isAI = $.global.dcCtlExportAuditFormat === "AI";
-  var folder = new Folder(root + (isAI ? "/tmp/ctl_ai_20261003_" + new Date().getTime() : "/tmp/ctl_pdf_crash_20261003"));
+  var folder = new Folder(
+    root +
+      (isAI
+        ? "/tmp/ctl_ai_20261003_" + new Date().getTime()
+        : "/tmp/ctl_pdf_crash_20261003"),
+  );
   if (!folder.exists) folder.create();
   var phase = new File(folder.fsName + "/phase.txt");
   function log(s) {
@@ -16,6 +21,7 @@
   var owned = null;
   var oldPicker =
     typeof dcChonThuMucLuuPDF === "function" ? dcChonThuMucLuuPDF : null;
+  var oldErrorFormatter = typeof dcMoTaLoi === "function" ? dcMoTaLoi : null;
   var oldInteraction = app.userInteractionLevel;
   var oldCoordinates = app.coordinateSystem;
   var openedOutput = null;
@@ -80,7 +86,11 @@
     lib.close();
     var from = text.indexOf("function dcLuuCtlOffsetPDF(");
     var to = text.indexOf("//  TEST: Dàn CATALOGUE KEO GÁY", from);
-    eval(text.substring(from, to));
+    var exportSource = text.substring(from, to);
+    eval(exportSource);
+    dcMoTaLoi = function (e) {
+      return String(e) + " [line " + e.line + "]";
+    };
     dcChonThuMucLuuPDF = function () {
       return folder;
     };
@@ -190,7 +200,8 @@
     for (var f = 0; f < names.length; f++) {
       var file = new File(folder.fsName + "/" + names[f]);
       result.files.push(names[f] + ":" + file.exists + ":" + file.length);
-      if (!file.exists || file.length < 100) throw new Error("Missing output " + names[f]);
+      if (!file.exists || file.length < 100)
+        throw new Error("Missing output " + names[f]);
     }
     result.collisionResult = saveOffset("4", jobs);
     result.invalidResult = saveOffset("5", jobs);
@@ -219,38 +230,55 @@
           var sourcePage = expected[aiPage];
           var ab = openedOutput.artboards[aiPage];
           var abRect = ab.artboardRect;
-          if (ab.name !== "SOURCE_" + sourcePage ||
-              Math.abs(abRect[2] - abRect[0] - sizes[sourcePage][0] * MM) > 0.1 ||
-              Math.abs(abRect[1] - abRect[3] - sizes[sourcePage][1] * MM) > 0.1)
+          if (
+            ab.name !== "SOURCE_" + sourcePage ||
+            Math.abs(abRect[2] - abRect[0] - sizes[sourcePage][0] * MM) > 0.1 ||
+            Math.abs(abRect[1] - abRect[3] - sizes[sourcePage][1] * MM) > 0.1
+          )
             throw new Error("AI page identity/size mismatch");
-          var markFound = false, noteFound = false, bodyFound = false;
-          for (var outputItem = 0; outputItem < openedOutput.pageItems.length; outputItem++) {
+          var markFound = false,
+            noteFound = false,
+            bodyFound = false;
+          for (
+            var outputItem = 0;
+            outputItem < openedOutput.pageItems.length;
+            outputItem++
+          ) {
             var savedItem = openedOutput.pageItems[outputItem];
             if (savedItem.name === "PON_" + sourcePage) {
               var mb = savedItem.geometricBounds;
-              if (Math.abs(mb[0] - abRect[0] - 4 * MM) > 0.1 ||
-                  Math.abs(mb[1] - abRect[1] + 4 * MM) > 0.1)
+              if (
+                Math.abs(mb[0] - abRect[0] - 4 * MM) > 0.1 ||
+                Math.abs(mb[1] - abRect[1] + 4 * MM) > 0.1
+              )
                 throw new Error("PON shifted in AI");
               markFound = true;
             }
             if (savedItem.name === "NOTE_" + sourcePage) noteFound = true;
-            if (savedItem.name === (sourcePage === 1 ? "RASTER_1" : "COLOR_" + sourcePage)) bodyFound = true;
+            if (
+              savedItem.name ===
+              (sourcePage === 1 ? "RASTER_1" : "COLOR_" + sourcePage)
+            )
+              bodyFound = true;
           }
-          if (!markFound || !noteFound || !bodyFound) throw new Error("Missing art/PON/note in AI");
+          if (!markFound || !noteFound || !bodyFound)
+            throw new Error("Missing art/PON/note in AI");
           pageSummary.push(ab.name + ":art+PON+note");
         }
-        if (aiFile === 1 && openedOutput.rasterItems.length !== 1) throw new Error("Raster lost");
+        if (aiFile === 1 && openedOutput.rasterItems.length !== 1)
+          throw new Error("Raster lost");
         result.reopened.push(names[aiFile] + ":" + pageSummary.join(","));
         openedOutput.close(SaveOptions.DONOTSAVECHANGES);
         openedOutput = null;
         owned.activate();
       }
       result.afterReopenUnchanged = before === snapshot(owned);
-      if (!result.afterReopenUnchanged) throw new Error("Source changed during reopen");
+      if (!result.afterReopenUnchanged)
+        throw new Error("Source changed during reopen");
     }
     result.passed = true;
   } catch (e) {
-    result.error = String(e);
+    result.error = String(e) + " [line " + e.line + "]";
     log("ERROR " + e);
   } finally {
     if (openedOutput) {
@@ -270,6 +298,7 @@
     if (original) original.activate();
     if (oldPicker) dcChonThuMucLuuPDF = oldPicker;
     else dcChonThuMucLuuPDF = undefined;
+    dcMoTaLoi = oldErrorFormatter || undefined;
     app.userInteractionLevel = oldInteraction;
     app.coordinateSystem = oldCoordinates;
     $.global.dcCtlExportAuditFormat = undefined;

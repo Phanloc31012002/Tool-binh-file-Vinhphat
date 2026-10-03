@@ -2,6 +2,23 @@
 
 _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
+## v2.16.0 — phát hanh test ok
+
+- phát hanh test ok
+
+---
+
+## v2.15.20 — KTS ghép nhiều kích thước, sửa canvas CTL và lưu AI theo cụm (03/10/2026)
+
+- **Dàn KTS**: tick **Dàn nhiều mẫu vào một tờ** để ghép các kích thước khác nhau chung tờ. Đo riêng từng mẫu, thử nhiều cách xếp/xoay 0°/90° và tận dụng ô trống theo đúng kích thước; không quy tất cả mẫu về ô lớn nhất, không thu nhỏ bài. Tự nhân bản, số con giữa các mẫu chênh tối đa 1. Nếu không ghép được ít nhất một con mỗi mẫu thì báo trước khi tạo kết quả. Tìm kiếm có giới hạn, không cam kết tối ưu tuyệt đối.
+- Bài hai mặt vẫn khóa cặp **trái = trước, phải = sau** theo hàng. Mặt sau dùng chung sơ đồ vị trí đã chọn, đối xứng trái–phải, không lật gương chữ/hình. Canh giữa theo ô chung để sai số đo nhỏ của hai mặt không làm lệch đăng ký. Giữ lề 3 mm, khe 0 mm, chế độ cùng kích thước cũ và xóa artboard cũ chỉ khi dàn thành công.
+- **CTL bấm ghim/keo gáy**: đọc biên canvas thực từ phần đầu file AI đã lưu thay vì mặc định ±7200 pt, vẫn bắt đầu tại vị trí nguồn. Kiểm tra/tạo đủ khung trước khi raster hoặc thay PON; lỗi biên/tạo khung thì dọn riêng khung mới, giữ nguồn. Trả lại chế độ tọa độ của người dùng.
+- **Keo gáy A5 tự trở 8 trang** 14,5 × 20,7 cm dùng đúng artboard **64,8 × 41,8 cm**: bài 58 × 41,4 cm vừa tờ, không bị điều kiện cộng dư lề PON đẩy lên khổ lớn. Nét PON sát biên được giới hạn trong tờ, không bóp bài. Nếu bài thực sự không vừa thì vẫn dùng khổ lớn. Ghi chú/nút Lưu AI lấy đúng khổ kết quả.
+- **Lưu AI CTL**: trên tài liệu tạm, gom bài + PON + ghi chú của mỗi artboard thành một cụm và dịch vị trí **một lần cho cả cụm**, rồi trả nhóm về layer tương ứng. Không snap từng object nữa. Bỏ group nguồn rỗng do raster; chỉ mở khóa bản sao/layer tạm, không group, di chuyển hay mở khóa nguồn. Illustrator vẫn phải copy object qua tài liệu tạm; chưa đo tăng tốc trên bài sản xuất lớn. Giữ bìa/ruột thành file riêng, A/B chung file AI, không ghi đè file có sẵn.
+- Kiểm chứng: 27 file kiểm thử tự động; KTS chạy native một/hai mặt với 3 kích thước 90 × 50, 60 × 40, 75 × 65 mm ra 25 con (9–8–8), đo không chồng bài, đủ lề, đúng đối xứng và nguồn không đổi. CTL chạy trên bản sao file canvas lệch gốc, cả hai kiểu dàn thành công; hai ca vượt biên bị chặn trước raster và giữ nguồn. Lưu/mở lại 3 AI bìa/ruột tự trở/ruột A+B, kiểm tra bài/PON/ghi chú và nguồn không đổi. Chỉ cài local, chưa phát hành GitHub.
+
+---
+
 ## v2.15.19 — XUẤT TEST OK
 
 - XUẤT TEST OK

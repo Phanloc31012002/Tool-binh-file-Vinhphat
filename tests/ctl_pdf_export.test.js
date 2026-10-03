@@ -19,6 +19,39 @@ function fixture(failName) {
     saves = [],
     docs = [];
   let app;
+  let batchTranslations = 0;
+  function addGroup(parent) {
+    const group = {
+      name: "",
+      parent,
+      doc: parent.doc,
+      pageItems: [],
+      locked: false,
+    };
+    group.move = (target) => {
+      group.parent.pageItems.splice(group.parent.pageItems.indexOf(group), 1);
+      group.parent = target;
+      target.pageItems.push(group);
+    };
+    group.remove = () =>
+      group.parent.pageItems.splice(group.parent.pageItems.indexOf(group), 1);
+    group.translate = (x, y) => {
+      assert.strictEqual(app.activeDocument, group.doc);
+      batchTranslations++;
+      function walk(node) {
+        for (const child of node.pageItems) {
+          if (child.pageItems) walk(child);
+          else
+            child.geometricBounds = child.geometricBounds.map(
+              (v, i) => v + (i % 2 ? y : x),
+            );
+        }
+      }
+      walk(group);
+    };
+    parent.pageItems.push(group);
+    return group;
+  }
   function layersFor(doc) {
     const layers = [];
     layers.add = () => {
@@ -36,6 +69,8 @@ function fixture(failName) {
         doc,
       };
       layer.layers = layersFor(doc);
+      layer.groupItems = { add: () => addGroup(layer) };
+      layer.remove = () => layers.splice(layers.indexOf(layer), 1);
       layers.unshift(layer);
       return layer;
     };
@@ -57,7 +92,10 @@ function fixture(failName) {
       },
     });
     let abIndex = 0;
-    const boards = rects.map((rect, n) => ({ artboardRect: rect, name: "Board " + (n + 1) }));
+    const boards = rects.map((rect, n) => ({
+      artboardRect: rect,
+      name: "Board " + (n + 1),
+    }));
     boards.getActiveArtboardIndex = () => abIndex;
     boards.setActiveArtboardIndex = (n) => {
       abIndex = n;
@@ -94,6 +132,7 @@ function fixture(failName) {
   }
   app = {
     documents: docs,
+    coordinateSystem: "user-coordinate-mode",
     executeMenuCommand() {
       throw Error("source mutation");
     },
@@ -136,18 +175,19 @@ function fixture(failName) {
         const copy = {
           name,
           locked: it.locked,
-          geometricBounds: [
-            0,
-            50,
-            bounds[2] - bounds[0],
-            50 - (bounds[1] - bounds[3]),
-          ],
-          translate(x, y) {
-            assert.strictEqual(app.activeDocument, target.doc);
-            this.geometricBounds = this.geometricBounds.map(
-              (v, i) => v + (i % 2 ? y : x),
-            );
+          // A cross-document duplicate applies one coordinate-frame offset,
+          // not an independent origin for each item.
+          geometricBounds: bounds.map((v, i) => v + (i % 2 ? -950 : 2000)),
+          translate() {
+            throw Error("per-object snapping is forbidden");
           },
+        };
+        copy.parent = target;
+        copy.move = (parent) => {
+          assert.strictEqual(app.activeDocument, target.doc);
+          copy.parent.pageItems.splice(copy.parent.pageItems.indexOf(copy), 1);
+          copy.parent = parent;
+          parent.pageItems.push(copy);
         };
         target.pageItems.push(copy);
         // Model a host changing the active document during duplicate.
@@ -175,6 +215,16 @@ function fixture(failName) {
     name: "groupChild",
     parent: { typename: "GroupItem" },
     hidden: false,
+  });
+  body.pageItems.push({
+    name: "empty raster source group",
+    parent: body,
+    typename: "GroupItem",
+    pageItems: [],
+    hidden: false,
+    get visibleBounds() {
+      throw Error("PARM on empty group");
+    },
   });
   source.selection = [body.pageItems[0]];
   source.artboards.setActiveArtboardIndex(2);
@@ -209,8 +259,11 @@ function fixture(failName) {
     File,
     dcChonThuMucLuuPDF: () => ({ fsName: "OUTPUT" }),
     DocumentColorSpace: { CMYK: "CMYK" },
+    CoordinateSystem: { DOCUMENTCOORDINATESYSTEM: "document" },
     PDFSaveOptions: function () {},
-    IllustratorSaveOptions: function () { this.typename = "IllustratorSaveOptions"; },
+    IllustratorSaveOptions: function () {
+      this.typename = "IllustratorSaveOptions";
+    },
     PDFCompatibility: { ACROBAT5: 5 },
     ElementPlacement: { PLACEATEND: 1 },
     SaveOptions: { DONOTSAVECHANGES: 0 },
@@ -224,9 +277,11 @@ function fixture(failName) {
     saves,
     source,
     docs,
+    batchTranslations: () => batchTranslations,
     before,
     unchanged() {
       assert.strictEqual(app.activeDocument, source);
+      assert.strictEqual(app.coordinateSystem, "user-coordinate-mode");
       assert.strictEqual(source.artboards.getActiveArtboardIndex(), 2);
       assert.strictEqual(source.activeLayer, body);
       assert.strictEqual(
@@ -244,6 +299,11 @@ function fixture(failName) {
   };
 }
 const jobs = "BIA=1@300x200|RUOT 1=2,3@300x200";
+function leaves(layer) {
+  return layer.pageItems.flatMap((item) =>
+    item.pageItems ? leaves(item) : [item],
+  );
+}
 const good = fixture();
 assert.match(good.run(jobs), /^OK:.*2 PDF/);
 good.unchanged();
@@ -256,15 +316,15 @@ assert.deepStrictEqual(
   ["PON", "Bai", ""],
 );
 assert.deepStrictEqual(
-  good.saves[0].doc.layers[0].pageItems.map((i) => i.name),
+  leaves(good.saves[0].doc.layers[0]).map((i) => i.name),
   ["pon0"],
 );
 assert.deepStrictEqual(
-  good.saves[1].doc.layers[0].pageItems.map((i) => i.name),
+  leaves(good.saves[1].doc.layers[0]).map((i) => i.name),
   ["pon1", "pon2"],
 );
 assert.deepStrictEqual(
-  good.saves[0].doc.layers[1].pageItems[0].geometricBounds,
+  leaves(good.saves[0].doc.layers[1])[0].geometricBounds,
   [10, 190, 110, 90],
 );
 assert.match(good.run(jobs), /^ERR: File đã tồn tại/);
@@ -299,10 +359,26 @@ for (const save of ai.saves) {
 // A/B are two native artboards in ONE modern AI, not legacy extracted assets.
 assert.strictEqual(ai.saves[0].doc.name, "TEMP");
 ai.saves[1].doc.activate();
-assert.deepStrictEqual(ai.saves[1].doc.artboards.map((a) => a.name), ["Board 2", "Board 3"]);
+assert.deepStrictEqual(
+  ai.saves[1].doc.artboards.map((a) => a.name),
+  ["Board 2", "Board 3"],
+);
 assert.strictEqual(ai.saves[1].doc.artboards.length, 2);
 ai.source.activate();
-assert.deepStrictEqual(ai.saves[1].doc.layers[0].pageItems.map((i) => i.name), ["pon1", "pon2"]);
+assert.deepStrictEqual(
+  leaves(ai.saves[1].doc.layers[0]).map((i) => i.name),
+  ["pon1", "pon2"],
+);
+assert.strictEqual(
+  ai.batchTranslations(),
+  3,
+  "one whole-sheet snap per artboard, never one per object",
+);
+assert.strictEqual(
+  ai.saves[1].doc.layers[0].pageItems.length,
+  2,
+  "one PON group for each A/B artboard",
+);
 assert.match(ai.runAI(jobs), /^ERR: File đã tồn tại: BIA\.ai/);
 ai.unchanged();
 const aiBad = fixture("RUOT");
@@ -311,7 +387,10 @@ aiBad.unchanged();
 assert.deepStrictEqual([...aiBad.files], ["OUTPUT/BIA.ai"]);
 const aiInvalid = fixture();
 assert.match(aiInvalid.runAI(jobs, "4"), /^ERR:.*lưu AI/);
-assert.match(aiInvalid.runAI("BIA=1@300x200|bia=2@300x200"), /^ERR: Hai tờ trùng tên AI/);
+assert.match(
+  aiInvalid.runAI("BIA=1@300x200|bia=2@300x200"),
+  /^ERR: Hai tờ trùng tên AI/,
+);
 assert.match(aiInvalid.runAI("BIA=1@310x200"), /^ERR:.*lưu AI/);
 assert.match(aiInvalid.runAI("invalid"), /^ERR:.*lưu AI/);
 assert.strictEqual(aiInvalid.files.size, 0);

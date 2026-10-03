@@ -87,7 +87,7 @@ function panel(options = {}) {
     dcDanToiUu() {},
     dcCopyToiUuNoteToOddArtboards() {},
     dcCopyToiUuNoteToAllArtboards() {},
-    dcDanToiUuVersion: 18,
+    dcDanToiUuVersion: 19,
     dcDanBeNestingVersion: 8,
     dcDanBePrepare(...args) {
       context.prepareArguments = args;

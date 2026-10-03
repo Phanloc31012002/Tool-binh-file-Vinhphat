@@ -3688,7 +3688,7 @@ function dcDanToiUuV2(pageWidthText, pageHeightText) {
 //  - Artboard moi tu xep theo luoi canvas, trai sang phai roi xuong hang.
 //  - Tach hinh chu nhat de tan dung khoang trong chu L, van cat dao duoc.
 // ============================================================
-var dcDanToiUuVersion = 18;
+var dcDanToiUuVersion = 19;
 // Called only after successful rendering. Remove frames, never their artwork.
 function dcRemoveOldCanvasArtboards(doc, oldCount) {
   var removed = 0;
@@ -3958,6 +3958,117 @@ function dcKtsPairSourceRecords(records, epsilon) {
   return pairs;
 }
 
+// Bounded, deterministic mixed-rectangle search. Geometry is in pt, with
+// top-left local coordinates; the existing KTS renderer owns all app writes.
+function dcKtsMixedSizePlan(specs, width, height) {
+  var EPS = 0.01, totalArea = 0;
+  if (!(width > EPS && height > EPS) || !isFinite(width) || !isFinite(height) || !specs || !specs.length)
+    throw new Error("Khong co vung in/mau hop le.");
+  for (var si = 0; si < specs.length; si++) {
+    var s = specs[si];
+    if (!(s.w > EPS && s.h > EPS) || !isFinite(s.w) || !isFinite(s.h))
+      throw new Error("Khong do duoc kich thuoc mau " + (si + 1) + ".");
+    if (!(s.w <= width + EPS && s.h <= height + EPS) &&
+        !(s.h <= width + EPS && s.w <= height + EPS))
+      throw new Error("Mau " + (si + 1) + " khong vua vung in; khong tu thu nho bai.");
+    totalArea += s.w * s.h;
+  }
+  // No rasterization, recursion, exhaustive permutations or host redraw in
+  // this search. Explicit caps prevent very small input from freezing JSX.
+  var limit = Math.ceil(width * height / totalArea) * specs.length;
+  if (limit > 10000 || specs.length > 100)
+    throw new Error("Qua nhieu vi tri/mau de ghep; hay chia thanh nhom nho hon.");
+  var best = null;
+  function less(a, b) {
+    if (!b) return true;
+    for(var i = 0; i < a.length; i++) {
+      if (a[i] < b[i] - EPS) return true;
+      if (a[i] > b[i] + EPS) return false;
+    }
+    return false;
+  }
+  function splitFree(free, cell) {
+    var next = [], x2 = cell.x + cell.w, y2 = cell.y + cell.h;
+    function add(x,y,w,h) { if(w > EPS && h > EPS) next.push({x:x,y:y,w:w,h:h}); }
+    for(var i = 0; i < free.length; i++) {
+      var r = free[i], rx2 = r.x + r.w, ry2 = r.y + r.h;
+      if(cell.x >= rx2 - EPS || x2 <= r.x + EPS || cell.y >= ry2 - EPS || y2 <= r.y + EPS) {
+        next.push(r); continue;
+      }
+      if(cell.x > r.x + EPS) add(r.x,r.y,cell.x-r.x,r.h);
+      if(x2 < rx2 - EPS) add(x2,r.y,rx2-x2,r.h);
+      if(cell.y > r.y + EPS) add(r.x,r.y,r.w,cell.y-r.y);
+      if(y2 < ry2 - EPS) add(r.x,y2,r.w,ry2-y2);
+    }
+    for(i = next.length - 1; i >= 0; i--) {
+      for(var j = 0; j < next.length; j++) {
+        if(i === j) continue;
+        var a = next[i], b = next[j];
+        if(a.x >= b.x - EPS && a.y >= b.y - EPS &&
+           a.x+a.w <= b.x+b.w+EPS && a.y+a.h <= b.y+b.h+EPS) {
+          next.splice(i,1); break;
+        }
+      }
+    }
+    return next;
+  }
+  var operations = 0;
+  for(var strategy = 0; strategy < 4; strategy++) {
+    for(var seed = 0; seed < Math.min(specs.length,4); seed++) {
+      var free = [{x:0,y:0,w:width,h:height}], slots = [], counts = [], area = 0;
+      for(si = 0; si < specs.length; si++) counts.push(0);
+      while(slots.length < limit && operations < 400000) {
+        var minimum = counts[0];
+        for(si = 1; si < counts.length; si++) minimum = Math.min(minimum,counts[si]);
+        var chosen = null, chosenScore = null;
+        for(si = 0; si < specs.length; si++) {
+          if(counts[si] !== minimum) continue; // counts always differ by at most one
+          s = specs[si];
+          for(var fi = 0; fi < free.length; fi++) {
+            var r = free[fi];
+            for(var rotation = 0; rotation < 2; rotation++) {
+              if(++operations >= 400000) break;
+              var w = rotation ? s.h : s.w, h = rotation ? s.w : s.h;
+              if(w > r.w + EPS || h > r.h + EPS) continue;
+              var shortSide = Math.min(r.w-w,r.h-h), longSide = Math.max(r.w-w,r.h-h);
+              var waste = r.w*r.h-w*h, order = (si-seed+specs.length)%specs.length;
+              var score;
+              if(strategy === 0) score = [shortSide,longSide,waste,order,r.y,r.x,rotation];
+              else if(strategy === 1) score = [waste,shortSide,longSide,order,r.y,r.x,rotation];
+              else if(strategy === 2) score = [r.y,r.x,-w*h,order,rotation];
+              else score = [-w*h,shortSide,longSide,order,r.y,r.x,rotation];
+              if(less(score,chosenScore)) {
+                chosenScore = score;
+                chosen = {x:r.x,y:r.y,w:w,h:h,angle:rotation?90:0,modelIndex:si};
+              }
+            }
+          }
+        }
+        if(!chosen) break;
+        slots.push(chosen); counts[chosen.modelIndex]++;
+        area += chosen.w*chosen.h;
+        free = splitFree(free,chosen);
+      }
+      var minCount = counts[0];
+      for(si = 1; si < counts.length; si++) minCount = Math.min(minCount,counts[si]);
+      // Keep the null guard separate: Illustrator's legacy ExtendScript
+      // can eagerly evaluate property access in this compound expression.
+      var improve = false;
+      if(minCount > 0) {
+        if(best === null) improve = true;
+        else if(minCount > best.minimum) improve = true;
+        else if(minCount === best.minimum) {
+          if(slots.length > best.count) improve = true;
+          else if(slots.length === best.count && area > best.area + EPS) improve = true;
+        }
+      }
+      if(improve) best = {slots:slots,counts:counts,count:slots.length,minimum:minCount,area:area};
+    }
+  }
+  if(!best) throw new Error("Khong ghep du moi mau tren mot to; hay tang kho giay hoac bot mau.");
+  return best;
+}
+
 function dcDanToiUu(
   pageWidthText,
   pageHeightText,
@@ -4059,20 +4170,25 @@ function dcDanToiUu(
     var sourceW = referenceBounds[2] - referenceBounds[0];
     var sourceH = referenceBounds[1] - referenceBounds[3];
 
-    function checkSameSize(item, sideLabel) {
+    var modelSpecs = [], mixedSizes = false;
+    function measuredSize(item, sideLabel) {
       var b = boundsOf(item);
       if (!b) throw new Error("Khong do duoc " + sideLabel + " cua mau.");
-      var w = b[2] - b[0];
-      var h = b[1] - b[3];
-      if (Math.abs(w - sourceW) > 0.2 || Math.abs(h - sourceH) > 0.2)
-        throw new Error(
-          "Cac mau can cung kich thuoc. Hay group/clip moi mau ve cung mot khung truoc khi dan.",
-        );
+      return {w:b[2]-b[0],h:b[1]-b[3]};
     }
     for (mi = 0; mi < models.length; mi++) {
-      checkSameSize(models[mi].front, "mat truoc");
-      if (twoSided) checkSameSize(models[mi].back, "mat sau");
+      var spec = measuredSize(models[mi].front, "mat truoc");
+      if (twoSided) {
+        var backSpec = measuredSize(models[mi].back, "mat sau");
+        if (Math.abs(spec.w-backSpec.w) > 0.2 || Math.abs(spec.h-backSpec.h) > 0.2)
+          throw new Error("Hai mat cua mau " + (mi+1) + " phai cung kich thuoc va huong khung.");
+        spec.w = Math.max(spec.w,backSpec.w); spec.h = Math.max(spec.h,backSpec.h);
+      }
+      modelSpecs.push(spec);
+      if(Math.abs(spec.w-sourceW) > 0.2 || Math.abs(spec.h-sourceH) > 0.2) mixedSizes = true;
     }
+    if(mixedSizes && !multiPerArtboard)
+      throw new Error("Tick Dan nhieu mau vao mot to de ghep cac kich thuoc khac nhau.");
 
     var paperW = parseCentimeters(pageWidthText, "Ngang giay");
     var paperH = parseCentimeters(pageHeightText, "Doc giay");
@@ -4267,7 +4383,8 @@ function dcDanToiUu(
       return best;
     }
 
-    var bestPlan = solveRegion(usableW, usableH, 2);
+    var mixedPlan = mixedSizes ? dcKtsMixedSizePlan(modelSpecs, usableW, usableH) : null;
+    var bestPlan = mixedPlan || solveRegion(usableW, usableH, 2);
     if (!bestPlan || bestPlan.count <= 0)
       return "ERR: Bai mau khong nam vua trong vung in sau khi tru le 3 mm.";
 
@@ -4309,7 +4426,7 @@ function dcDanToiUu(
     var multiSheetCount = 1;
     var multiTotalSlots = bestPlan.count;
     var multiExtraSlots = 0;
-    if (multiPerArtboard) {
+    if (multiPerArtboard && !mixedSizes) {
       // Mot to co the khong chua het cac mau. Tao du so to de moi mau xuat
       // hien it nhat mot lan, sau do moi lap cac mau dau cho cac slot con du.
       multiSheetCount = Math.ceil(models.length / bestPlan.count);
@@ -4324,7 +4441,9 @@ function dcDanToiUu(
     // Mac dinh giu moi mau tren mot to rieng. Khi tick gop mau, xep cac ban
     // sao cung mau lien nhau trong cac slot de cat va phan loai de hon.
     var outputBatches = [];
-    if (multiPerArtboard) {
+    if(mixedSizes) {
+      outputBatches.push(models);
+    } else if (multiPerArtboard) {
       var groupedModels = [];
       var copiesPerModel = Math.floor(multiTotalSlots / models.length);
       var remainderCopies = multiTotalSlots % models.length;
@@ -4759,11 +4878,15 @@ function dcDanToiUu(
       return ordered;
     }
 
-    function copyAt(source, layer, left, top, angle) {
+    function copyAt(source, layer, left, top, angle, slotWidth, slotHeight) {
       var copy = source.duplicate(layer, ElementPlacement.PLACEATEND);
       if (angle !== 0) copy.rotate(angle);
       var bounds = boundsOf(copy);
       if (!bounds) throw new Error("Khong do duoc ban sao de dat vao to giay.");
+      if (slotWidth !== undefined) {
+        left += (slotWidth - (bounds[2] - bounds[0])) / 2;
+        top -= (slotHeight - (bounds[1] - bounds[3])) / 2;
+      }
       copy.translate(left - bounds[0], top - bounds[1]);
       return copy;
     }
@@ -4813,7 +4936,23 @@ function dcDanToiUu(
       var frontSafeLeft = frontRect[0] + MARGIN;
       var frontSafeTop = frontRect[1] - MARGIN;
       var slots = [];
-      collectSlots(
+      if(mixedSizes) {
+        // Center the shared slot geometry once, not each face's artwork
+        // bounds independently. Small front/back measurement differences
+        // must not shift duplex registration.
+        var mixedRight = 0, mixedBottom = 0;
+        for(var boundSlot = 0; boundSlot < mixedPlan.slots.length; boundSlot++) {
+          var boundCell = mixedPlan.slots[boundSlot];
+          mixedRight = Math.max(mixedRight,boundCell.x+boundCell.w);
+          mixedBottom = Math.max(mixedBottom,boundCell.y+boundCell.h);
+        }
+        var mixedDx = (usableW-mixedRight)/2, mixedDy = (usableH-mixedBottom)/2;
+        for(var mixedSlot = 0; mixedSlot < mixedPlan.slots.length; mixedSlot++) {
+          var cell = mixedPlan.slots[mixedSlot];
+          slots.push({x:frontSafeLeft+mixedDx+cell.x,y:frontSafeTop-mixedDy-cell.y,w:cell.w,h:cell.h,
+            angle:cell.angle,modelIndex:cell.modelIndex});
+        }
+      } else collectSlots(
         bestPlan,
         frontSafeLeft,
         frontSafeTop,
@@ -4823,12 +4962,12 @@ function dcDanToiUu(
       );
       if (slots.length !== bestPlan.count)
         return "ERR: Loi tao vi tri dan. Hay thu lai.";
-      slots = orderSlotsForBatch(slots, batch);
+      if(!mixedSizes) slots = orderSlotsForBatch(slots, batch);
 
       // Both faces consume exactly the same captured model-to-slot mapping.
       var slotModels = [];
       for (var mappedSlot = 0; mappedSlot < slots.length; mappedSlot++)
-        slotModels.push(batch[mappedSlot % batch.length]);
+        slotModels.push(mixedSizes ? models[slots[mappedSlot].modelIndex] : batch[mappedSlot % batch.length]);
 
       var frontItems = [];
       var backItems = [];
@@ -4842,10 +4981,12 @@ function dcDanToiUu(
           slots[slotIndex].x,
           slots[slotIndex].y,
           slots[slotIndex].angle,
+          mixedSizes ? slots[slotIndex].w : undefined,
+          mixedSizes ? slots[slotIndex].h : undefined,
         );
         frontItems.push(frontItem);
       }
-      centerItems(frontItems, frontRect);
+      if(!mixedSizes) centerItems(frontItems, frontRect);
 
       if (twoSided) {
         var backSafeLeft = backRect[0] + MARGIN;
@@ -4865,10 +5006,12 @@ function dcDanToiUu(
             mirroredLeft,
             mirroredTop,
             backAngle,
+            mixedSizes ? slot.w : undefined,
+            mixedSizes ? slot.h : undefined,
           );
           backItems.push(backItem);
         }
-        centerItems(backItems, backRect);
+        if(!mixedSizes) centerItems(backItems, backRect);
       }
     }
 
@@ -4897,7 +5040,9 @@ function dcDanToiUu(
         "Da tao " +
         sheetCount +
         " cap artboard truoc/sau doi xung va canh giua artwork; cac cap da tu xuong hang khi het be ngang.";
-    if (multiPerArtboard && models.length > 1) {
+    if(mixedSizes) {
+      detail += " Ghep nhieu kich thuoc; so con tung mau: " + mixedPlan.counts.join(", ") + ".";
+    } else if (multiPerArtboard && models.length > 1) {
       if (multiExtraSlots === 0)
         detail += " Da dan deu " + models.length + " mau.";
       else
@@ -17709,10 +17854,12 @@ function dcRunCatalogueAuto(wCm, hCm) {
 // 65 x 86 source; they are never pulled inward by the squeezed ruot.  A
 // centred 2-page squeeze also receives the tiny nominal-bottom compensation
 // required to keep the first inner sheet inside its fixed artboard.
-var dcSignature8AutoPonVersion = 37;
+var dcSignature8AutoPonVersion = 38;
 
 function dcRunSignature8(wCm, hCm, coBia) {
+  var previousSignatureCoordinates = app.coordinateSystem;
   try {
+    app.coordinateSystem = CoordinateSystem.DOCUMENTCOORDINATESYSTEM;
     var MM = 2.834645669;
 
     // ---------- BẢNG NHẬP KÍCH THƯỚC (cm) ----------
@@ -17805,8 +17952,8 @@ function dcRunSignature8(wCm, hCm, coBia) {
     // selection was captured before these two generated layers were removed.
     // If an old PON layer was unlocked/selected, its marks were rasterized as
     // source pages and then squeezed together with the ruot, while new PON
-    // stayed nominal.  That looks exactly like a PON that moves.  Remove only
-    // the two exact layer names owned by CTL Offset before reading selection.
+    // stayed nominal. Exclude owned PON without removing anything until the
+    // complete canvas/artboard preflight has succeeded.
     var CTL_OFFSET_PAPER_PON_LAYER = "Pon CTL Offset tu dong";
     var CTL_OFFSET_CUT_PON_LAYER = "Pon cat CTL Offset tu dong";
     function removePreviousCtlOffsetPonLayers() {
@@ -17838,8 +17985,23 @@ function dcRunSignature8(wCm, hCm, coBia) {
         } catch (oldPonRemoveError) {}
       }
     }
-    removePreviousCtlOffsetPonLayers();
-    var sel = doc.selection;
+    var sel = [];
+    var selectedPages = doc.selection;
+    for (var selectedIndex = 0; selectedPages && selectedIndex < selectedPages.length; selectedIndex++) {
+      var selectedPage = selectedPages[selectedIndex];
+      var ancestor = selectedPage;
+      var isOldPon = false;
+      for (var ancestorDepth = 0; ancestor && ancestorDepth < 50; ancestorDepth++) {
+        if (ancestor.typename === "Layer" &&
+          (ancestor.name === CTL_OFFSET_PAPER_PON_LAYER || ancestor.name === CTL_OFFSET_CUT_PON_LAYER)) {
+          isOldPon = true;
+          break;
+        }
+        if (ancestor.typename === "Document") break;
+        ancestor = ancestor.parent;
+      }
+      if (!isOldPon) sel.push(selectedPage);
+    }
     if (!sel || sel.length === 0) {
       alert("Chưa chọn trang ruột.");
       return "OK: (dừng)";
@@ -18035,38 +18197,40 @@ function dcRunSignature8(wCm, hCm, coBia) {
     //  về đúng kích thước đích (cách A - ép đúng số, raster không méo).
     // ============================================================
     var processed = [];
-    for (var p = 0; p < pages.length; p++) {
-      var item = pages[p];
-      var s0 = sizeMM(item); // do kich thuoc that (xu ly clip neu co)
-      var frame = s0.b.slice(0); // khung để raster
+    function prepareSignaturePages() {
+      for (var p = 0; p < pages.length; p++) {
+        var item = pages[p];
+        var s0 = sizeMM(item); // do kich thuoc that (xu ly clip neu co)
+        var frame = s0.b.slice(0); // khung để raster
 
-      var flat = dcFlattenForImposition(doc, item, frame, 400);
+        var flat = dcFlattenForImposition(doc, item, frame, 400);
 
-      // phong ve dung PAGE_W x PAGE_H
-      var gb;
-      try {
-        gb = flat.geometricBounds;
-      } catch (e) {
-        gb = null;
-      }
-      if (gb) {
-        var cw = (gb[2] - gb[0]) / MM,
-          ch = (gb[1] - gb[3]) / MM;
-        if (cw > 0 && ch > 0) {
-          try {
-            flat.resize((SOURCE_PAGE_W / cw) * 100, (SOURCE_PAGE_H / ch) * 100);
-          } catch (e) {}
-        }
-      }
-      // The A5 production artboard is sometimes entered as 21.15 x 15.
-      // Normalise that sideways entry to the portrait A5 grid so the chosen
-      // paper form is independent of the field order in the panel.
-      if (SMALL_SOURCE_IS_LANDSCAPE) {
+        // phong ve dung PAGE_W x PAGE_H
+        var gb;
         try {
-          flat.rotate(90);
-        } catch (smallPortraitRotateError) {}
+          gb = flat.geometricBounds;
+        } catch (e) {
+          gb = null;
+        }
+        if (gb) {
+          var cw = (gb[2] - gb[0]) / MM,
+            ch = (gb[1] - gb[3]) / MM;
+          if (cw > 0 && ch > 0) {
+            try {
+              flat.resize((SOURCE_PAGE_W / cw) * 100, (SOURCE_PAGE_H / ch) * 100);
+            } catch (e) {}
+          }
+        }
+        // The A5 production artboard is sometimes entered as 21.15 x 15.
+        // Normalise that sideways entry to the portrait A5 grid so the chosen
+        // paper form is independent of the field order in the panel.
+        if (SMALL_SOURCE_IS_LANDSCAPE) {
+          try {
+            flat.rotate(90);
+          } catch (smallPortraitRotateError) {}
+        }
+        processed.push(flat);
       }
-      processed.push(flat);
     }
 
     // ============================================================
@@ -18769,6 +18933,7 @@ function dcRunSignature8(wCm, hCm, coBia) {
 
       function draw(p1, p2) {
         var mark = layer.pathItems.add();
+        mark.locked = false;
         mark.setEntirePath([p1, p2]);
         mark.filled = false;
         mark.stroked = true;
@@ -18844,26 +19009,31 @@ function dcRunSignature8(wCm, hCm, coBia) {
     }
 
     var artworkLayer = doc.activeLayer;
-    var ponLayer = createAutoPonLayer(CTL_OFFSET_PAPER_PON_LAYER);
-    var cutPonLayer = createAutoPonLayer(CTL_OFFSET_CUT_PON_LAYER);
-    try {
-      doc.activeLayer = artworkLayer;
-    } catch (restoreArtworkLayerError) {
-      for (
-        var fallbackLayer = 0;
-        fallbackLayer < doc.layers.length;
-        fallbackLayer++
-      ) {
-        try {
-          if (
-            doc.layers[fallbackLayer] !== ponLayer &&
-            doc.layers[fallbackLayer] !== cutPonLayer
-          ) {
-            artworkLayer = doc.layers[fallbackLayer];
-            doc.activeLayer = artworkLayer;
-            break;
-          }
-        } catch (findArtworkLayerError) {}
+    var ponLayer = null;
+    var cutPonLayer = null;
+    function prepareSignatureLayers() {
+      removePreviousCtlOffsetPonLayers();
+      ponLayer = createAutoPonLayer(CTL_OFFSET_PAPER_PON_LAYER);
+      cutPonLayer = createAutoPonLayer(CTL_OFFSET_CUT_PON_LAYER);
+      try {
+        doc.activeLayer = artworkLayer;
+      } catch (restoreArtworkLayerError) {
+        for (
+          var fallbackLayer = 0;
+          fallbackLayer < doc.layers.length;
+          fallbackLayer++
+        ) {
+          try {
+            if (
+              doc.layers[fallbackLayer] !== ponLayer &&
+              doc.layers[fallbackLayer] !== cutPonLayer
+            ) {
+              artworkLayer = doc.layers[fallbackLayer];
+              doc.activeLayer = artworkLayer;
+              break;
+            }
+          } catch (findArtworkLayerError) {}
+        }
       }
     }
 
@@ -19001,8 +19171,10 @@ function dcRunSignature8(wCm, hCm, coBia) {
     }
 
     function readCanvasBounds() {
-      // Normal Canvas is 14,400 pt wide; on Large Canvas Illustrator exposes
-      // scaleFactor, so the usable coordinate range grows accordingly.
+      // Saved AI records the actual canvas origin, which need not be (0,0).
+      var savedCanvas = dcDanTheoMauReadCanvasBounds(doc);
+      if (savedCanvas) return savedCanvas;
+      // Conservative fallback for unsaved documents without AI metadata.
       var halfSize = 7200;
       try {
         if (doc.scaleFactor && doc.scaleFactor < 1)
@@ -19120,23 +19292,20 @@ function dcRunSignature8(wCm, hCm, coBia) {
     }
 
     // ---- Tạo artboard (chưa nhân bản pon - sẽ làm SAU khi đặt trang) ----
-    for (var k = 0; k < numFaces; k++) {
-      var pos = abPos[k];
-      try {
+    var k = 0;
+    try {
+      for (; k < numFaces; k++) {
+        var pos = abPos[k];
         doc.artboards.add(pos);
-      } catch (artboardError) {
-        throw new Error(
-          "Illustrator khong tao duoc artboard CTL Offset thu " + (k + 1) + ".",
-        );
       }
-    }
-    if (doc.artboards.length > numFaces) {
-      for (var a2 = oldAb - 1; a2 >= 0; a2--) {
-        try {
-          doc.artboards.remove(a2);
-        } catch (e) {}
+    } catch (artboardError) {
+      for (var rollbackAb = doc.artboards.length - 1; rollbackAb >= oldAb; rollbackAb--) {
+        try { doc.artboards.remove(rollbackAb); } catch (rollbackError) {}
       }
+      throw new Error("Illustrator khong tao duoc artboard CTL Offset thu " + (k + 1) + ".");
     }
+    prepareSignatureLayers();
+    prepareSignaturePages();
 
     // ---------- đặt trang lên 1 MẶT ----------
     function centerItem(it, cx, cy) {
@@ -19994,6 +20163,7 @@ function dcRunSignature8(wCm, hCm, coBia) {
     var restoredPonCount = restoreNominalPonGeometry(nominalPonGeometry);
     lockNominalPonLayersOnTop();
 
+    dcRemoveOldCanvasArtboards(doc, oldAb);
     app.redraw();
     alert(
       "Đã dàn " +
@@ -20008,9 +20178,6 @@ function dcRunSignature8(wCm, hCm, coBia) {
         "PON tự vẽ nằm trên cùng. " +
         (note ? "Ghi chú đã xử lý." : "Đã bỏ qua ghi chú."),
     );
-  } catch (e) {
-    return "ERR: signature8: " + e.toString();
-  }
   var ponNote = "OK: Đã dàn CTL Offset; đã vẽ " + cutPonCount + " nét PON cắt.";
   if (ponClampCount > 0)
     ponNote +=
@@ -20019,6 +20186,11 @@ function dcRunSignature8(wCm, hCm, coBia) {
       " mốc PON bị kéo về mép artboard vì lưới danh định của form này lòi ra ngoài khổ giấy.";
   // Kèm danh sách khổ vừa dàn để panel hiện nút Lưu PDF cho từng khổ.
   return ponNote + dcCtlOffsetPdfPlan(doc, faces, abPos);
+  } catch (e) {
+    return "ERR: signature8: " + e.toString();
+  } finally {
+    app.coordinateSystem = previousSignatureCoordinates;
+  }
 }
 
 // ============================================================
@@ -20037,7 +20209,7 @@ function dcRunSignature8(wCm, hCm, coBia) {
 //  liệu tạm rồi lưu AI (entry PDF cũ vẫn dùng chung cơ chế an toàn).
 //  Không group/undo hay mở khoá trong tài liệu nguồn.
 // ============================================================
-var dcCtlOffsetPdfVersion = 3;
+var dcCtlOffsetPdfVersion = 4;
 
 // Gọi ở cuối lượt dàn. Trả về đuôi "||CTLPDF:{...}" để gắn sau chuỗi OK;
 // panel đọc đuôi này để biết bài có những khổ nào, mỗi khổ gồm những tờ nào
@@ -20144,7 +20316,9 @@ function dcLuuCtlOffsetAI(totalText, jobsText) {
   return dcLuuCtlOffsetFiles(totalText, jobsText, "AI");
 }
 function dcLuuCtlOffsetFiles(totalText, jobsText, format) {
+  var originalCoordinates = app.coordinateSystem;
   try {
+    app.coordinateSystem = CoordinateSystem.DOCUMENTCOORDINATESYSTEM;
     var isAI = format === "AI";
     var formatLabel = isAI ? "AI" : "PDF";
     var extension = isAI ? ".ai" : ".pdf";
@@ -20234,6 +20408,9 @@ function dcLuuCtlOffsetFiles(totalText, jobsText, format) {
       for (var it = 0; it < layer.pageItems.length; it++) {
         var item = layer.pageItems[it];
         if (item.parent !== layer || item.hidden) continue;
+        // Rasterization can leave an empty source group. Illustrator throws
+        // PARM on its bounds; it is not printable artwork and must be skipped.
+        if (item.typename === "GroupItem" && item.pageItems.length === 0) continue;
         node.items.push({ item: item, bounds: item.visibleBounds.slice(0) });
       }
       for (var sub = 0; sub < layer.layers.length; sub++) {
@@ -20284,33 +20461,81 @@ function dcLuuCtlOffsetFiles(totalText, jobsText, format) {
       return opt;
     }
 
-    function copyLayer(node, targetLayer, page, targetRect, workDoc) {
+    function copyLayer(node, targetLayer, page, batch, workDoc) {
       var copied = 0;
+      workDoc.activate();
+      targetLayer.locked = false;
+      targetLayer.visible = true;
+      workDoc.activeLayer = targetLayer;
+      var group = targetLayer.groupItems.add();
+      group.locked = false;
+      group.name = "CTL " + (page.name || "Artboard " + (page.index + 1));
+      var pendingCopies = [];
+      sourceDoc.activate();
       // pageItems có thứ tự trên -> dưới; PLACEATEND giữ đúng thứ tự đó.
+      // Chỉ copy vào nhóm, KHÔNG snap/đổi tài liệu cho từng object.
       for (var ci = 0; ci < node.items.length; ci++) {
         var entry = node.items[ci];
         var b = entry.bounds, r = page.rect;
         if (b[2] < r[0] || b[0] > r[2] || b[1] < r[3] || b[3] > r[1]) continue;
-        sourceDoc.activate();
-        var before = entry.item.geometricBounds.slice(0);
+        // Một số bản Illustrator tự đổi activeDocument khi duplicate.
+        if (app.activeDocument !== sourceDoc) sourceDoc.activate();
+        var referenceBounds = batch.reference ? null : entry.item.geometricBounds.slice(0);
+        // Illustrator accepts a cross-document Layer target, not a GroupItem
+        // (PARM). Collect on the target layer, then group in one work-doc pass.
         var duplicate = entry.item.duplicate(targetLayer, ElementPlacement.PLACEATEND);
-        workDoc.activate();
-        duplicate.locked = false;
-        var after = duplicate.geometricBounds;
-        duplicate.translate(
-          targetRect[0] + before[0] - r[0] - after[0],
-          targetRect[1] + before[1] - r[1] - after[1]
-        );
+        pendingCopies.push(duplicate);
+        if (!batch.reference) batch.reference = { item: duplicate, bounds: referenceBounds };
         copied++;
       }
+      workDoc.activate();
+      workDoc.selection = null;
+      for (var pendingIndex = 0; pendingIndex < pendingCopies.length; pendingIndex++) {
+        unlockWorkCopy(pendingCopies[pendingIndex]);
+        pendingCopies[pendingIndex].move(group, ElementPlacement.PLACEATEND);
+      }
+      if (copied) batch.groups.push({ group: group, layer: targetLayer });
+      else group.remove();
       // layers.add đặt layer mới ở trên cùng: tạo từ dưới lên trên.
       for (var ch = node.children.length - 1; ch >= 0; ch--) {
-        workDoc.activate();
         var childLayer = targetLayer.layers.add();
         childLayer.name = node.children[ch].name;
-        copied += copyLayer(node.children[ch], childLayer, page, targetRect, workDoc);
+        copied += copyLayer(node.children[ch], childLayer, page, batch, workDoc);
       }
       return copied;
+    }
+    function unlockWorkCopy(item) {
+      // Only copies in the temporary document, never source layer/item locks.
+      item.locked = false;
+      if (item.typename === "GroupItem") {
+        for (var child = 0; child < item.pageItems.length; child++)
+          if (item.pageItems[child].parent === item) unlockWorkCopy(item.pageItems[child]);
+      }
+    }
+    function positionSheetBatch(batch, page, targetRect, workDoc) {
+      workDoc.activate();
+      workDoc.selection = null;
+      // Gom toàn bộ bài + ghi chú + PON của MỘT artboard trên bản sao.
+      // Dời một lần cho cả bộ, rồi trả các nhóm về đúng layer của chúng.
+      var batchLayer = workDoc.layers.add();
+      batchLayer.name = "_CTL temporary batch";
+      batchLayer.locked = false;
+      batchLayer.visible = true;
+      workDoc.activeLayer = batchLayer;
+      var wholeSheet = batchLayer.groupItems.add();
+      wholeSheet.locked = false;
+      for (var gi = 0; gi < batch.groups.length; gi++)
+        batch.groups[gi].group.move(wholeSheet, ElementPlacement.PLACEATEND);
+      var before = batch.reference.bounds;
+      var after = batch.reference.item.geometricBounds;
+      wholeSheet.translate(
+        targetRect[0] + before[0] - page.rect[0] - after[0],
+        targetRect[1] + before[1] - page.rect[1] - after[1]
+      );
+      for (var restoreGroup = 0; restoreGroup < batch.groups.length; restoreGroup++)
+        batch.groups[restoreGroup].group.move(batch.groups[restoreGroup].layer, ElementPlacement.PLACEATEND);
+      wholeSheet.remove();
+      batchLayer.remove();
     }
     function exportJob(job) {
       var pages = job.pages;
@@ -20348,9 +20573,11 @@ function dcLuuCtlOffsetFiles(totalText, jobsText, format) {
         }
         for (var ci = 0; ci < pages.length; ci++) {
           var copiedCount = 0;
+          var batch = { groups: [], reference: null };
           for (var sl = 0; sl < sourceLayers.length; sl++)
-            copiedCount += copyLayer(sourceLayers[sl], targetLayers[sl], pages[ci], targetRects[ci], workDoc);
+            copiedCount += copyLayer(sourceLayers[sl], targetLayers[sl], pages[ci], batch, workDoc);
           if (!copiedCount) throw new Error("Artboard " + (pages[ci].index + 1) + " không có object để lưu.");
+          positionSheetBatch(batch, pages[ci], targetRects[ci], workDoc);
         }
         workDoc.activate();
         workDoc.saveAs(job.file, isAI ? makeAiOptions() : makePdfOptions(pages.length));
@@ -20417,6 +20644,8 @@ function dcLuuCtlOffsetFiles(totalText, jobsText, format) {
     return (
       "ERR: " + (typeof dcMoTaLoi === "function" ? dcMoTaLoi(e) : e.toString())
     );
+  } finally {
+    app.coordinateSystem = originalCoordinates;
   }
 }
 
@@ -20450,7 +20679,7 @@ function dcLuuCtlOffsetFiles(totalText, jobsText, format) {
 //   5. Nhập ghi chú (RUỘT N + chữ thêm).
 // ============================================================
 
-var dcKeoGayAutoPonVersion = 8;
+var dcKeoGayAutoPonVersion = 9;
 
 // A5 packs TWO unchanged A4-style 16-page signatures on one A/B sheet.
 // This is not a new 32-page folding signature. B reverses the block order
@@ -20834,10 +21063,11 @@ function dcRunKeoGay(wCm, hCm) {
     var ponMain = { W: 858 * MM, H: 638 * MM };
     var ponTT4 = { W: 648 * MM, H: 418 * MM };
     var ponSmall4 = { W: 428 * MM, H: 313 * MM };
-    // Small TT8 is centred on 65x43 when the complete artwork AND marks fit.
-    // An oversized/bleed-inclusive TT8 uses the larger sheet, never squeezed.
+    // At 14.5x20.7 cm, centred TT8 has 2 mm above/below. Shorten crop
+    // endpoints via safePoint rather than unnecessarily choosing 65x86.
+    // Actually oversized TT8 still uses the larger sheet, never squeezed.
     var smallTT8Fits = pageWpt * 4 + 4 * MM + 1 <= ponTT4.W &&
-      pageHpt * 2 + 4 * MM + 1 <= ponTT4.H;
+      pageHpt * 2 + 1 <= ponTT4.H;
     function ponFor(face) {
       if (face.type === "TT4") return IS_SMALL_A5 ? ponSmall4 : ponTT4;
       return face.smallSelfTurn && smallTT8Fits ? ponTT4 : ponMain;
@@ -20911,6 +21141,7 @@ function dcRunKeoGay(wCm, hCm) {
       var black = makeBlack();
       function draw(x1, y1, x2, y2) {
         var mark = layer.pathItems.add();
+        mark.locked = false;
         mark.setEntirePath([
           [x1, y1],
           [x2, y2],
@@ -20949,6 +21180,7 @@ function dcRunKeoGay(wCm, hCm) {
             Math.max(rect[3] + 0.5, Math.min(rect[1] - 0.5, p[1]))];
         }
         var mark = layer.pathItems.add();
+        mark.locked = false;
         mark.setEntirePath([safePoint(p1), safePoint(p2)]);
         mark.filled = false;
         mark.stroked = true;
@@ -21042,6 +21274,8 @@ function dcRunKeoGay(wCm, hCm) {
     // Keep a safety margin inside the Illustrator canvas. Normal Canvas is
     // 14,400 pt wide; Large Canvas reports scaleFactor for its larger space.
     function readCanvasBounds() {
+      var savedCanvas = dcDanTheoMauReadCanvasBounds(doc);
+      if (savedCanvas) return savedCanvas;
       var halfSize = 7200;
       try {
         if (doc.scaleFactor && doc.scaleFactor < 1)
