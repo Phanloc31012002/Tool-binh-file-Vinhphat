@@ -1,9 +1,9 @@
 {
     "product":  "com.locdev.dancard",
-    "version":  "2.15.6",
-    "title":  "Phát hành bản bế tag, decal",
-    "description":  "đã test xong phát hành cho nv dùng",
-    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.15.6.zip",
-    "sha256":  "62BE0634B4A3E6F219CAF2FBF20C7B6F11797A2ADE7FB13413347E091C839E0B",
-    "publishedUtc":  "2026-10-02T08:23:09.8640349Z"
+    "version":  "2.15.12",
+    "title":  "vá dàn theo mẫu để cứng artboard nguồn",
+    "description":  "vá dàn theo mẫu để cứng artboard nguồn",
+    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.15.12.zip",
+    "sha256":  "391CC6A46FF07D075E740FC88ECAD7F7C9260D6F2DF179AD8534E1FC0197E259",
+    "publishedUtc":  "2026-10-03T02:13:05.7551262Z"
 }

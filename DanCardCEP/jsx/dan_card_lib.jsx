@@ -3624,18 +3624,27 @@ function dcDanToiUuV2(pageWidthText, pageHeightText) {
 //  - Artboard moi tu xep theo luoi canvas, trai sang phai roi xuong hang.
 //  - Tach hinh chu nhat de tan dung khoang trong chu L, van cat dao duoc.
 // ============================================================
-var dcDanToiUuVersion = 16;
+var dcDanToiUuVersion = 17;
 
 // Ghi chu duoc dat tren artboard mat truoc dau tien. Nhan ban giu nguyen
 // dinh dang, chi doi toa do de khoang cach voi mep artboard luon giong nhau.
 function dcCopyToiUuNoteToOddArtboards(prefixListText) {
+  return dcCopyToiUuNoteToArtboards(prefixListText, true);
+}
+function dcCopyToiUuNoteToAllArtboards(prefixListText) {
+  return dcCopyToiUuNoteToArtboards(prefixListText, false);
+}
+function dcCopyToiUuNoteToArtboards(prefixListText, twoSided) {
+  var previousCoordinates = app.coordinateSystem;
+  var copied = [], sourceTextFrame = null, originalTextContents = "";
   try {
+    app.coordinateSystem = CoordinateSystem.DOCUMENTCOORDINATESYSTEM;
     if (app.documents.length === 0) return "ERR: Chua mo tai lieu nao.";
 
     var doc = app.activeDocument;
     var selection = doc.selection;
     if (!selection || selection.length === 0)
-      return "ERR: Chon ghi chu tren artboard mat truoc dau tien truoc khi copy.";
+      return "ERR: Chon ghi chu tren artboard dau tien can dien.";
 
     var EPS = 0.01;
     function boundsOf(item) {
@@ -3701,27 +3710,27 @@ function dcCopyToiUuNoteToOddArtboards(prefixListText) {
       var centerY = (sourceBounds[1] + sourceBounds[3]) / 2;
       var itemArtboard = findArtboardAt(centerX, centerY);
       if (itemArtboard < 0)
-        return "ERR: Ghi chu dang chon nam ngoai artboard. Dat no vao artboard mat truoc dau tien.";
+        return "ERR: Ghi chu dang chon nam ngoai artboard. Dat no vao artboard dau tien can dien.";
       if (sourceIndex < 0) sourceIndex = itemArtboard;
       else if (sourceIndex !== itemArtboard)
         return "ERR: Chi chon ghi chu tren mot artboard trong mot lan copy.";
       records.push({ item: selection[si], bounds: sourceBounds });
     }
     if (records.length === 0) return "ERR: Khong doc duoc ghi chu dang chon.";
-    if (sourceIndex % 2 !== 0)
+    if (twoSided && sourceIndex % 2 !== 0)
       return "ERR: Ghi chu phai nam tren artboard mat truoc (artboard so le).";
 
     var targetIndexes = [];
-    for (var ai = sourceIndex + 2; ai < doc.artboards.length; ai += 2)
+    var step = twoSided ? 2 : 1;
+    for (var ai = sourceIndex + step; ai < doc.artboards.length; ai += step)
       targetIndexes.push(ai);
-    if (targetIndexes.length === 0)
-      return "ERR: Chua co artboard mat truoc tiep theo de copy ghi chu.";
 
     var prefixes = parsePrefixes(prefixListText);
     var usePrefixes = prefixes.length > 0;
+    if (targetIndexes.length === 0 && (twoSided || !usePrefixes))
+      return "ERR: Chua co artboard " + (twoSided ? "mat truoc " : "") + "tiep theo de copy ghi chu.";
     var prefixRecordIndex = -1;
     var prefixTextIndex = -1;
-    var originalTextContents = "";
     if (usePrefixes) {
       if (prefixes.length !== targetIndexes.length + 1)
         return (
@@ -3730,7 +3739,7 @@ function dcCopyToiUuNoteToOddArtboards(prefixListText) {
           " noi dung cho artboard " +
           (sourceIndex + 1) +
           ", " +
-          (sourceIndex + 3) +
+          (sourceIndex + 1 + step) +
           ", ...; hien dang co " +
           prefixes.length +
           "."
@@ -3754,7 +3763,8 @@ function dcCopyToiUuNoteToOddArtboards(prefixListText) {
       prefixRecordIndex = selectedTextFrames[0].recordIndex;
       prefixTextIndex = selectedTextFrames[0].textIndex;
       originalTextContents = selectedTextFrames[0].frame.contents;
-      selectedTextFrames[0].frame.contents =
+      sourceTextFrame = selectedTextFrames[0].frame;
+      sourceTextFrame.contents =
         prefixes[0] + " - " + originalTextContents;
     }
 
@@ -3762,16 +3772,16 @@ function dcCopyToiUuNoteToOddArtboards(prefixListText) {
     for (var ri = 0; ri < records.length; ri++) {
       records[ri].bounds = boundsOf(records[ri].item);
       if (!records[ri].bounds)
-        return "ERR: Khong do duoc ghi chu sau khi them noi dung.";
+        throw new Error("Khong do duoc ghi chu sau khi them noi dung.");
       records[ri].leftOffset = records[ri].bounds[0] - sourceRect[0];
       records[ri].topOffset = records[ri].bounds[1] - sourceRect[1];
     }
 
-    var copied = [];
     for (var ti = 0; ti < targetIndexes.length; ti++) {
       var targetRect = doc.artboards[targetIndexes[ti]].artboardRect;
       for (ri = 0; ri < records.length; ri++) {
         var copy = records[ri].item.duplicate();
+        copied.push(copy);
         var copyBounds = boundsOf(copy);
         if (!copyBounds) {
           try {
@@ -3800,14 +3810,15 @@ function dcCopyToiUuNoteToOddArtboards(prefixListText) {
             targetRect[1] + records[ri].topOffset - prefixedCopyBounds[1],
           );
         }
-        copied.push(copy);
       }
     }
 
     try {
-      doc.selection = null;
-      for (var ci = 0; ci < copied.length; ci++) copied[ci].selected = true;
-      doc.artboards.setActiveArtboardIndex(targetIndexes[0]);
+      if (copied.length) {
+        doc.selection = null;
+        for (var ci = 0; ci < copied.length; ci++) copied[ci].selected = true;
+        doc.artboards.setActiveArtboardIndex(targetIndexes[0]);
+      }
     } catch (selectError) {}
     app.redraw();
     return (
@@ -3817,11 +3828,19 @@ function dcCopyToiUuNoteToOddArtboards(prefixListText) {
       (sourceIndex + 1) +
       " sang " +
       targetIndexes.length +
-      " artboard mat truoc tiep theo." +
+      (twoSided ? " artboard mat truoc tiep theo." : " artboard tiep theo (bai 1 mat).") +
       (usePrefixes ? " Da them noi dung theo thu tu da nhap." : "")
     );
   } catch (e) {
+    for (var cleanup = copied.length - 1; cleanup >= 0; cleanup--) {
+      try { copied[cleanup].remove(); } catch (removeCopyError) {}
+    }
+    if (sourceTextFrame) {
+      try { sourceTextFrame.contents = originalTextContents; } catch (restoreTextError) {}
+    }
     return "ERR: " + dcMoTaLoi(e);
+  } finally {
+    app.coordinateSystem = previousCoordinates;
   }
 }
 
@@ -17579,7 +17598,7 @@ function dcRunCatalogueAuto(wCm, hCm) {
 // 65 x 86 source; they are never pulled inward by the squeezed ruot.  A
 // centred 2-page squeeze also receives the tiny nominal-bottom compensation
 // required to keep the first inner sheet inside its fixed artboard.
-var dcSignature8AutoPonVersion = 34;
+var dcSignature8AutoPonVersion = 37;
 
 function dcRunSignature8(wCm, hCm, coBia) {
   try {
@@ -18293,7 +18312,7 @@ function dcRunSignature8(wCm, hCm, coBia) {
     //    gutter      : khe giữa, chèn vào chính giữa dãy cột
     //    rowGap      : khe giữa hai block hàng (0 = không có)
     //    side/top/bottom : lề quanh lưới
-    //    trimCut     : xén bớt chiều cao mỗi hàng (chỉ form tự trở 8 A5)
+    //    trimCut     : allowance tối đa mỗi hàng (chỉ form tự trở 8 A5)
     //    pon         : nhóm thông số PON giấy ("large" | "small")
     //    midAxis     : có vạch PON ở đúng tâm khe giữa không
     //    rowSeam     : có vạch PON ở đường nối giữa hai hàng không
@@ -18335,9 +18354,11 @@ function dcRunSignature8(wCm, hCm, coBia) {
           trimCut: SMALL8_TRIM_OVERLAP,
           pon: "small",
           midAxis: true,
-          rowSeam: false,
+          // Cắt ngang giữa hai hàng. Trục giữa hai trang của mỗi cụm
+          // là nếp gấp dọc, không đánh PON cắt tại đó.
+          rowSeam: true,
           cornerLegs: true,
-          pageAxes: true,
+          pageAxes: false,
         };
       if (type === "SMALL16" || type === "SMALLAB")
         return {
@@ -18398,7 +18419,15 @@ function dcRunSignature8(wCm, hCm, coBia) {
     function nominalGridFor(face, rect) {
       var spec = formSpec(face.type);
       var cellW = spec.rotated ? pageHpt : pageWpt;
-      var cellH = (spec.rotated ? pageWpt : pageHpt) - spec.trimCut;
+      var fullCellH = spec.rotated ? pageWpt : pageHpt;
+      // Chỉ dùng allowance khi hai hàng thật sự cao hơn tờ. Trang 14 x 20
+      // đã lọt 41.8 cm nên không được trừ 2.5 mm rồi đặt bài nguyên cao
+      // theo tâm ô ngắn hơn: cách đó làm mép dưới tràn 1.25 mm.
+      var requiredTrim = Math.max(
+        0,
+        (fullCellH * spec.rows + spec.rowGap - spec.sheet.H) / spec.rows,
+      );
+      var cellH = fullCellH - Math.min(spec.trimCut, requiredTrim);
       if (cellH <= 0) throw new Error("Chiều cao trang quá nhỏ cho form này.");
 
       var grid = {
@@ -18643,11 +18672,11 @@ function dcRunSignature8(wCm, hCm, coBia) {
         yHi = artboardRect[1];
       function clamp(v, lo, hi) {
         if (v < lo) {
-          ponClampCount++;
+          if (lo - v > 0.001) ponClampCount++;
           return lo;
         }
         if (v > hi) {
-          ponClampCount++;
+          if (v - hi > 0.001) ponClampCount++;
           return hi;
         }
         return v;
@@ -19031,7 +19060,12 @@ function dcRunSignature8(wCm, hCm, coBia) {
       var totalW = pageWpt * 4 + MID_GAP;
       var leftEdge = acx - totalW / 2;
       var trimH = rowTrimH || pageHpt;
-      var cy = rowIsTop ? cumTop - trimH / 2 : cumTop - trimH * 1.5;
+      // Neo mép ngoài bằng chiều cao BÀI thật, không bằng chiều cao ô.
+      // Nếu A5 tối đa cần allowance, nó nằm ở đường ghép hai hàng bên
+      // trong; không đẩy artwork qua mép trên/dưới của giấy.
+      var cy = rowIsTop
+        ? cumTop - pageHpt / 2
+        : cumTop - trimH * 2 + pageHpt / 2;
       for (var c = 0; c < 4; c++) {
         var it = processed[pageArr[c] - 1];
         if (!it) continue;
@@ -19046,10 +19080,8 @@ function dcRunSignature8(wCm, hCm, coBia) {
     }
     function placeFace8(face, pos) {
       var grid = nominalGridFor(face, pos);
-      // SMALL8 is centred on its approved 64.8 x 41.8 trim grid.  A full
-      // 21.15 cm A5 source therefore overlaps its adjacent source by the
-      // normal bleed amount, while paper PON continues to define the exact
-      // artboard boundary.
+      // SMALL8 chỉ dùng allowance cần thiết trên tờ 64.8 x 41.8. Mép
+      // ngoài của bài nằm trong giấy; PON vẫn lấy từ lưới chưa bóp.
       var small8TrimH = grid.trimH;
       var cumTop = face.type === "SMALL8" ? grid.small8Top : grid.a4Top;
       var rowTrimH = face.type === "SMALL8" ? small8TrimH : pageHpt;
@@ -19571,48 +19603,208 @@ function dcRunSignature8(wCm, hCm, coBia) {
       } catch (e) {}
     }
     //  Ghi chú ngang cho TT8/AB A4: mép trái vào 2cm, mép trên xuống 1.1cm.
-    // A5 note positions are calibrated from the approved supplied forms.
-    // They deliberately do not reuse the A4 2 cm / 1.1 cm position, which
-    // can place a note over the imposed artwork on smaller A5 paper.
+    // Fit the whole A5 note in a real blank strip, not just its text baseline.
+    // The icon keeps its original size; SMALL8 always uses the lower left strip.
+    function a5NotePlacement(rect, artwork, width, height, ponBounds, prefer, sideOnly, leftOnly) {
+      var inset = 1 * MM, artClear = 2 * MM, ponClear = 0.5 * MM;
+      var l = rect[0] + inset, t = rect[1] - inset;
+      var r = rect[2] - inset, b = rect[3] + inset;
+      var zones = [];
+      if (!sideOnly) {
+        zones.push([l, t, r, Math.max(b, artwork[1] + artClear)]);
+        zones.push([l, Math.min(t, artwork[3] - artClear), r, b]);
+      }
+      zones.push([l, t, Math.min(r, artwork[0] - artClear), b]);
+      if (!leftOnly) zones.push([Math.max(l, artwork[2] + artClear), t, r, b]);
+      function overlaps(a, obstacle) {
+        return a[0] < obstacle[2] + ponClear && a[2] > obstacle[0] - ponClear &&
+          a[3] < obstacle[1] + ponClear && a[1] > obstacle[3] - ponClear;
+      }
+      function clamp(value, lo, hi) { return Math.max(lo, Math.min(hi, value)); }
+      for (var zi = 0; zi < zones.length; zi++) {
+        var z = zones[zi];
+        if (z[2] - z[0] < width - 0.001 || z[1] - z[3] < height - 0.001) continue;
+        var xs = [clamp(prefer[0], z[0], z[2] - width)];
+        var ys = [clamp(prefer[1], z[3] + height, z[1])];
+        if (!leftOnly) {
+          xs.push(z[0], z[2] - width);
+          ys.push(z[1], z[3] + height);
+        }
+        for (var oi = 0; oi < ponBounds.length; oi++) {
+          var obstacle = ponBounds[oi];
+          if (obstacle[2] < z[0] - ponClear || obstacle[0] > z[2] + ponClear ||
+              obstacle[1] < z[3] - ponClear || obstacle[3] > z[1] + ponClear) continue;
+          xs.push(obstacle[2] + ponClear, obstacle[0] - ponClear - width);
+          ys.push(obstacle[3] - ponClear, obstacle[1] + ponClear + height);
+        }
+        if (leftOnly) {
+          xs.push(z[0], z[2] - width);
+          ys.push(z[3] + height, z[1]);
+        }
+        for (var yi = 0; yi < ys.length; yi++) for (var xi = 0; xi < xs.length; xi++) {
+          var x = xs[xi], y = ys[yi];
+          if (x < z[0] - 0.001 || x + width > z[2] + 0.001 ||
+              y > z[1] + 0.001 || y - height < z[3] - 0.001) continue;
+          var candidate = [x, y, x + width, y - height], clear = true;
+          for (oi = 0; oi < ponBounds.length; oi++) {
+            if (overlaps(candidate, ponBounds[oi])) { clear = false; break; }
+          }
+          if (clear) return { left: x, top: y, zone: zi, bounds: candidate };
+        }
+      }
+      return null;
+    }
     function addNoteA5(text, pos, isRed, face) {
       if (!text) return;
+      var icon = null, tf = null;
       try {
-        var icon = duplicateNoteIcon();
-        var iconW = 0;
-        if (icon) {
-          try {
-            var ib = icon.geometricBounds;
-            iconW = ib[2] - ib[0];
-          } catch (a5NoteIconBoundsError) {}
+        function bounds(item) {
+          var v = item.visibleBounds;
+          return [v[0], v[1], v[2], v[3]];
         }
-        var tf = artworkLayer.textFrames.add();
+        function union(a, v) {
+          if (!a) return v.slice(0);
+          return [Math.min(a[0], v[0]), Math.max(a[1], v[1]),
+            Math.max(a[2], v[2]), Math.min(a[3], v[3])];
+        }
+        var artwork = null, seen = {};
+        function readFacePages(part) {
+          if (!part) return;
+          var lists = [part.row, part.top, part.bottom];
+          for (var li = 0; li < lists.length; li++) {
+            var list = lists[li];
+            if (!list) continue;
+            for (var pi = 0; pi < list.length; pi++) {
+              var pageNo = list[pi];
+              if (seen[String(pageNo)]) continue;
+              seen[String(pageNo)] = true;
+              var page = processed[pageNo - 1];
+              if (!page) throw new Error("Thieu trang de do vung trong ghi chu.");
+              artwork = union(artwork, bounds(page));
+            }
+          }
+          readFacePages(part.leftFace);
+          readFacePages(part.rightFace);
+        }
+        readFacePages(face);
+        if (!artwork) throw new Error("Khong do duoc vung trong ghi chu A5.");
+
+        // Use the saved nominal marks, including half their stroke width.
+        // This reads no mutable artwork/PON bounds after the squeeze.
+        var obstacles = [];
+        for (var gi = 0; gi < nominalPonGeometry.length; gi++) {
+          var mark = nominalPonGeometry[gi], mb = null;
+          for (var qi = 0; qi < mark.points.length; qi++) {
+            var point = mark.points[qi];
+            mb = union(mb, [point[0], point[1], point[0], point[1]]);
+          }
+          if (!mb) continue;
+          var halfStroke = mark.strokeWidth / 2;
+          mb = [mb[0] - halfStroke, mb[1] + halfStroke,
+            mb[2] + halfStroke, mb[3] - halfStroke];
+          if (mb[2] >= pos[0] && mb[0] <= pos[2] && mb[1] >= pos[3] && mb[3] <= pos[1])
+            obstacles.push(mb);
+        }
+
+        icon = duplicateNoteIcon();
+        tf = artworkLayer.textFrames.add();
         tf.contents = text;
         setNoteStyle(tf, isRed);
-
-        var textX;
-        var textY;
+        var textX, textY;
         if (face.type === "SMALL4") {
-          // 42.835 x 31.335 sample: text baseline 6.637 mm from left,
-          // 5.342 mm below the artboard top.
           textX = pos[0] + 6.637 * MM;
           textY = pos[1] - 5.342 * MM;
         } else if (face.type === "SMALL16" || face.type === "SMALLAB") {
-          // 85.870 x 63.870 sample: baseline 12.968 mm from left and
-          // 17.202 mm below top.
           textX = pos[0] + 12.968 * MM;
           textY = pos[1] - 17.202 * MM;
         } else {
-          // The 8-page form has no supplied note specimen.  Keep it safely
-          // above paper instead of over either imposition row.
-          textX = pos[0] + 4 * MM;
-          textY = pos[1] + 5 * MM;
+          textX = pos[0] + 8 * MM;
+          textY = pos[1] - 8 * MM;
         }
-        tf.position = [textX, textY];
-        if (icon) {
-          var tb = tf.visibleBounds;
-          moveCenterTo(icon, textX - iconW / 2 - 2, (tb[1] + tb[3]) / 2);
+        var rotation = 0;
+        function arrange(vertical) {
+          if (rotation) tf.rotate(-rotation);
+          rotation = vertical ? 90 : 0;
+          if (rotation) tf.rotate(rotation);
+          tf.position = [textX, textY];
+          if (icon) {
+            var tb = bounds(tf), ib = bounds(icon);
+            var iw = ib[2] - ib[0], ih = ib[1] - ib[3];
+            if (vertical) {
+              // Upright icon below text, matching the existing A4 note style.
+              var cx = (tb[0] + tb[2]) / 2;
+              icon.translate(cx - (ib[0] + ib[2]) / 2, tb[3] - 3 - ib[1]);
+            } else {
+              icon.translate(tb[0] - 3 - iw - ib[0],
+                (tb[1] + tb[3]) / 2 + ih / 2 - ib[1]);
+            }
+          }
+          return icon ? union(bounds(tf), bounds(icon)) : bounds(tf);
         }
-      } catch (a5NoteError) {}
+        function findPlacement(block, sideOnly) {
+          var lowerLeft = face.type === "SMALL8";
+          return a5NotePlacement(pos, artwork, block[2] - block[0], block[1] - block[3],
+            obstacles, lowerLeft ? [pos[0] + 9 * MM, pos[3] + 15 * MM + block[1] - block[3]] :
+              [block[0], block[1]], sideOnly, lowerLeft);
+        }
+        // Point text is measured again after each wrap/rotation; no guessed
+        // font width or baseline is used to enforce the paper boundary.
+        function wrapText(contents, maxWidth) {
+          if (rotation) { tf.rotate(-rotation); rotation = 0; }
+          var paragraphs = String(contents).replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
+          var lines = [];
+          function fitsLine(value) {
+            tf.contents = value;
+            var v = bounds(tf);
+            return v[2] - v[0] <= maxWidth + 0.001;
+          }
+          for (var paragraph = 0; paragraph < paragraphs.length; paragraph++) {
+            var words = paragraphs[paragraph].split(/\s+/), line = "";
+            for (var wi = 0; wi < words.length; wi++) {
+              var word = words[wi];
+              if (!word) continue;
+              var combined = line ? line + " " + word : word;
+              if (fitsLine(combined)) { line = combined; continue; }
+              if (line) { lines.push(line); line = ""; }
+              while (word && !fitsLine(word)) {
+                var lo = 1, hi = word.length, best = 0;
+                while (lo <= hi) {
+                  var middle = Math.floor((lo + hi) / 2);
+                  if (fitsLine(word.substring(0, middle))) { best = middle; lo = middle + 1; }
+                  else hi = middle - 1;
+                }
+                if (!best) throw new Error("Khong du cho ghi chu A5 o co chu hien tai.");
+                lines.push(word.substring(0, best)); word = word.substring(best);
+              }
+              line = word;
+            }
+            lines.push(line);
+          }
+          return lines.join("\r");
+        }
+        var small8Vertical = face.type === "SMALL8";
+        var block = arrange(small8Vertical), placement = findPlacement(block, small8Vertical);
+        if (!placement) { block = arrange(true); placement = findPlacement(block, true); }
+        var ib = icon ? bounds(icon) : null;
+        if (!placement && !small8Vertical) {
+          tf.contents = wrapText(text, pos[2] - pos[0] - 2 * MM - (ib ? ib[2] - ib[0] + 3 : 0));
+          block = arrange(false); placement = findPlacement(block, false);
+        }
+        if (!placement) {
+          tf.contents = wrapText(text, pos[1] - pos[3] - (small8Vertical ? 16 : 2) * MM - (ib ? ib[1] - ib[3] + 3 : 0));
+          block = arrange(true); placement = findPlacement(block, true);
+        }
+        if (!placement) throw new Error("Ghi chu A5 qua dai de nam trong vung trong cua to. Hay rut ngan ghi chu.");
+        var dx = placement.left - block[0], dy = placement.top - block[1];
+        tf.translate(dx, dy);
+        if (icon) icon.translate(dx, dy);
+      } catch (a5NoteError) {
+        try { if (tf) tf.remove(); } catch (removeNoteTextError) {}
+        try { if (icon) icon.remove(); } catch (removeNoteIconError) {}
+        try { if (noteIconTemplate) noteIconTemplate.remove(); } catch (removeNoteTemplateError) {}
+        noteIconTemplate = null;
+        throw a5NoteError;
+      }
     }
 
     function addNote8(text, pos, isRed) {
@@ -19714,7 +19906,384 @@ function dcRunSignature8(wCm, hCm, coBia) {
       " Lưu ý: " +
       ponClampCount +
       " mốc PON bị kéo về mép artboard vì lưới danh định của form này lòi ra ngoài khổ giấy.";
-  return ponNote;
+  // Kèm danh sách khổ vừa dàn để panel hiện nút Lưu PDF cho từng khổ.
+  return ponNote + dcCtlOffsetPdfPlan(doc, faces, abPos);
+}
+
+// ============================================================
+//  LƯU PDF THEO KHỔ — CTL Offset (Đóng ghim giữa + Keo gáy)
+//
+//  Dàn xong, bài có khổ nào thì panel hiện nút Lưu PDF của khổ đó, giống
+//  bảng ghi chú chỉ hiện ô của loại tờ thật sự có trong bài.
+//
+//  Mỗi TỜ in là một file PDF:
+//    - Bìa            -> BIA.pdf      (1 trang)
+//    - Tự trở         -> RUOT N.pdf   (1 trang)
+//    - Tờ AB          -> RUOT N.pdf   (2 trang: mặt A rồi mặt B)
+//  Số N trùng với ghi chú "RUỘT N" in trên tờ.
+//
+//  Không lưu đè file AI đang mở: chép trực tiếp các object/layer sang tài
+//  liệu tạm rồi xuất PDF. Không group/undo hay mở khoá trong tài liệu nguồn.
+// ============================================================
+var dcCtlOffsetPdfVersion = 2;
+
+// Gọi ở cuối lượt dàn. Trả về đuôi "||CTLPDF:{...}" để gắn sau chuỗi OK;
+// panel đọc đuôi này để biết bài có những khổ nào, mỗi khổ gồm những tờ nào
+// và tờ đó nằm ở artboard số mấy.
+// Lỗi ở đây không được làm hỏng lượt dàn: có gì bất thường thì trả "" và
+// panel đơn giản là không hiện nút.
+function dcCtlOffsetPdfPlan(doc, faces, abPos) {
+  try {
+    var total = doc.artboards.length;
+    var used = {};
+    var groups = [];
+    var groupByKey = {};
+    // Tìm artboard theo đúng toạ độ đã tạo, không đoán theo số thứ tự: nếu
+    // Illustrator không xoá được artboard cũ thì số thứ tự sẽ lệch.
+    function findArtboard(rect) {
+      for (var a = 0; a < total; a++) {
+        if (used[a]) continue;
+        var r = doc.artboards[a].artboardRect;
+        if (
+          Math.abs(r[0] - rect[0]) < 1 &&
+          Math.abs(r[1] - rect[1]) < 1 &&
+          Math.abs(r[2] - rect[2]) < 1 &&
+          Math.abs(r[3] - rect[3]) < 1
+        )
+          return a;
+      }
+      return -1;
+    }
+    for (var k = 0; k < faces.length; k++) {
+      var face = faces[k];
+      var pos = abPos[k];
+      if (!face || !pos) return "";
+      var artboardIndex = findArtboard(pos);
+      if (artboardIndex < 0) return "";
+      used[artboardIndex] = true;
+
+      // Bìa mang sheetNo 0; mọi tờ ruột đều có sheetNo từ 1 trở lên. Hai mặt
+      // A/B của một tờ AB dùng chung sheetNo nên rơi vào cùng một file.
+      var isCover = !(face.sheetNo > 0);
+      var key = isCover ? "BIA" : String(face.type);
+      var fileName = isCover ? "BIA" : "RUOT " + face.sheetNo;
+      var group = groupByKey[key];
+      if (!group) {
+        group = { key: key, jobs: [], jobByName: {} };
+        groupByKey[key] = group;
+        groups.push(group);
+      }
+      var job = group.jobByName[fileName];
+      if (!job) {
+        job = {
+          name: fileName,
+          ab: [],
+          w: Math.round((pos[2] - pos[0]) * 100) / 100,
+          h: Math.round((pos[1] - pos[3]) * 100) / 100
+        };
+        group.jobByName[fileName] = job;
+        group.jobs.push(job);
+      }
+      job.ab.push(artboardIndex + 1);
+    }
+    if (groups.length === 0) return "";
+
+    // ExtendScript không có JSON.stringify. Dữ liệu chỉ gồm chữ không dấu
+    // và số nên ghép chuỗi trực tiếp là đủ.
+    var groupTexts = [];
+    for (var g = 0; g < groups.length; g++) {
+      var jobTexts = [];
+      for (var j = 0; j < groups[g].jobs.length; j++) {
+        var item = groups[g].jobs[j];
+        jobTexts.push(
+          '{"name":"' +
+            item.name +
+            '","ab":[' +
+            item.ab.join(",") +
+            '],"w":' +
+            item.w +
+            ',"h":' +
+            item.h +
+            "}"
+        );
+      }
+      groupTexts.push(
+        '{"key":"' + groups[g].key + '","jobs":[' + jobTexts.join(",") + "]}"
+      );
+    }
+    return (
+      '||CTLPDF:{"total":' + total + ',"groups":[' + groupTexts.join(",") + "]}"
+    );
+  } catch (e) {
+    return "";
+  }
+}
+
+// Lưu PDF cho MỘT khổ (một nút trên panel).
+//   totalText : số artboard của tài liệu lúc dàn xong.
+//   jobsText  : "TÊN=artboard,artboard@rộngxcao|..." (pt), mỗi phần là một
+//               file. Ví dụ "RUOT 2=3,4@2432.13x1808.5|RUOT 3=5,6@2432.13x1808.5".
+// Số artboard và khổ từng artboard được so lại với lúc dàn; tài liệu đã bị
+// đổi thì báo lỗi chứ không lưu nhầm tờ.
+function dcLuuCtlOffsetPDF(totalText, jobsText) {
+  try {
+    if (app.documents.length === 0) return "ERR: Chưa mở tài liệu nào.";
+    var sourceDoc = app.activeDocument;
+    var CHANGED = " Tài liệu đã khác lúc dàn — hãy dàn lại rồi lưu PDF.";
+    var artboardCount = sourceDoc.artboards.length;
+    var total = parseInt(String(totalText), 10);
+    if (isNaN(total) || total !== artboardCount)
+      return (
+        "ERR: Tài liệu đang mở có " +
+        artboardCount +
+        " artboard, lúc dàn là " +
+        (isNaN(total) ? "?" : total) +
+        "." +
+        CHANGED
+      );
+
+    // ---------- Đọc danh sách file cần lưu ----------
+    var jobs = [];
+    var parts = String(jobsText === undefined || jobsText === null ? "" : jobsText).split("|");
+    for (var p = 0; p < parts.length; p++) {
+      if (parts[p] === "") continue;
+      var m = /^([^=@|]+)=([0-9,]+)@([0-9.]+)x([0-9.]+)$/.exec(parts[p]);
+      if (!m) return "ERR: Thiếu thông tin tờ cần lưu — hãy dàn lại rồi lưu PDF.";
+      var baseName = m[1]
+        .replace(/^\s+|\s+$/g, "")
+        .replace(/[\\\/:*?"<>|]/g, "-");
+      var wantW = parseFloat(m[3]);
+      var wantH = parseFloat(m[4]);
+      var numbers = m[2].split(",");
+      var indices = [];
+      var pages = [];
+      for (var q = 0; q < numbers.length; q++) {
+        var no = parseInt(numbers[q], 10);
+        if (isNaN(no) || no < 1 || no > artboardCount)
+          return "ERR: Không có artboard số " + numbers[q] + "." + CHANGED;
+        var rect = sourceDoc.artboards[no - 1].artboardRect;
+        if (
+          Math.abs(rect[2] - rect[0] - wantW) > 1 ||
+          Math.abs(rect[1] - rect[3] - wantH) > 1
+        )
+          return (
+            "ERR: Artboard " + no + " không còn đúng khổ của " + baseName + "." + CHANGED
+          );
+        indices.push(no - 1);
+        pages.push({ index: no - 1, rect: rect.slice(0) });
+      }
+      if (baseName === "" || indices.length === 0)
+        return "ERR: Thiếu thông tin tờ cần lưu — hãy dàn lại rồi lưu PDF.";
+      for (var duplicateJob = 0; duplicateJob < jobs.length; duplicateJob++)
+        if (jobs[duplicateJob].name.toLowerCase() === (baseName + ".pdf").toLowerCase())
+          return "ERR: Hai tờ trùng tên PDF: " + baseName + ".";
+      jobs.push({ name: baseName + ".pdf", indices: indices, pages: pages, file: null });
+    }
+    if (jobs.length === 0) return "ERR: Không có tờ nào để lưu.";
+
+    var folder = dcChonThuMucLuuPDF("Chọn nơi lưu PDF CTL Offset");
+    if (!folder) return "ERR: Chưa chọn thư mục lưu PDF - đã huỷ.";
+    for (var jf = 0; jf < jobs.length; jf++) {
+      jobs[jf].file = new File(folder.fsName + "/" + jobs[jf].name);
+      if (jobs[jf].file.exists)
+        return "ERR: File đã tồn tại: " + jobs[jf].name + ".";
+    }
+
+    // ---------- Ghi lại trạng thái để trả về như cũ ----------
+    var originalSelection = [];
+    try {
+      for (var os = 0; os < sourceDoc.selection.length; os++)
+        originalSelection.push(sourceDoc.selection[os]);
+    } catch (selectionError) {}
+    var originalArtboard = 0;
+    try {
+      originalArtboard = sourceDoc.artboards.getActiveArtboardIndex();
+    } catch (artboardError) {}
+    var colorSpace = DocumentColorSpace.CMYK;
+    try {
+      colorSpace = sourceDoc.documentColorSpace;
+    } catch (colorError) {}
+
+    var originalLayer = sourceDoc.activeLayer;
+    // Đọc trực tiếp cả layer PON khoá. Không dùng selection/group/undo,
+    // không di chuyển object hay thay đổi khoá của tài liệu nguồn.
+    function readLayer(layer) {
+      if (!layer.visible || layer.printable === false) return null;
+      var node = { name: layer.name, items: [], children: [] };
+      for (var it = 0; it < layer.pageItems.length; it++) {
+        var item = layer.pageItems[it];
+        if (item.parent !== layer || item.hidden) continue;
+        node.items.push({ item: item, bounds: item.visibleBounds.slice(0) });
+      }
+      for (var sub = 0; sub < layer.layers.length; sub++) {
+        var child = readLayer(layer.layers[sub]);
+        if (child) node.children.push(child);
+      }
+      return node;
+    }
+    var sourceLayers = [];
+    for (var li = 0; li < sourceDoc.layers.length; li++) {
+      var layerData = readLayer(sourceDoc.layers[li]);
+      if (layerData) sourceLayers.push(layerData);
+    }
+    function makePdfOptions(pageCount) {
+      var opt = new PDFSaveOptions();
+      try {
+        opt.compatibility = PDFCompatibility.ACROBAT5;
+      } catch (e) {}
+      try {
+        opt.generateThumbnails = false;
+      } catch (e2) {}
+      try {
+        opt.preserveEditability = false;
+      } catch (e3) {}
+      try {
+        opt.optimization = true;
+      } catch (e4) {}
+      try {
+        opt.viewAfterSaving = false;
+      } catch (e5) {}
+      try {
+        opt.saveMultipleArtboards = true;
+      } catch (e6) {}
+      try {
+        opt.artboardRange = pageCount === 1 ? "1" : "1-" + pageCount;
+      } catch (e7) {}
+      return opt;
+    }
+
+    function copyLayer(node, targetLayer, page, targetRect, workDoc) {
+      var copied = 0;
+      // pageItems có thứ tự trên -> dưới; PLACEATEND giữ đúng thứ tự đó.
+      for (var ci = 0; ci < node.items.length; ci++) {
+        var entry = node.items[ci];
+        var b = entry.bounds, r = page.rect;
+        if (b[2] < r[0] || b[0] > r[2] || b[1] < r[3] || b[3] > r[1]) continue;
+        sourceDoc.activate();
+        var before = entry.item.geometricBounds.slice(0);
+        var duplicate = entry.item.duplicate(targetLayer, ElementPlacement.PLACEATEND);
+        workDoc.activate();
+        duplicate.locked = false;
+        var after = duplicate.geometricBounds;
+        duplicate.translate(
+          targetRect[0] + before[0] - r[0] - after[0],
+          targetRect[1] + before[1] - r[1] - after[1]
+        );
+        copied++;
+      }
+      // layers.add đặt layer mới ở trên cùng: tạo từ dưới lên trên.
+      for (var ch = node.children.length - 1; ch >= 0; ch--) {
+        workDoc.activate();
+        var childLayer = targetLayer.layers.add();
+        childLayer.name = node.children[ch].name;
+        copied += copyLayer(node.children[ch], childLayer, page, targetRect, workDoc);
+      }
+      return copied;
+    }
+    function exportJob(job) {
+      var pages = job.pages;
+      var maxPageWidth = 1;
+      var maxPageHeight = 1;
+      for (var pi = 0; pi < job.indices.length; pi++) {
+        var pageRect = pages[pi].rect;
+        maxPageWidth = Math.max(maxPageWidth, pageRect[2] - pageRect[0]);
+        maxPageHeight = Math.max(maxPageHeight, pageRect[1] - pageRect[3]);
+      }
+      var workDoc = null;
+      var completed = false;
+      try {
+        // Tạo đủ trang ngay từ đầu. Không gán artboardRect hay gọi
+        // artboards.add ở tài liệu tạm: cả hai gây lỗi 1200 trên một số file.
+        workDoc = app.documents.add(
+          colorSpace,
+          maxPageWidth,
+          maxPageHeight,
+          pages.length
+        );
+        workDoc.activate();
+        if (workDoc.artboards.length !== pages.length)
+          throw new Error("Không tạo đủ artboard tạm để xuất PDF.");
+        var targetRects = [];
+        for (var ti = 0; ti < pages.length; ti++)
+          targetRects.push(workDoc.artboards[ti].artboardRect.slice(0));
+        var targetLayers = [];
+        for (var tl = sourceLayers.length - 1; tl >= 0; tl--) {
+          var targetLayer = workDoc.layers.add();
+          targetLayer.name = sourceLayers[tl].name;
+          targetLayers[tl] = targetLayer;
+        }
+        for (var ci = 0; ci < pages.length; ci++) {
+          var copiedCount = 0;
+          for (var sl = 0; sl < sourceLayers.length; sl++)
+            copiedCount += copyLayer(sourceLayers[sl], targetLayers[sl], pages[ci], targetRects[ci], workDoc);
+          if (!copiedCount) throw new Error("Artboard " + (pages[ci].index + 1) + " không có object để lưu.");
+        }
+        workDoc.activate();
+        workDoc.saveAs(job.file, makePdfOptions(pages.length));
+        completed = true;
+      } finally {
+        try {
+          if (workDoc) {
+            workDoc.activate();
+            workDoc.close(SaveOptions.DONOTSAVECHANGES);
+          }
+        } catch (closeError) {}
+        sourceDoc.activate();
+        if (!completed) {
+          try {
+            if (job.file.exists) job.file.remove();
+          } catch (removeError) {}
+        }
+      }
+    }
+
+    var saved = [];
+    var saveErrors = [];
+    try {
+      for (var ji = 0; ji < jobs.length; ji++) {
+        try {
+          exportJob(jobs[ji]);
+          saved.push(jobs[ji].name);
+        } catch (saveError) {
+          saveErrors.push(
+            jobs[ji].name +
+              ": " +
+              (typeof dcMoTaLoi === "function"
+                ? dcMoTaLoi(saveError)
+                : saveError.toString())
+          );
+        }
+      }
+    } finally {
+      try {
+        sourceDoc.activate();
+      } catch (activateError) {}
+      try {
+        sourceDoc.artboards.setActiveArtboardIndex(originalArtboard);
+      } catch (restoreArtboardError) {}
+      try {
+        sourceDoc.selection = null;
+        for (var rs = 0; rs < originalSelection.length; rs++)
+          originalSelection[rs].selected = true;
+      } catch (restoreSelectionError) {}
+      try { sourceDoc.activeLayer = originalLayer; } catch (restoreLayerError) {}
+    }
+
+    if (saved.length === 0)
+      return (
+        "ERR: Không lưu được PDF nào." +
+        (saveErrors.length ? " " + saveErrors.join(" | ") : "")
+      );
+    var message =
+      "OK: Đã lưu " + saved.length + " PDF vào " + folder.fsName + ": " + saved.join(", ") + ".";
+    if (saveErrors.length)
+      message += " Lỗi " + saveErrors.length + " file: " + saveErrors.join(" | ");
+    return message;
+  } catch (e) {
+    return (
+      "ERR: " + (typeof dcMoTaLoi === "function" ? dcMoTaLoi(e) : e.toString())
+    );
+  }
 }
 
 // ============================================================
@@ -19748,7 +20317,7 @@ function dcRunSignature8(wCm, hCm, coBia) {
 //   5. Nhập ghi chú (RUỘT N + chữ thêm).
 // ============================================================
 
-var dcKeoGayAutoPonVersion = 5;
+var dcKeoGayAutoPonVersion = 6;
 
 function dcRunKeoGay(wCm, hCm) {
   try {
@@ -20797,12 +21366,14 @@ function dcRunKeoGay(wCm, hCm) {
   } catch (e) {
     return "ERR: keo gáy: " + e.toString();
   }
+  // Kèm danh sách khổ vừa dàn để panel hiện nút Lưu PDF cho từng khổ.
   return (
     "OK: Da dan CTL keo gay tren " +
     usedColumns +
     " cot canvas; da ve " +
     cutPonCount +
-    " net PON cat."
+    " net PON cat." +
+    dcCtlOffsetPdfPlan(doc, faces, abPos)
   );
 }
 
@@ -21700,7 +22271,20 @@ function dcXoaPreviewMau(pathsText) {
 }
 
 // ---------- FILE 2: ÁP MẪU ----------
+var dcDanTheoMauVersion = 1;
 function dcApMau(multiSourcePerArtboard) {
+  // Artboard coordinates are local to EACH active artboard. Reading a PON
+  // there, then applying those numbers in another document, moves the first
+  // result to the source's origin instead of the PON's document position.
+  var previousCoordinates = app.coordinateSystem;
+  try {
+    app.coordinateSystem = CoordinateSystem.DOCUMENTCOORDINATESYSTEM;
+    return dcApMauCore(multiSourcePerArtboard);
+  } finally {
+    app.coordinateSystem = previousCoordinates;
+  }
+}
+function dcApMauCore(multiSourcePerArtboard) {
   var MM = 2.834645669;
   // Mặc định giữ cách dàn gốc: 1 con nguồn -> 1 artboard.
   // Chỉ khi tick trên panel mới gán nhiều nguồn khác nhau vào từng slot.

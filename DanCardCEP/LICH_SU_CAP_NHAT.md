@@ -2,6 +2,60 @@
 
 _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
+## v2.15.12 — vá dàn theo mẫu để cứng artboard nguồn
+
+- vá dàn theo mẫu để cứng artboard nguồn
+
+---
+
+## v2.15.11 — Neo Dàn theo mẫu tại artboard PON (03/10/2026)
+
+- Áp mẫu luôn đọc và đặt PON, bài, artboard trong hệ tọa độ document, sau đó trả lại hệ tọa độ đang dùng. Artboard đầu tiên neo đúng tọa độ artboard đầu tiên trong file PON mặt trước, không phụ thuộc vị trí mẫu học, artboard active hay gốc thước của bài nguồn.
+- Thêm nạp lại JSX theo phiên bản trước khi Áp mẫu để tránh engine CEP giữ hàm cũ sau khi cập nhật. Không thay góc/kích thước slot, chế độ nhiều mẫu hay cách xếp các tờ tiếp theo.
+- Đã tái hiện lỗi tọa độ trong Illustrator thật trước khi sửa. Sau sửa, bốn trường hợp (tọa độ artboard/document, hai mặt, nhiều mẫu) đều neo đúng tờ PON; nguồn không đổi và hệ tọa độ được khôi phục. Kiểm thử tự động kiểm tra cả đường thành công/lỗi và loader; không dùng bài hoặc dữ liệu Học mẫu của người dùng để chạy thử.
+
+---
+
+## v2.15.10 — Sửa luồng lưu PDF CTL Offset (03/10/2026)
+
+- Bỏ Group/Undo và mở khoá layer trên file nguồn khi lưu PDF ruột/bìa. Chép trực tiếp bài, ghi chú và PON, kể cả PON đang khoá, sang tài liệu tạm; giữ thứ tự layer và vị trí trong tờ.
+- Chụp khổ/tọa độ artboard trước khi tạo tài liệu tạm. Kích hoạt đúng tài liệu trước khi đọc artboard, chép, lưu PDF và đóng; tránh lưu trong ngữ cảnh file nguồn sau Undo.
+- Giữ tên BIA/RUOT, một trang tự trở và hai trang A–B của tờ AB. Không ghi đè PDF có sẵn; từ chối tên trùng trong cùng lượt, dọn file chưa hoàn tất khi lưu lỗi, khôi phục selection, artboard và layer active.
+- Đã chạy trong Illustrator thật trên tài liệu thử có vector, raster, ghi chú và PON khoá: lưu đủ ba file ở ba khổ 42,8 × 31,3 / 64,8 × 41,8 / 85,8 × 63,8 cm; PDF AB đủ hai mặt theo thứ tự. Kiểm tra PDF sau lưu và hình render đạt; nội dung/trạng thái nguồn không đổi. Có kiểm thử hồi quy ngữ cảnh active, lỗi lưu và file trùng. Chưa chạy lại trên chính bài từng crash của người dùng.
+- Không đổi thuật toán dàn, ghi chú, PON hoặc tab Auto Save riêng.
+
+---
+
+## v2.15.9 — Lưu PDF theo khổ cho CTL Offset (02/10/2026)
+
+- Dàn xong **Đóng ghim giữa** hoặc **Keo gáy**, panel hiện khung **Lưu PDF theo khổ vừa dàn** ngay dưới ô kết quả. Bài có khổ nào thì có nút của khổ đó (Bìa, Tự trở 4/8/16 trang, Tờ AB) kèm kích thước tờ, cùng cách với bảng ghi chú chỉ hiện ô của loại tờ có trong bài.
+- Mỗi tờ in là một file: bìa → `BIA.pdf`, mỗi ruột → `RUOT N.pdf` với N trùng ghi chú RUỘT N trên tờ. Tờ tự trở 1 trang; tờ AB 2 trang, mặt A rồi mặt B. Bài có nhiều tờ AB thì một lần bấm nút Tờ AB lưu hết, mỗi tờ một file.
+- PDF gồm đủ bài, ghi chú và PON: hai layer PON đang khoá được mở trong lúc xuất rồi khoá lại như cũ. Xuất qua tài liệu tạm như Lưu PDF của Dàn theo mẫu nên không lưu đè và không đổi file AI đang mở.
+- Trước khi lưu, so lại số artboard và khổ từng artboard với lúc dàn; tài liệu đã bị sửa thì báo dàn lại chứ không lưu nhầm tờ. File trùng tên trong thư mục chọn thì báo lỗi, không ghi đè.
+- Bấm Dàn rồi huỷ ở bảng nhập khổ thì giữ nút của lượt trước; dàn lỗi hoặc dừng giữa chừng thì giấu nút.
+- Không đổi thuật toán dàn, PON, bóp hay ghi chú. `dcRunSignature8` và `dcRunKeoGay` chỉ gắn thêm danh sách khổ vào chuỗi trả về.
+- Mới kiểm tra bằng Illustrator giả lập trong Node, **chưa chạy trong Illustrator thật**: ba bài mẫu (ghim giữa A4, ghim giữa A5, keo gáy) ra đúng nút, đúng tên file, đúng số trang; mỗi trang đủ bài + ghi chú + PON và đúng vị trí trong tờ; tài liệu nguồn, khoá layer, selection giữ nguyên; các đường lỗi không để lại file rác.
+
+---
+
+## v2.15.8 — PON cắt ngang và ghi chú dọc tờ A5 64,8 × 41,8 (02/10/2026)
+
+- Bỏ PON cắt tại hai nếp gấp dọc trong cụm hai trang của form SMALL8. Đánh bốn nét ngang 2 mm ở đường chia hai hàng: hai mép ngoài và hai mép khe giữa.
+- Ghi chú của form này luôn dọc ở lề trái phía dưới; cụm icon + chữ neo cách trái 9 mm, cách đáy 15 mm, kiểm tra né bài và PON. Icon giữ nguyên kích thước.
+- Giữ sửa tràn mép của v2.15.7, bóp canh giữa cụm hai trang và PON theo lưới danh định. Các form khác giữ cấu hình hiện tại.
+- Kiểm tra trực tiếp trong Illustrator trên tờ thử 14 × 20 và 15 × 21,15 cm: đủ bốn PON ngang, ghi chú đúng neo 9/15 mm, không tràn/đè bài/PON và tài liệu nguồn không đổi.
+
+---
+
+## v2.15.7 — Sửa mép bài và ghi chú CTL Offset A5 (02/10/2026)
+
+- Form 64,8 × 41,8 cm chỉ dùng allowance khi hai hàng vượt chiều cao tờ. Trang 14 × 20 cm không còn bị đặt tràn đáy 1,25 mm; hai mép ngoài neo theo chiều cao bài thật, không co/cắt chiều cao.
+- A5 tối đa 15 × 21,15 cm giữ allowance ở đường ghép hai hàng bên trong, không tràn ra ngoài giấy. Giữ bóp canh giữa cụm hai trang, PON lấy từ lưới chưa bóp và khổ tờ cố định.
+- Đặt cả icon + ghi chú A5 theo bounds hiển thị trong vùng trống của artboard, tránh bài và PON. Icon không đổi kích thước; tờ không còn lề trên dùng ghi chú dọc ở lề bên. Ghi chú quá dài được xuống dòng hoặc báo yêu cầu rút ngắn.
+- Không đổi form A4. Bộ kiểm thử đạt; chạy trực tiếp bản sao 48 ảnh với trang 14 × 20 cm tạo đủ 5 artboard, toàn bộ bài/ghi chú nằm trong tờ và nguồn không đổi. Kiểm tra native riêng A5 tối đa cũng đạt, icon nguyên kích thước và ghi chú né bài/PON.
+
+---
+
 ## v2.15.6 — Phát hành bản bế tag, decal
 
 - đã test xong phát hành cho nv dùng

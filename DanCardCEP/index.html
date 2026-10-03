@@ -264,15 +264,27 @@
                 class="note-copy-input"
                 type="text"
                 placeholder="F1, F2, F3..."
-                title="Nội dung cho artboard 1, 3, 5…; ngăn bằng dấu phẩy"
+                title="F1, F2… theo thứ tự tờ; ngăn bằng dấu phẩy. Để trống để copy nguyên ghi chú."
               />
+            </div>
+            <div class="field-row toiuu-actions">
+              <button
+                id="btnCopyToiUuNoteOneSide"
+                class="btn"
+                type="button"
+                style="flex: 1"
+                title="Chọn ghi chú trên tờ đầu; điền lần lượt artboard 1, 2, 3…"
+              >
+                Điền ghi chú bài 1 mặt
+              </button>
               <button
                 id="btnCopyToiUuNote"
                 class="btn"
                 type="button"
-                title="Copy ghi chú đã chọn sang các mặt trước"
+                style="flex: 1"
+                title="Chọn ghi chú trên mặt trước đầu tiên; điền artboard 1, 3, 5…"
               >
-                Copy ghi chú
+                Điền ghi chú bài 2 mặt
               </button>
             </div>
             <div id="outDanToiUu" class="out">Chọn một bài rồi bấm Dàn tối ưu.</div>
@@ -600,6 +612,16 @@
         </div>
 
         <div id="outOffset" class="out">Nhập kích thước rồi bấm Dàn.</div>
+
+        <!-- Lưu PDF theo khổ: chỉ hiện sau khi dàn xong; bài có khổ nào thì có nút của khổ đó -->
+        <div id="offsetPdfBox" class="field hidden">
+          <div class="label">Lưu PDF theo khổ vừa dàn</div>
+          <p class="hint">
+            Mỗi tờ một file; tờ AB gồm 2 trang A + B.
+          </p>
+          <div id="offsetPdfButtons" class="field"></div>
+          <div id="outOffsetPdf" class="out">Bấm nút của khổ cần lưu.</div>
+        </div>
       </main>
 
       <!-- TAB: ĐỔI TÊN -->
@@ -762,7 +784,7 @@
       </main>
 
       <footer class="foot">
-          <span class="ver">v2.15.6</span>
+          <span class="ver">v2.15.12</span>
       </footer>
     </div>
 

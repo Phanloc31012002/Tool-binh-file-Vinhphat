@@ -1364,6 +1364,13 @@
     // ExtendScript hiểu \U \A... là escape rồi nuốt mất dấu \).
     return "'" + String(s).replace(/\\/g, "\\\\").replace(/'/g, "\\'") + "'";
   }
+  function loadDanTheoMauJsx() {
+    try {
+      var extensionRoot = cs.getSystemPath(SystemPath.EXTENSION).replace(/\\/g, "/");
+      var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
+      return "if (typeof dcApMau !== 'function' || typeof dcDanTheoMauVersion === 'undefined' || dcDanTheoMauVersion < 1) { $.evalFile(" + jsStr(jsxPath) + "); } ";
+    } catch (e) { return ""; }
+  }
   function loadDanToiUuJsx() {
     // CEP co the giu ExtendScript engine cu sau khi cai thu panel. Nạp lại khi
     // chưa có, hoặc khi engine vẫn giữ bộ tính Dàn tối ưu phiên bản cũ.
@@ -1374,7 +1381,7 @@
       var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
       var danBeBridgePath = extensionRoot + "/jsx/dan_be_bridge.jsx";
       return (
-        "if (typeof dcDanToiUu !== 'function' || typeof dcCopyToiUuNoteToOddArtboards !== 'function' || typeof dcDanToiUuVersion === 'undefined' || dcDanToiUuVersion < 16) { $.evalFile(" +
+        "if (typeof dcDanToiUu !== 'function' || typeof dcCopyToiUuNoteToAllArtboards !== 'function' || typeof dcCopyToiUuNoteToOddArtboards !== 'function' || typeof dcDanToiUuVersion === 'undefined' || dcDanToiUuVersion < 17) { $.evalFile(" +
         jsStr(jsxPath) +
         "); } " +
         "if (typeof dcDanBePrepare !== 'function' || typeof dcDanBeRender !== 'function' || typeof dcDanBeNestingVersion === 'undefined' || dcDanBeNestingVersion < 7) { $.evalFile(" +
@@ -1436,7 +1443,7 @@
         .replace(/\\/g, "/");
       var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
       return (
-        "if (typeof dcRunSignature8 !== 'function' || typeof dcSignature8AutoPonVersion === 'undefined' || dcSignature8AutoPonVersion < 34) { $.evalFile(" +
+        "if (typeof dcRunSignature8 !== 'function' || typeof dcSignature8AutoPonVersion === 'undefined' || dcSignature8AutoPonVersion < 37) { $.evalFile(" +
         jsStr(jsxPath) +
         "); } "
       );
@@ -1451,7 +1458,22 @@
         .replace(/\\/g, "/");
       var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
       return (
-        "if (typeof dcRunKeoGay !== 'function' || typeof dcKeoGayAutoPonVersion === 'undefined' || dcKeoGayAutoPonVersion < 5) { $.evalFile(" +
+        "if (typeof dcRunKeoGay !== 'function' || typeof dcKeoGayAutoPonVersion === 'undefined' || dcKeoGayAutoPonVersion < 6) { $.evalFile(" +
+        jsStr(jsxPath) +
+        "); } "
+      );
+    } catch (e) {
+      return "";
+    }
+  }
+  function loadOffsetPdfJsx() {
+    try {
+      var extensionRoot = cs
+        .getSystemPath(SystemPath.EXTENSION)
+        .replace(/\\/g, "/");
+      var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
+      return (
+        "if (typeof dcLuuCtlOffsetPDF !== 'function' || typeof dcCtlOffsetPdfVersion === 'undefined' || dcCtlOffsetPdfVersion < 2) { $.evalFile(" +
         jsStr(jsxPath) +
         "); } "
       );
@@ -1742,24 +1764,30 @@
   }
 
   var btnCopyToiUuNote = document.getElementById("btnCopyToiUuNote");
-  if (btnCopyToiUuNote && outDanToiUu) {
-    btnCopyToiUuNote.addEventListener("click", function () {
+  var btnCopyToiUuNoteOneSide = document.getElementById("btnCopyToiUuNoteOneSide");
+  function wireToiUuNoteButton(button, twoSided) {
+    if (!button || !outDanToiUu) return;
+    button.addEventListener("click", function () {
       var notePrefixInput = document.getElementById("autoSheetNotePrefixes");
       var notePrefixes = notePrefixInput ? notePrefixInput.value || "" : "";
-      show(outDanToiUu, "Đang copy ghi chú sang các artboard mặt trước…");
-      btnCopyToiUuNote.disabled = true;
+      show(outDanToiUu, twoSided ? "Đang điền ghi chú bài 2 mặt (1, 3, 5…)…" : "Đang điền ghi chú bài 1 mặt (1, 2, 3…)…");
+      if (btnCopyToiUuNote) btnCopyToiUuNote.disabled = true;
+      if (btnCopyToiUuNoteOneSide) btnCopyToiUuNoteOneSide.disabled = true;
       cs.evalScript(
         loadDanToiUuJsx() +
-          "dcCopyToiUuNoteToOddArtboards(" +
+          (twoSided ? "dcCopyToiUuNoteToOddArtboards(" : "dcCopyToiUuNoteToAllArtboards(") +
           jsStr(notePrefixes) +
           ")",
         function (res) {
-          btnCopyToiUuNote.disabled = false;
+          if (btnCopyToiUuNote) btnCopyToiUuNote.disabled = false;
+          if (btnCopyToiUuNoteOneSide) btnCopyToiUuNoteOneSide.disabled = false;
           handleRes(outDanToiUu, res);
         },
       );
     });
   }
+  wireToiUuNoteButton(btnCopyToiUuNote, true);
+  wireToiUuNoteButton(btnCopyToiUuNoteOneSide, false);
 
   // ---- Dàn Offset: Tự trở (1 artboard) ----
   var btnDanOffset = document.getElementById("btnDanOffset");
@@ -2249,7 +2277,7 @@
         multiSourcePerArtboard && multiSourcePerArtboard.checked
       );
       cs.evalScript(
-        "dcApMau(" + (useMultiSource ? "true" : "false") + ")",
+        loadDanTheoMauJsx() + "dcApMau(" + (useMultiSource ? "true" : "false") + ")",
         function (res) {
           btnApMau.disabled = false;
           handleRes(outApMau, res);
@@ -3550,6 +3578,113 @@
 
   var btnOffset = document.getElementById("btnOffset");
   var outOffset = document.getElementById("outOffset");
+
+  // ---- Lưu PDF theo khổ (Đóng ghim giữa + Keo gáy) ----
+  //  Dàn xong, JSX gắn đuôi "||CTLPDF:{json}" sau chuỗi OK, liệt kê từng khổ
+  //  có trong bài. Bài có khổ nào thì hiện nút Lưu PDF của khổ đó, giống bảng
+  //  ghi chú chỉ hiện ô của loại tờ thật sự có.
+  var offsetPdfBox = document.getElementById("offsetPdfBox");
+  var offsetPdfButtons = document.getElementById("offsetPdfButtons");
+  var outOffsetPdf = document.getElementById("outOffsetPdf");
+  var OFFSET_PDF_LABELS = {
+    BIA: "Bìa",
+    TT4: "Tự trở 4 trang",
+    TT8: "Tự trở 8 trang",
+    AB: "Tờ AB",
+    SMALL4: "Tự trở 4 trang",
+    SMALL8: "Tự trở 8 trang",
+    SMALL16: "Tự trở 16 trang",
+    SMALLAB: "Tờ AB",
+  };
+  // pt -> cm, làm tròn tới mm: 1213.23 pt -> "42.8".
+  function offsetPdfCm(pt) {
+    return String(Math.round(pt / 2.834645669) / 10);
+  }
+  function hideOffsetPdf() {
+    offsetPdfBox.classList.add("hidden");
+    offsetPdfButtons.innerHTML = "";
+  }
+  function saveOffsetPdf(total, jobsText, label) {
+    var buttons = offsetPdfButtons.querySelectorAll("button");
+    function setDisabled(disabled) {
+      for (var i = 0; i < buttons.length; i++) buttons[i].disabled = disabled;
+    }
+    setDisabled(true);
+    show(outOffsetPdf, "Mở cửa sổ chọn nơi lưu PDF " + label + "…");
+    cs.evalScript(
+      loadOffsetPdfJsx() +
+        "dcLuuCtlOffsetPDF(" +
+        jsStr(total) +
+        ", " +
+        jsStr(jobsText) +
+        ")",
+      function (res) {
+        setDisabled(false);
+        handleRes(outOffsetPdf, res);
+      },
+    );
+  }
+  function renderOffsetPdf(plan) {
+    offsetPdfButtons.innerHTML = "";
+    var shown = 0;
+    plan.groups.forEach(function (group) {
+      if (!group || !group.jobs || !group.jobs.length) return;
+      var first = group.jobs[0];
+      var label = OFFSET_PDF_LABELS[group.key] || group.key;
+      var text =
+        "Lưu PDF " +
+        label +
+        " — " +
+        offsetPdfCm(first.w) +
+        " × " +
+        offsetPdfCm(first.h) +
+        " cm";
+      if (group.jobs.length > 1) text += " (" + group.jobs.length + " file)";
+      // Mỗi phần "TÊN=artboard,artboard@rộngxcao" là một file PDF.
+      var jobsText = group.jobs
+        .map(function (job) {
+          return job.name + "=" + job.ab.join(",") + "@" + job.w + "x" + job.h;
+        })
+        .join("|");
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "btn";
+      btn.textContent = text;
+      btn.addEventListener("click", function () {
+        saveOffsetPdf(plan.total, jobsText, label);
+      });
+      offsetPdfButtons.appendChild(btn);
+      shown++;
+    });
+    if (!shown) {
+      hideOffsetPdf();
+      return;
+    }
+    offsetPdfBox.classList.remove("hidden");
+    show(outOffsetPdf, "Bấm nút của khổ cần lưu.");
+  }
+  // Tách đuôi kế hoạch PDF khỏi kết quả dàn rồi mới hiện thông báo.
+  function showOffsetResult(res) {
+    var text = res;
+    var plan = null;
+    if (typeof res === "string") {
+      var at = res.indexOf("||CTLPDF:");
+      if (at >= 0) {
+        text = res.substring(0, at);
+        try {
+          plan = JSON.parse(res.substring(at + 9));
+        } catch (e) {
+          plan = null;
+        }
+      }
+    }
+    handleRes(outOffset, text);
+    if (!offsetPdfBox || !offsetPdfButtons || !outOffsetPdf) return;
+    if (plan && plan.groups && plan.groups.length) renderOffsetPdf(plan);
+    // Bấm Dàn rồi huỷ ngay ở bảng nhập khổ thì tài liệu chưa bị đụng tới, nút
+    // của lượt dàn trước vẫn đúng. Mọi trường hợp khác đều giấu nút cũ đi.
+    else if (res !== "OK: (bỏ qua)") hideOffsetPdf();
+  }
   btnOffset.addEventListener("click", function () {
     var w = document.getElementById("wOffset").value;
     var h = document.getElementById("hOffset").value;
@@ -3573,7 +3708,7 @@
       ")";
     cs.evalScript(expr, function (res) {
       btnOffset.disabled = false;
-      handleRes(outOffset, res);
+      showOffsetResult(res);
     });
   });
 
@@ -3594,7 +3729,7 @@
       loadKeoGayJsx() + "dcRunKeoGay(" + jsStr(w) + ", " + jsStr(h) + ")";
     cs.evalScript(expr, function (res) {
       btnKeo.disabled = false;
-      handleRes(outOffset, res);
+      showOffsetResult(res);
     });
   });
 
