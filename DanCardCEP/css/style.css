@@ -1344,6 +1344,10 @@ body {
 .toiuu-actions .btn-primary {
   flex: 1;
 }
+.toiuu-note-actions .btn {
+  min-width: 0;
+  white-space: normal;
+}
 .note-copy-input {
   flex: 1;
   min-width: 0;

@@ -2,71 +2,66 @@
 
 _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
-## v2.15.12 — vá dàn theo mẫu để cứng artboard nguồn
+## v2.15.19 — XUẤT TEST OK
 
-- vá dàn theo mẫu để cứng artboard nguồn
-
----
-
-## v2.15.11 — Neo Dàn theo mẫu tại artboard PON (03/10/2026)
-
-- Áp mẫu luôn đọc và đặt PON, bài, artboard trong hệ tọa độ document, sau đó trả lại hệ tọa độ đang dùng. Artboard đầu tiên neo đúng tọa độ artboard đầu tiên trong file PON mặt trước, không phụ thuộc vị trí mẫu học, artboard active hay gốc thước của bài nguồn.
-- Thêm nạp lại JSX theo phiên bản trước khi Áp mẫu để tránh engine CEP giữ hàm cũ sau khi cập nhật. Không thay góc/kích thước slot, chế độ nhiều mẫu hay cách xếp các tờ tiếp theo.
-- Đã tái hiện lỗi tọa độ trong Illustrator thật trước khi sửa. Sau sửa, bốn trường hợp (tọa độ artboard/document, hai mặt, nhiều mẫu) đều neo đúng tờ PON; nguồn không đổi và hệ tọa độ được khôi phục. Kiểm thử tự động kiểm tra cả đường thành công/lỗi và loader; không dùng bài hoặc dữ liệu Học mẫu của người dùng để chạy thử.
+- XUẤT TEST OK
 
 ---
 
-## v2.15.10 — Sửa luồng lưu PDF CTL Offset (03/10/2026)
+## v2.15.18 — Keo gáy đồng bộ khổ giấy/PON, A5 tự trở 4 trang (03/10/2026)
 
-- Bỏ Group/Undo và mở khoá layer trên file nguồn khi lưu PDF ruột/bìa. Chép trực tiếp bài, ghi chú và PON, kể cả PON đang khoá, sang tài liệu tạm; giữ thứ tự layer và vị trí trong tờ.
-- Chụp khổ/tọa độ artboard trước khi tạo tài liệu tạm. Kích hoạt đúng tài liệu trước khi đọc artboard, chép, lưu PDF và đóng; tránh lưu trong ngữ cảnh file nguồn sau Undo.
-- Giữ tên BIA/RUOT, một trang tự trở và hai trang A–B của tờ AB. Không ghi đè PDF có sẵn; từ chối tên trùng trong cùng lượt, dọn file chưa hoàn tất khi lưu lỗi, khôi phục selection, artboard và layer active.
-- Đã chạy trong Illustrator thật trên tài liệu thử có vector, raster, ghi chú và PON khoá: lưu đủ ba file ở ba khổ 42,8 × 31,3 / 64,8 × 41,8 / 85,8 × 63,8 cm; PDF AB đủ hai mặt theo thứ tự. Kiểm tra PDF sau lưu và hình render đạt; nội dung/trạng thái nguồn không đổi. Có kiểm thử hồi quy ngữ cảnh active, lỗi lưu và file trùng. Chưa chạy lại trên chính bài từng crash của người dùng.
-- Không đổi thuật toán dàn, ghi chú, PON hoặc tab Auto Save riêng.
-
----
-
-## v2.15.9 — Lưu PDF theo khổ cho CTL Offset (02/10/2026)
-
-- Dàn xong **Đóng ghim giữa** hoặc **Keo gáy**, panel hiện khung **Lưu PDF theo khổ vừa dàn** ngay dưới ô kết quả. Bài có khổ nào thì có nút của khổ đó (Bìa, Tự trở 4/8/16 trang, Tờ AB) kèm kích thước tờ, cùng cách với bảng ghi chú chỉ hiện ô của loại tờ có trong bài.
-- Mỗi tờ in là một file: bìa → `BIA.pdf`, mỗi ruột → `RUOT N.pdf` với N trùng ghi chú RUỘT N trên tờ. Tờ tự trở 1 trang; tờ AB 2 trang, mặt A rồi mặt B. Bài có nhiều tờ AB thì một lần bấm nút Tờ AB lưu hết, mỗi tờ một file.
-- PDF gồm đủ bài, ghi chú và PON: hai layer PON đang khoá được mở trong lúc xuất rồi khoá lại như cũ. Xuất qua tài liệu tạm như Lưu PDF của Dàn theo mẫu nên không lưu đè và không đổi file AI đang mở.
-- Trước khi lưu, so lại số artboard và khổ từng artboard với lúc dàn; tài liệu đã bị sửa thì báo dàn lại chứ không lưu nhầm tờ. File trùng tên trong thư mục chọn thì báo lỗi, không ghi đè.
-- Bấm Dàn rồi huỷ ở bảng nhập khổ thì giữ nút của lượt trước; dàn lỗi hoặc dừng giữa chừng thì giấu nút.
-- Không đổi thuật toán dàn, PON, bóp hay ghi chú. `dcRunSignature8` và `dcRunKeoGay` chỉ gắn thêm danh sách khổ vào chuỗi trả về.
-- Mới kiểm tra bằng Illustrator giả lập trong Node, **chưa chạy trong Illustrator thật**: ba bài mẫu (ghim giữa A4, ghim giữa A5, keo gáy) ra đúng nút, đúng tên file, đúng số trang; mỗi trang đủ bài + ghi chú + PON và đúng vị trí trong tờ; tài liệu nguồn, khoá layer, selection giữ nguyên; các đường lỗi không để lại file rác.
+- Keo gáy dùng cùng khổ artboard thực với Đóng ghim giữa: form 65 × 86 = **85,8 × 63,8 cm**, form 65 × 43 = **64,8 × 41,8 cm**. Bỏ khổ cũ 85,9 × 62,6 / 64,9 × 41,9 lấy từ bounds ngoài của PON.
+- Đồng bộ độ dài/nét PON giấy và đặt tim hai nét tại đúng từng góc artboard, không lùi vào nửa stroke như trước. Mỗi tờ vẫn có bốn dấu góc (8 nét).
+- Form A5 AB 32 trang / TT16 thêm dấu cắt trên và dưới tại biên cột 1 và 3: **thêm 4 nét**, tổng 16 nét cắt/tờ, để chia cụm 2 trang. Giữ thứ tự trang, xoay và đối xứng A/B; không vẽ nét xuyên artwork.
+- A5 tự trở 4 trang dùng form **43 × 32,5**, artboard thực **42,8 × 31,3 cm**, khe giữa 5 mm như Bấm ghim. A4 tự trở 4 vẫn dùng form 65 × 43. Kiểm tra vừa giấy trước khi raster/tạo artboard; PON cắt sát biên giữ cả stroke trong tờ.
+- Ghi chú A5 4 trang chuyển sang dải trắng trên khi lề trái không đủ, đo kích thước chữ/icon và thu chữ khi cần, không đè vào bài. Ô ghi chú hiện tên form nhỏ đúng; nút Lưu AI lấy đúng khổ mới từ artboard. Không đổi định dạng lưu AI hay vị trí bắt đầu dàn.
+- Nút Keo gáy nạp script phiên bản 8, tránh dùng engine cũ. Đạt 25 file kiểm thử tự động và 6 lần thử trực tiếp trong Illustrator: A5 4 trang thường/tối đa/nguồn ngang, A5 60 trang, A4 32 trang và A5 40 trang khổ tràn. Đo khổ giấy/PON bốn góc, đủ bốn nét chia cụm, bài/ghi chú không chồng lấn hoặc tràn tờ, A/B đối diện đúng, giữ object ngoài selection và trả lại trạng thái app. Đã xem ảnh render; cài local, chưa phát hành GitHub.
 
 ---
 
-## v2.15.8 — PON cắt ngang và ghi chú dọc tờ A5 64,8 × 41,8 (02/10/2026)
+## v2.15.17 — Copy ghi chú trong Dàn theo mẫu, CTL Offset lưu AI (03/10/2026)
 
-- Bỏ PON cắt tại hai nếp gấp dọc trong cụm hai trang của form SMALL8. Đánh bốn nét ngang 2 mm ở đường chia hai hàng: hai mép ngoài và hai mép khe giữa.
-- Ghi chú của form này luôn dọc ở lề trái phía dưới; cụm icon + chữ neo cách trái 9 mm, cách đáy 15 mm, kiểm tra né bài và PON. Icon giữ nguyên kích thước.
-- Giữ sửa tràn mép của v2.15.7, bóp canh giữa cụm hai trang và PON theo lưới danh định. Các form khác giữ cấu hình hiện tại.
-- Kiểm tra trực tiếp trong Illustrator trên tờ thử 14 × 20 và 15 × 21,15 cm: đủ bốn PON ngang, ghi chú đúng neo 9/15 mm, không tràn/đè bài/PON và tài liệu nguồn không đổi.
-
----
-
-## v2.15.7 — Sửa mép bài và ghi chú CTL Offset A5 (02/10/2026)
-
-- Form 64,8 × 41,8 cm chỉ dùng allowance khi hai hàng vượt chiều cao tờ. Trang 14 × 20 cm không còn bị đặt tràn đáy 1,25 mm; hai mép ngoài neo theo chiều cao bài thật, không co/cắt chiều cao.
-- A5 tối đa 15 × 21,15 cm giữ allowance ở đường ghép hai hàng bên trong, không tràn ra ngoài giấy. Giữ bóp canh giữa cụm hai trang, PON lấy từ lưới chưa bóp và khổ tờ cố định.
-- Đặt cả icon + ghi chú A5 theo bounds hiển thị trong vùng trống của artboard, tránh bài và PON. Icon không đổi kích thước; tờ không còn lề trên dùng ghi chú dọc ở lề bên. Ghi chú quá dài được xuống dòng hoặc báo yêu cầu rút ngắn.
-- Không đổi form A4. Bộ kiểm thử đạt; chạy trực tiếp bản sao 48 ảnh với trang 14 × 20 cm tạo đủ 5 artboard, toàn bộ bài/ghi chú nằm trong tờ và nguồn không đổi. Kiểm tra native riêng A5 tối đa cũng đạt, icon nguyên kích thước và ghi chú né bài/PON.
+- Chuyển toàn bộ Copy ghi chú từ Dàn KTS sang mục thu gọn/mở rộng **Copy ghi chú** trong tab **Dàn theo mẫu**, đặt sau Áp mẫu và trước Lưu PDF. Mặc định thu gọn.
+- Giữ ô F1, F2… và hai nút **Điền ghi chú bài 1 mặt** (artboard 1, 2, 3…) / **Điền ghi chú bài 2 mặt** (artboard 1, 3, 5…). Để trống vẫn copy nguyên ghi chú; không đổi logic JSX.
+- Thông báo tiến trình/kết quả/lỗi hiện ngay trong mục mới, không chạy sang tab Dàn KTS. Hai nút cùng khóa trong lúc xử lý và mở lại khi có kết quả.
+- Đổi riêng nút lưu trong tab **CTL Offset** (Đóng ghim giữa + Keo gáy) thành **Lưu AI** theo khổ vừa dàn. Bìa/từng ruột vẫn ra file riêng; hai artboard A/B của cùng ruột nằm chung một `.ai`, giữ tên artboard, layer, object và ghi chú có thể chỉnh sửa. Các tab khác vẫn lưu PDF.
+- Lưu AI thuần có nén, nhúng ảnh liên kết và profile màu, không tạo kèm phần PDF. Giữ cơ chế kiểm tra khổ, không ghi đè file có sẵn, xóa riêng đầu ra chưa hoàn tất khi lỗi và trả lại trạng thái tài liệu nguồn. Không group/di chuyển/undo trên nguồn; chưa thay cơ chế copy từng object nên không cam kết hết thời gian chờ trên file lớn.
+- Không đổi vị trí/bắt đầu PON hoặc cách dàn CTL theo yêu cầu bỏ số 2. Nút lưu nạp script phiên bản 3 để thay engine PDF cũ.
+- Kiểm thử vị trí/ID không trùng, mở–thu accordion, gọi đúng chế độ một/hai mặt, tiền tố và thông báo; giữ kiểm thử sao chép ghi chú hiện tại. Lưu và mở lại trực tiếp 3 file AI trong Illustrator (bìa, ruột tự trở, ruột A/B), kiểm tra đủ artboard/kích thước/tên, vector/raster/PON/ghi chú và nguồn không thay đổi. Bản sửa cài local, chưa phát hành GitHub.
 
 ---
 
-## v2.15.6 — Phát hành bản bế tag, decal
+## v2.15.16 — Keo gáy A5 ghép 32 trang trên cùng tờ AB (03/10/2026)
 
-- đã test xong phát hành cho nv dùng
+- A4 giữ form 16 trang/tờ AB. A5 tự nhận theo khổ một trang đến 15 × 21,15 cm, ghép hai tay 16 trang liên tiếp lên cùng một cặp artboard A/B: 1–32, rồi 33–64… Không dùng form gấp 32 mới và không thêm trang trắng.
+- Giữ nguyên thứ tự trang của form A4 trong từng tay; xoay cụm để vừa tờ lớn 65 × 86. Mặt B đảo vị trí hai cụm và góc xoay để lật ngang đúng cặp trang, không lật gương chữ/hình. Hỗ trợ nguồn nhập ngang như 20 × 14 cm.
+- Luôn dàn phần AB trước; phần dư A5 làm tự trở 16 trang rồi 8/4 trang. Ví dụ 48 trang = AB 32 + TT16; 60 trang = AB 32 + TT16 + TT8 + TT4. Phần dư 12 vẫn giữ thứ tự lồng TT8/TT4 cũ.
+- PON cắt bám theo lưới hai cụm, không vẽ nét vào giữa artwork. TT8 A5 dùng tờ 65 × 43 khi cả bài và PON vừa; nếu phần tràn vượt tờ nhỏ thì dùng tờ lớn, không tự bóp bài.
+- Thêm ghi chú và nút lưu PDF cho TT16; mỗi cặp AB vẫn lưu chung một PDF, tờ tự trở lưu riêng. Lập dữ liệu PDF trước khi trả lại chế độ tọa độ artboard, tránh mất nút lưu PDF.
+- Kiểm tra toàn bộ vị trí canvas trước khi raster; tạo artboard lỗi thì dọn khung mới, giữ khung nguồn. Chỉ xóa artboard cũ sau khi dàn thành công. Nút Keo gáy nạp script phiên bản 7 thay cho engine cũ.
+- Kiểm chứng trực tiếp trên 6 tài liệu thử riêng trong Illustrator: A5 32/60 trang, khổ tràn 15 × 21,15, nguồn ngang, TT16 riêng và A4 32 trang; kiểm tra trang đối diện, góc xoay raster, PON, ghi chú và dữ liệu PDF. Đạt 23 file kiểm thử tự động. Bản sửa cài local, chưa phát hành GitHub.
 
 ---
 
-## v2.15.5 — Rút gọn hướng dẫn toàn bộ panel (02/10/2026)
+## v2.15.15 — Đặt PON tiếp mà không xóa layer (03/10/2026)
 
-- Rút gọn hướng dẫn ở tất cả tab: Dàn file, Dàn tối ưu (KTS/Bế/Offset), Dấu cắt, Dàn theo mẫu, Catalogue, CTL Offset, Đổi tên, Variable và Auto Save.
-- Bỏ giải thích thuật toán và ví dụ dài/lặp; giữ cách chọn nguồn, đơn vị/khoảng đo, ý nghĩa dấu tick và lưu ý về file gốc.
-- Không đổi ô nhập, giá trị mặc định, thuật toán dàn hay ghi chú/nội dung trên artboard.
+- Dấu cắt tự động không còn bỏ qua toàn bộ layer PON: chỉ nhận diện nét PON do tool tạo, vẫn xử lý bài/ảnh/group nằm trong cùng layer.
+- Dùng lại layer `Dau cat tu dong`, giữ dấu cũ và thêm dấu cho bài mới. Bấm lại cùng vị trí không tạo nét trùng; hỗ trợ dấu cũ chưa có nhãn nhận diện.
+- Tạm mở khóa layer để vẽ, khôi phục trạng thái khóa và layer đang làm việc; chuẩn hóa tọa độ khi xử lý nhiều artboard. Lỗi tạo nét chỉ dọn nét mới của lượt lỗi, không xóa PON cũ.
+- Thêm kiểm tra phiên bản script khi bấm Đánh dấu cắt để nạp bản sửa thay cho engine cũ.
+- Kiểm chứng trực tiếp trong Illustrator: 8 ca đặt liên tục/đặt lại, bài trong layer PON, dấu cũ/mới được chọn kèm, layer khóa/ẩn và artboard khác; giữ nguyên bài và dấu cũ. Đạt toàn bộ 22 file kiểm thử tự động. Bản sửa cài local, chưa phát hành GitHub.
+
+---
+
+## v2.15.14 — Giới hạn canvas và chỉ giữ artboard kết quả mới (03/10/2026)
+
+- Artboard đầu bắt đầu ở góc trên trái vùng canvas như KTS, theo lựa chọn mới thay cho vị trí file PON. Chạy ngang rồi xuống hàng; chừa 10 mm giữa các tờ, tránh artboard và bài nguồn. PON vẫn quyết định khổ tờ và vị trí tương đối các dấu.
+- Giữ cặp trước–sau cạnh nhau, canh mép trên và tính bước hàng theo tờ cao hơn nếu hai PON khác khổ. Bỏ xếp cố định 15 tờ mỗi cột; giữ nguyên slot, hướng artwork và chế độ nhiều mẫu.
+- Lập kế hoạch đủ tờ trước khi tạo; hết chỗ thì giữ kết quả cũ. Tạo artboard lỗi thì dọn artboard mới và báo lỗi, không bỏ tờ âm thầm. Đọc tối đa 1 MB metadata AI để bù gốc tọa độ canvas; file chưa lưu/không đọc được dùng gốc KTS cũ với kiểm tra lỗi tạo artboard. Không tạo artboard dò hoặc đổi gốc thước trong tài liệu nguồn.
+- Các luồng bắt đầu từ góc canvas (KTS, Dàn bế, Offset tự trở/AB/nhiều khổ, Dàn theo mẫu): dàn xong thành công mới xóa toàn bộ artboard cũ, chỉ giữ artboard vừa tạo và chọn tờ đầu. Bước dọn chỉ xóa khung, không thêm thao tác xóa object/layer nguồn. Dàn lỗi giữ artboard cũ; nếu Illustrator không xóa được khung nào thì báo rõ, không xóa kết quả mới.
+- Vá lỗi Offset tự trở một khổ gọi hàm PON giấy chưa được định nghĩa. Tạo đủ PON ở bốn góc như các nhánh KTS và Offset nhiều khổ trước khi dọn artboard.
+- Kiểm chứng trực tiếp trong Illustrator bằng tài liệu thử riêng: 7 ca Dàn theo mẫu (gốc thước, một/hai mặt, nhiều mẫu, 26 tờ xuống hàng, 14 cặp khác khổ, hết canvas giữ kết quả cũ), cùng 9 ca dọn artboard KTS/Offset/Bế và lỗi đầu vào. Không chạy xóa artboard trên bài thật đang mở.
+- Đạt toàn bộ 21 file kiểm thử tự động; đã cài bản 2.15.14 vào CEP trên máy này sau khi sao lưu bản 2.15.13. Chưa phát hành lên GitHub.
 
 ---
 
@@ -142,30 +137,30 @@ _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
 ## v2.13.20 — Dựng lại lưới, PON và bóp của CTL Offset
 
-- *Khổ artboard cố định, không co theo khổ trang**
+- \*Khổ artboard cố định, không co theo khổ trang\*\*
 - Trước đây artboard tính từ khổ trang nhập nên nhập 13×20 cm ra artboard 81,27×55,87 cm — một khổ giấy không có thật. Nay chỉ còn ba tờ cố định: **42,8×31,3** (bìa A5), **64,8×41,8** (tự trở 8 A5, TT4), **85,8×63,8** (ruột A5, A4 main).
 - Bài canh giữa theo chiều ngang tờ. Khổ trang chỉ quyết định bài nằm thế nào trên tờ, không đổi khổ tờ.
 - Trang quá lớn không lọt tờ thì báo lỗi rõ (dư bao nhiêu mm theo chiều nào), không âm thầm phình artboard ra.
-- *Lưới họ A5 tì vào mép dưới artboard**
+- \*Lưới họ A5 tì vào mép dưới artboard\*\*
 - Mọi khổ trang từ A5 trở xuống (≤ 15 × 21,15 cm) đều neo lưới vào mép dưới, lề thừa dồn lên trên. PON đáy vì vậy luôn bắt đầu từ đáy tờ với bất kỳ khổ trang nào.
 - Nhờ đó khổ tối đa 15 × 21,15 cm chạy được. Trước đây lề nhíp 24 mm cộng cứng làm bài cao 63,9 cm, dư đúng 1 mm so với tờ 63,8 cm nên bị chặn.
 - Họ A4 giữ nguyên cách treo từ mép trên xuống với lề nhíp cố định.
-- *Hằng số lưới giải lại từ ba khổ form chuẩn**
+- \*Hằng số lưới giải lại từ ba khổ form chuẩn\*\*
 - Các số 0,1766805 / 3,351722 / −0,647805 / 13,176 / 24,351972 mm là sai số đo từ file mẫu chứ không phải thiết kế. Giải ngược từ ba khổ chuẩn với trang A5 14,9 × 21,15 cm ra số nguyên: lề hông 0 / 22 / 3 mm, lề trên+dưới 15 / 0 / 27 mm.
 - Bỏ lề âm −0,65 mm của ruột A5 và bỏ luôn `fitLift`. Trước đây lưới lòi khỏi artboard 0,65 mm nên PON đáy vẽ ra ngoài giấy, phải nhấc artwork lên bù.
-- *PON cắt**
+- \*PON cắt\*\*
 - Thêm mốc ở biên trang bên trong mỗi nửa để cắt ra cụm 2 rồi xếp lại: ruột A5 từ 26 lên **44 nét**, tự trở 8 A5 từ 18 lên **22 nét**.
 - Mọi giao điểm đều là chữ L đủ (nét dọc quay vào rãnh trống kèm chân ngang), kể cả chỗ giao khe giữa với khe hàng 15 mm — trước đây chỗ đó chỉ có chân ngang.
 - Bỏ các số bù lắt nhắt `coverOuterLift` 0,2 mm và `coverBottomOutset` 0,3 mm; dấu nay nằm đúng trên đường cắt.
 - Thêm luật chung: không nét nào được nằm ngoài artboard. Mốc lọt ra ngoài bị kéo về mép và số lượng được báo trong dòng kết quả.
 - Số nét báo ra nay đếm thật, không còn trả số cứng 12 / 10.
-- *PON giấy**
+- \*PON giấy\*\*
 - Cùng khổ giấy thì cùng kiểu dấu. Trước đây trên cùng tờ 65×86, job A4 vẽ nét dọc 21,091 pt / nét 3,971 còn job A5 vẽ 21,53 pt / nét 1,997. Nay chỉ còn hai bộ: form lớn 18,766 / 21,091 / 3,971, form nhỏ 14,173 / 14,106 / 1,995.
-- *Gọn lại phần code**
+- \*Gọn lại phần code\*\*
 - Năm loại form gom về **một bản mô tả** mỗi loại (số cột, số hàng, khe, lề nhíp, tờ giấy, kiểu neo). Lưới danh định và cả hai loại PON đều sinh ra từ bản mô tả đó, thay cho năm nhánh code riêng.
 - Ba đoạn bóp viết trùng nhau ở ba chỗ gom về một hàm `squeezeAboutCentre`.
 - `dcRunSignature8` từ 2.292 xuống 2.103 dòng.
-- *Phần A4**
+- \*Phần A4\*\*
 - Topology PON của A4 giữ nguyên: A4 main 20 nét, TT4 10 nét, trùng khớp từng nét so với bản cũ khi cùng lưới; PON giấy không đổi.
 - Riêng khổ artboard A4 nay cũng cố định như A5 (85,8×63,8 và 64,8×41,8) thay vì tính động theo khổ trang.
 

@@ -258,35 +258,6 @@
                 <span class="btn-label">Dàn tối ưu</span>
               </button>
             </div>
-            <div class="field-row toiuu-actions">
-              <input
-                id="autoSheetNotePrefixes"
-                class="note-copy-input"
-                type="text"
-                placeholder="F1, F2, F3..."
-                title="F1, F2… theo thứ tự tờ; ngăn bằng dấu phẩy. Để trống để copy nguyên ghi chú."
-              />
-            </div>
-            <div class="field-row toiuu-actions">
-              <button
-                id="btnCopyToiUuNoteOneSide"
-                class="btn"
-                type="button"
-                style="flex: 1"
-                title="Chọn ghi chú trên tờ đầu; điền lần lượt artboard 1, 2, 3…"
-              >
-                Điền ghi chú bài 1 mặt
-              </button>
-              <button
-                id="btnCopyToiUuNote"
-                class="btn"
-                type="button"
-                style="flex: 1"
-                title="Chọn ghi chú trên mặt trước đầu tiên; điền artboard 1, 3, 5…"
-              >
-                Điền ghi chú bài 2 mặt
-              </button>
-            </div>
             <div id="outDanToiUu" class="out">Chọn một bài rồi bấm Dàn tối ưu.</div>
           </div>
         </div>
@@ -486,6 +457,46 @@
         <div id="outApMau" class="out">Chọn con nguồn rồi bấm Áp mẫu.</div>
 
         <div class="acc" style="margin-top: 10px">
+          <button class="acc-head" data-acc="copyDanMauNote" type="button">
+            <span class="acc-arrow">&#9654;</span>
+            <span>Copy ghi chú</span>
+          </button>
+          <div class="acc-body" id="acc-copyDanMauNote">
+            <p class="hint">Chọn ghi chú trên tờ đầu. Để trống ô F1, F2… để copy nguyên.</p>
+            <div class="field-row toiuu-actions">
+              <input
+                id="autoSheetNotePrefixes"
+                class="note-copy-input"
+                type="text"
+                placeholder="F1, F2, F3..."
+                title="F1, F2… theo thứ tự tờ; ngăn bằng dấu phẩy. Để trống để copy nguyên ghi chú."
+              />
+            </div>
+            <div class="field-row toiuu-actions toiuu-note-actions">
+              <button
+                id="btnCopyToiUuNoteOneSide"
+                class="btn"
+                type="button"
+                style="flex: 1"
+                title="Chọn ghi chú trên tờ đầu; điền lần lượt artboard 1, 2, 3…"
+              >
+                Điền ghi chú bài 1 mặt
+              </button>
+              <button
+                id="btnCopyToiUuNote"
+                class="btn"
+                type="button"
+                style="flex: 1"
+                title="Chọn ghi chú trên mặt trước đầu tiên; điền artboard 1, 3, 5…"
+              >
+                Điền ghi chú bài 2 mặt
+              </button>
+            </div>
+            <div id="outCopyDanMauNote" class="out">Chọn ghi chú rồi bấm Điền.</div>
+          </div>
+        </div>
+
+        <div class="acc" style="margin-top: 10px">
           <button class="acc-head" data-acc="saveDanMau">
             <span class="acc-arrow">&#9654;</span>
             <span>Lưu PDF đã dàn</span>
@@ -597,7 +608,7 @@
           </button>
           <div class="acc-body" id="acc-offKeo">
             <p class="hint">
-              Số trang chia hết cho 4; mỗi tay 16 trang. Bìa dàn tay.
+              A4: 16 trang/tờ AB. A5: 32 trang/tờ AB (2 tay 16). Phần dư tự trở; bìa dàn tay.
             </p>
             <div class="field">
               <div class="label">Kích thước 1 trang (cm)</div>
@@ -613,9 +624,9 @@
 
         <div id="outOffset" class="out">Nhập kích thước rồi bấm Dàn.</div>
 
-        <!-- Lưu PDF theo khổ: chỉ hiện sau khi dàn xong; bài có khổ nào thì có nút của khổ đó -->
+        <!-- Lưu AI theo khổ: chỉ hiện sau khi dàn xong; bài có khổ nào thì có nút của khổ đó -->
         <div id="offsetPdfBox" class="field hidden">
-          <div class="label">Lưu PDF theo khổ vừa dàn</div>
+          <div class="label">Lưu AI theo khổ vừa dàn</div>
           <p class="hint">
             Mỗi tờ một file; tờ AB gồm 2 trang A + B.
           </p>
@@ -784,7 +795,7 @@
       </main>
 
       <footer class="foot">
-          <span class="ver">v2.15.12</span>
+          <span class="ver">v2.15.19</span>
       </footer>
     </div>
 

@@ -1,9 +1,9 @@
 {
     "product":  "com.locdev.dancard",
-    "version":  "2.15.12",
-    "title":  "vá dàn theo mẫu để cứng artboard nguồn",
-    "description":  "vá dàn theo mẫu để cứng artboard nguồn",
-    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.15.12.zip",
-    "sha256":  "391CC6A46FF07D075E740FC88ECAD7F7C9260D6F2DF179AD8534E1FC0197E259",
-    "publishedUtc":  "2026-10-03T02:13:05.7551262Z"
+    "version":  "2.15.19",
+    "title":  "XUẤT TEST OK",
+    "description":  "XUẤT TEST OK",
+    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.15.19.zip",
+    "sha256":  "FCCD2B6A19051D598883140EE0DA60BA90AA7D05CC48FC2C7F1C3BA0A6C51ED2",
+    "publishedUtc":  "2026-10-03T06:31:03.2651764Z"
 }

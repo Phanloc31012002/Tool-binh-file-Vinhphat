@@ -2734,11 +2734,20 @@ function _dcDanCore(SEL_LAYOUT_KEY, VOUCHER_WITH_CARD_ARG) {
 //  TAB DẤU CẮT: chạy độc lập với các luồng dàn hiện có.
 //  Chọn từng bài, hoặc chọn group dàn mà các bài con là clipping group.
 // ============================================================
+var dcAutoCutMarksVersion = 1;
 function dcThemDauCatTuDong(lengthText, edgeText, gapText) {
+  var doc = null, markLayer = null, originalLayer = null;
+  var oldCoordinates = null, restoreCoordinates = false;
+  var originalMarkLocked = false, originalMarkVisible = true, capturedMarkState = false;
+  var createdMarkLayer = false, createdLines = [], completed = false;
   try {
     if (app.documents.length === 0) return "ERR: Chưa mở tài liệu nào.";
 
-    var doc = app.activeDocument;
+    oldCoordinates = app.coordinateSystem;
+    app.coordinateSystem = CoordinateSystem.DOCUMENTCOORDINATESYSTEM;
+    restoreCoordinates = true;
+    doc = app.activeDocument;
+    originalLayer = doc.activeLayer;
     var sel = doc.selection;
     if (!sel || sel.length === 0)
       return "ERR: Chọn các bài cần tạo dấu cắt trước.";
@@ -2791,7 +2800,25 @@ function dcThemDauCatTuDong(lengthText, edgeText, gapText) {
 
     function isCutMarkItem(item) {
       try {
-        return item.layer && item.layer.name === "Dau cat tu dong";
+        if (item.note === "DANCARD_AUTO_CUT_MARK") return true;
+        // Older versions did not tag marks. Recognize only their straight,
+        // open, black 1 pt lines, never all artwork on the PON layer.
+        if (!item.layer || item.layer.name !== "Dau cat tu dong" ||
+            item.typename !== "PathItem" || item.closed || item.filled ||
+            !item.stroked || Math.abs(item.strokeWidth - 1) > 0.001 ||
+            item.pathPoints.length !== 2) return false;
+        var color = item.strokeColor;
+        if (color.typename !== "CMYKColor" || color.cyan !== 0 ||
+            color.magenta !== 0 || color.yellow !== 0 || color.black !== 100) return false;
+        var a = item.pathPoints[0].anchor, b = item.pathPoints[1].anchor;
+        if (Math.abs(a[0] - b[0]) > edgeEpsilon && Math.abs(a[1] - b[1]) > edgeEpsilon) return false;
+        for (var pi = 0; pi < 2; pi++) {
+          var p = item.pathPoints[pi];
+          for (var axis = 0; axis < 2; axis++)
+            if (Math.abs(p.leftDirection[axis] - p.anchor[axis]) > 0.001 ||
+                Math.abs(p.rightDirection[axis] - p.anchor[axis]) > 0.001) return false;
+        }
+        return true;
       } catch (e) {
         return false;
       }
@@ -2858,7 +2885,6 @@ function dcThemDauCatTuDong(lengthText, edgeText, gapText) {
     if (cards.length === 0)
       return "ERR: Không tìm thấy bài hợp lệ nằm trong artboard.";
 
-    var markLayer = null;
     for (var li = 0; li < doc.layers.length; li++) {
       if (doc.layers[li].name === "Dau cat tu dong") {
         markLayer = doc.layers[li];
@@ -2867,12 +2893,15 @@ function dcThemDauCatTuDong(lengthText, edgeText, gapText) {
     }
     if (!markLayer) {
       markLayer = doc.layers.add();
+      createdMarkLayer = true;
       markLayer.name = "Dau cat tu dong";
     }
-    try {
-      markLayer.locked = false;
-      markLayer.visible = true;
-    } catch (e) {}
+    originalMarkLocked = markLayer.locked;
+    originalMarkVisible = markLayer.visible;
+    capturedMarkState = true;
+    markLayer.locked = false;
+    markLayer.visible = true;
+    doc.activeLayer = markLayer;
 
     var cutColor = new CMYKColor();
     cutColor.cyan = 0;
@@ -2881,6 +2910,7 @@ function dcThemDauCatTuDong(lengthText, edgeText, gapText) {
     cutColor.black = 100;
     var drawn = 0;
     var drawnLines = {};
+    var existingDuplicates = 0;
 
     function fitsArtboard(p1, p2, rect) {
       return (
@@ -2955,17 +2985,32 @@ function dcThemDauCatTuDong(lengthText, edgeText, gapText) {
       // phép nét đi vào chính bài đó theo quy tắc lật vào trong.
       if (overlapsCard(p1, p2, owner, allowOwner)) return;
       var key = lineKey(p1, p2, cards[owner].abIndex);
-      if (drawnLines[key]) return;
+      if (drawnLines[key]) { existingDuplicates++; return; }
+      var line = markLayer.pathItems.add();
+      createdLines.push(line);
+      line.setEntirePath([p1, p2]);
+      line.closed = false;
+      line.filled = false;
+      line.stroked = true;
+      line.strokeColor = cutColor;
+      line.strokeWidth = 1;
+      try { line.note = "DANCARD_AUTO_CUT_MARK"; } catch (tagError) {}
+      drawnLines[key] = true;
+      drawn++;
+    }
+
+    // Reuse the existing layer without erasing its marks or duplicating an
+    // identical line when the user presses the button again.
+    for (var mi = 0; mi < markLayer.pathItems.length; mi++) {
+      var previousMark = markLayer.pathItems[mi];
+      if (!isCutMarkItem(previousMark)) continue;
       try {
-        var line = markLayer.pathItems.add();
-        line.setEntirePath([p1, p2]);
-        line.filled = false;
-        line.stroked = true;
-        line.strokeColor = cutColor;
-        line.strokeWidth = 1;
-        drawnLines[key] = true;
-        drawn++;
-      } catch (e) {}
+        if (previousMark.pathPoints.length !== 2) continue;
+        var p1 = previousMark.pathPoints[0].anchor.slice(0);
+        var p2 = previousMark.pathPoints[1].anchor.slice(0);
+        var previousBoard = artboardFor(previousMark.geometricBounds);
+        if (previousBoard >= 0) drawnLines[lineKey(p1, p2, previousBoard)] = true;
+      } catch (readMarkError) {}
     }
 
     for (var ci = 0; ci < cards.length; ci++) {
@@ -3041,20 +3086,39 @@ function dcThemDauCatTuDong(lengthText, edgeText, gapText) {
       );
     }
 
+    completed = true;
     if (drawn === 0) {
+      if (existingDuplicates > 0) return "OK: Dấu cắt phù hợp đã tồn tại; không tạo nét trùng.";
       return "OK: Không có khoảng trống phù hợp để đặt dấu cắt.";
     }
 
     try {
       markLayer.zOrder(ZOrderMethod.BRINGTOFRONT);
     } catch (e) {}
-    app.redraw();
+    try { app.redraw(); } catch (redrawError) {}
     var msg =
       "OK: Đã thêm " + drawn + " nét dấu cắt cho " + cards.length + " bài.";
     if (skipped > 0) msg += " Bỏ qua " + skipped + " object ngoài artboard.";
     return msg;
   } catch (e) {
     return "ERR: " + e.toString();
+  } finally {
+    if (!completed) {
+      for (var cleanup = createdLines.length - 1; cleanup >= 0; cleanup--)
+        try { createdLines[cleanup].remove(); } catch (removeLineError) {}
+    }
+    if (doc && originalLayer)
+      try { doc.activeLayer = originalLayer; } catch (restoreLayerError) {}
+    if (markLayer && capturedMarkState) {
+      try {
+        if (!completed) markLayer.visible = originalMarkVisible;
+        markLayer.locked = originalMarkLocked;
+      } catch (restoreMarkStateError) {}
+    }
+    if (!completed && createdMarkLayer)
+      try { markLayer.remove(); } catch (removeLayerError) {}
+    if (restoreCoordinates)
+      try { app.coordinateSystem = oldCoordinates; } catch (restoreCoordinatesError) {}
   }
 }
 
@@ -3624,7 +3688,21 @@ function dcDanToiUuV2(pageWidthText, pageHeightText) {
 //  - Artboard moi tu xep theo luoi canvas, trai sang phai roi xuong hang.
 //  - Tach hinh chu nhat de tan dung khoang trong chu L, van cat dao duoc.
 // ============================================================
-var dcDanToiUuVersion = 17;
+var dcDanToiUuVersion = 18;
+// Called only after successful rendering. Remove frames, never their artwork.
+function dcRemoveOldCanvasArtboards(doc, oldCount) {
+  var removed = 0;
+  app.activeDocument = doc;
+  if (!(oldCount >= 0 && Math.floor(oldCount) === oldCount) ||
+      doc.artboards.length <= oldCount)
+    return { removed: 0, firstNewIndex: oldCount, warning: "" };
+  for (var i = oldCount - 1; i >= 0; i--) {
+    try { doc.artboards[i].remove(); removed++; } catch (removeError) {}
+  }
+  var remaining = oldCount - removed, warning = "";
+  if (remaining > 0) warning = " Chưa xóa được " + remaining + " artboard cũ; kết quả mới vẫn được giữ.";
+  return { removed: removed, firstNewIndex: remaining, warning: warning };
+}
 
 // Ghi chu duoc dat tren artboard mat truoc dau tien. Nhan ban giu nguyen
 // dinh dang, chi doi toa do de khoang cach voi mep artboard luon giong nhau.
@@ -3890,6 +3968,7 @@ function dcDanToiUu(
     if (app.documents.length === 0) return "ERR: Chua mo tai lieu nao.";
 
     var doc = app.activeDocument;
+    var oldCanvasArtboardCount = doc.artboards.length;
     var selection = doc.selection;
     if (!selection || selection.length === 0)
       return "ERR: Chon it nhat mot artwork truoc khi dan.";
@@ -4793,6 +4872,8 @@ function dcDanToiUu(
       }
     }
 
+    var cleanup = dcRemoveOldCanvasArtboards(doc, oldCanvasArtboardCount);
+    firstFrontIndex = cleanup.firstNewIndex;
     var outputWasSelected = false;
     try {
       doc.artboards.setActiveArtboardIndex(firstFrontIndex);
@@ -4832,7 +4913,7 @@ function dcDanToiUu(
     if (!outputWasSelected)
       detail +=
         " Artwork nam tren layer Dan toi uu; Illustrator khong the tu chon tat ca trong tai lieu nay.";
-    return "OK:[[COUNT:" + bestPlan.count + "]] " + detail;
+    return "OK:[[COUNT:" + bestPlan.count + "]] " + detail + cleanup.warning;
   } catch (e) {
     return "ERR: " + dcMoTaLoi(e);
   }
@@ -4852,7 +4933,7 @@ function dcDanToiUu(
 //  Tool tự thử xoay 90°, tự thử bóp bài tối đa N mm mỗi chiều
 //  nếu nhờ vậy dàn thêm được con, và không đánh pon.
 // ============================================================
-var dcDanTuTroVersion = 10;
+var dcDanTuTroVersion = 11;
 
 function dcDanTuTro(
   pageWidthText,
@@ -4866,6 +4947,7 @@ function dcDanTuTro(
     if (app.documents.length === 0) return "ERR: Chưa mở tài liệu nào.";
 
     var doc = app.activeDocument;
+    var oldCanvasArtboardCount = doc.artboards.length;
     var selection = doc.selection;
     if (!selection || selection.length === 0)
       return "ERR: Hãy chọn cặp mặt trước + mặt sau trước khi dàn.";
@@ -5828,6 +5910,30 @@ function dcDanTuTro(
       for (var ci2 = 0; ci2 < items.length; ci2++) items[ci2].translate(dx, dy);
     }
 
+    // Same paper-corner PON as KTS and mixed-size Offset. This single-size
+    // branch must own the helper; the other branches' local functions are
+    // not visible here.
+    function addPaperPonAtCorners(layer, rect) {
+      var markLength = 3 * MM, strokeWidth = 1.995;
+      var black = new CMYKColor();
+      black.cyan = 0; black.magenta = 0; black.yellow = 0; black.black = 100;
+      function draw(x1, y1, x2, y2) {
+        var mark = layer.pathItems.add();
+        mark.setEntirePath([[x1, y1], [x2, y2]]);
+        mark.filled = false; mark.stroked = true;
+        mark.strokeColor = black; mark.strokeWidth = strokeWidth;
+      }
+      var left = rect[0], top = rect[1], right = rect[2], bottom = rect[3];
+      draw(left, top, left + markLength, top);
+      draw(left, top, left, top - markLength);
+      draw(right - markLength, top, right, top);
+      draw(right, top, right, top - markLength);
+      draw(left, bottom, left + markLength, bottom);
+      draw(left, bottom, left, bottom + markLength);
+      draw(right - markLength, bottom, right, bottom);
+      draw(right, bottom, right, bottom + markLength);
+    }
+
     // ==========================================================
     //  XẾP CẶP NGUỒN VÀO CÁC CHỖ TRÊN TỜ
     //  Mỗi cặp ăn một chỗ, theo thứ tự đã chọn. Hết chỗ thì dừng,
@@ -5981,6 +6087,8 @@ function dcDanTuTro(
       paperPonLayer.locked = true;
     } catch (paperPonLayerError) {}
 
+    var cleanup = dcRemoveOldCanvasArtboards(doc, oldCanvasArtboardCount);
+    sheetArtboardIndex = cleanup.firstNewIndex;
     var outputWasSelected = false;
     try {
       doc.artboards.setActiveArtboardIndex(sheetArtboardIndex);
@@ -6040,7 +6148,7 @@ function dcDanTuTro(
       detail +=
         " Artwork nằm trên layer Dàn tự trở; Illustrator không tự chọn hết được trong tài liệu này.";
 
-    return "OK:[[COUNT:" + capacity + "]] " + detail;
+    return "OK:[[COUNT:" + capacity + "]] " + detail + cleanup.warning;
   } catch (e) {
     return "ERR: " + dcMoTaLoi(e);
   }
@@ -6066,6 +6174,7 @@ function dcDanTuTroNhieuKho(
   modeArg,
 ) {
   try {
+    var oldCanvasArtboardCount = doc.artboards.length;
     var MM = 2.834645669;
     var EPS = 0.01;
 
@@ -6946,6 +7055,8 @@ function dcDanTuTroNhieuKho(
       } catch (paperPonLayerError) {}
     }
 
+    var cleanup = dcRemoveOldCanvasArtboards(doc, oldCanvasArtboardCount);
+    sheetArtboardIndex = cleanup.firstNewIndex;
     var outputWasSelected = false;
     try {
       doc.artboards.setActiveArtboardIndex(sheetArtboardIndex);
@@ -7000,7 +7111,7 @@ function dcDanTuTroNhieuKho(
     if (!outputWasSelected)
       detail +=
         " Artwork nằm trên layer Dàn tự trở; Illustrator không tự chọn được toàn bộ trong tài liệu này.";
-    return "OK:[[COUNT:" + placedCount + "]] " + detail;
+    return "OK:[[COUNT:" + placedCount + "]] " + detail + cleanup.warning;
   } catch (e) {
     try {
       return "ERR: " + dcMoTaLoi(e);
@@ -19923,9 +20034,10 @@ function dcRunSignature8(wCm, hCm, coBia) {
 //  Số N trùng với ghi chú "RUỘT N" in trên tờ.
 //
 //  Không lưu đè file AI đang mở: chép trực tiếp các object/layer sang tài
-//  liệu tạm rồi xuất PDF. Không group/undo hay mở khoá trong tài liệu nguồn.
+//  liệu tạm rồi lưu AI (entry PDF cũ vẫn dùng chung cơ chế an toàn).
+//  Không group/undo hay mở khoá trong tài liệu nguồn.
 // ============================================================
-var dcCtlOffsetPdfVersion = 2;
+var dcCtlOffsetPdfVersion = 3;
 
 // Gọi ở cuối lượt dàn. Trả về đuôi "||CTLPDF:{...}" để gắn sau chuỗi OK;
 // panel đọc đuôi này để biết bài có những khổ nào, mỗi khổ gồm những tờ nào
@@ -20019,17 +20131,26 @@ function dcCtlOffsetPdfPlan(doc, faces, abPos) {
   }
 }
 
-// Lưu PDF cho MỘT khổ (một nút trên panel).
+// Lưu AI cho MỘT khổ (một nút trên panel); giữ entry PDF cho caller cũ.
 //   totalText : số artboard của tài liệu lúc dàn xong.
 //   jobsText  : "TÊN=artboard,artboard@rộngxcao|..." (pt), mỗi phần là một
 //               file. Ví dụ "RUOT 2=3,4@2432.13x1808.5|RUOT 3=5,6@2432.13x1808.5".
 // Số artboard và khổ từng artboard được so lại với lúc dàn; tài liệu đã bị
 // đổi thì báo lỗi chứ không lưu nhầm tờ.
 function dcLuuCtlOffsetPDF(totalText, jobsText) {
+  return dcLuuCtlOffsetFiles(totalText, jobsText, "PDF");
+}
+function dcLuuCtlOffsetAI(totalText, jobsText) {
+  return dcLuuCtlOffsetFiles(totalText, jobsText, "AI");
+}
+function dcLuuCtlOffsetFiles(totalText, jobsText, format) {
   try {
+    var isAI = format === "AI";
+    var formatLabel = isAI ? "AI" : "PDF";
+    var extension = isAI ? ".ai" : ".pdf";
     if (app.documents.length === 0) return "ERR: Chưa mở tài liệu nào.";
     var sourceDoc = app.activeDocument;
-    var CHANGED = " Tài liệu đã khác lúc dàn — hãy dàn lại rồi lưu PDF.";
+    var CHANGED = " Tài liệu đã khác lúc dàn — hãy dàn lại rồi lưu " + formatLabel + ".";
     var artboardCount = sourceDoc.artboards.length;
     var total = parseInt(String(totalText), 10);
     if (isNaN(total) || total !== artboardCount)
@@ -20048,7 +20169,7 @@ function dcLuuCtlOffsetPDF(totalText, jobsText) {
     for (var p = 0; p < parts.length; p++) {
       if (parts[p] === "") continue;
       var m = /^([^=@|]+)=([0-9,]+)@([0-9.]+)x([0-9.]+)$/.exec(parts[p]);
-      if (!m) return "ERR: Thiếu thông tin tờ cần lưu — hãy dàn lại rồi lưu PDF.";
+      if (!m) return "ERR: Thiếu thông tin tờ cần lưu — hãy dàn lại rồi lưu " + formatLabel + ".";
       var baseName = m[1]
         .replace(/^\s+|\s+$/g, "")
         .replace(/[\\\/:*?"<>|]/g, "-");
@@ -20070,19 +20191,19 @@ function dcLuuCtlOffsetPDF(totalText, jobsText) {
             "ERR: Artboard " + no + " không còn đúng khổ của " + baseName + "." + CHANGED
           );
         indices.push(no - 1);
-        pages.push({ index: no - 1, rect: rect.slice(0) });
+        pages.push({ index: no - 1, rect: rect.slice(0), name: sourceDoc.artboards[no - 1].name });
       }
       if (baseName === "" || indices.length === 0)
-        return "ERR: Thiếu thông tin tờ cần lưu — hãy dàn lại rồi lưu PDF.";
+        return "ERR: Thiếu thông tin tờ cần lưu — hãy dàn lại rồi lưu " + formatLabel + ".";
       for (var duplicateJob = 0; duplicateJob < jobs.length; duplicateJob++)
-        if (jobs[duplicateJob].name.toLowerCase() === (baseName + ".pdf").toLowerCase())
-          return "ERR: Hai tờ trùng tên PDF: " + baseName + ".";
-      jobs.push({ name: baseName + ".pdf", indices: indices, pages: pages, file: null });
+        if (jobs[duplicateJob].name.toLowerCase() === (baseName + extension).toLowerCase())
+          return "ERR: Hai tờ trùng tên " + formatLabel + ": " + baseName + ".";
+      jobs.push({ name: baseName + extension, indices: indices, pages: pages, file: null });
     }
     if (jobs.length === 0) return "ERR: Không có tờ nào để lưu.";
 
-    var folder = dcChonThuMucLuuPDF("Chọn nơi lưu PDF CTL Offset");
-    if (!folder) return "ERR: Chưa chọn thư mục lưu PDF - đã huỷ.";
+    var folder = dcChonThuMucLuuPDF("Chọn nơi lưu " + formatLabel + " CTL Offset");
+    if (!folder) return "ERR: Chưa chọn thư mục lưu " + formatLabel + " - đã huỷ.";
     for (var jf = 0; jf < jobs.length; jf++) {
       jobs[jf].file = new File(folder.fsName + "/" + jobs[jf].name);
       if (jobs[jf].file.exists)
@@ -20151,6 +20272,17 @@ function dcLuuCtlOffsetPDF(totalText, jobsText) {
       } catch (e7) {}
       return opt;
     }
+    function makeAiOptions() {
+      var opt = new IllustratorSaveOptions();
+      // AI gốc, không sinh thêm phần PDF; vẫn giữ object/layer để chỉnh sửa.
+      opt.pdfCompatible = false;
+      opt.compressed = true;
+      opt.embedLinkedFiles = true;
+      opt.embedICCProfile = true;
+      // Giữ format AI hiện đại mặc định. Không dùng saveMultipleArtboards /
+      // artboardRange: đó là tách asset cho AI 13 trở về trước, không phải cặp A/B.
+      return opt;
+    }
 
     function copyLayer(node, targetLayer, page, targetRect, workDoc) {
       var copied = 0;
@@ -20202,10 +20334,12 @@ function dcLuuCtlOffsetPDF(totalText, jobsText) {
         );
         workDoc.activate();
         if (workDoc.artboards.length !== pages.length)
-          throw new Error("Không tạo đủ artboard tạm để xuất PDF.");
+          throw new Error("Không tạo đủ artboard tạm để xuất " + formatLabel + ".");
         var targetRects = [];
-        for (var ti = 0; ti < pages.length; ti++)
+        for (var ti = 0; ti < pages.length; ti++) {
           targetRects.push(workDoc.artboards[ti].artboardRect.slice(0));
+          if (isAI && pages[ti].name) workDoc.artboards[ti].name = pages[ti].name;
+        }
         var targetLayers = [];
         for (var tl = sourceLayers.length - 1; tl >= 0; tl--) {
           var targetLayer = workDoc.layers.add();
@@ -20219,7 +20353,7 @@ function dcLuuCtlOffsetPDF(totalText, jobsText) {
           if (!copiedCount) throw new Error("Artboard " + (pages[ci].index + 1) + " không có object để lưu.");
         }
         workDoc.activate();
-        workDoc.saveAs(job.file, makePdfOptions(pages.length));
+        workDoc.saveAs(job.file, isAI ? makeAiOptions() : makePdfOptions(pages.length));
         completed = true;
       } finally {
         try {
@@ -20271,11 +20405,11 @@ function dcLuuCtlOffsetPDF(totalText, jobsText) {
 
     if (saved.length === 0)
       return (
-        "ERR: Không lưu được PDF nào." +
+        "ERR: Không lưu được " + formatLabel + " nào." +
         (saveErrors.length ? " " + saveErrors.join(" | ") : "")
       );
     var message =
-      "OK: Đã lưu " + saved.length + " PDF vào " + folder.fsName + ": " + saved.join(", ") + ".";
+      "OK: Đã lưu " + saved.length + " " + formatLabel + " vào " + folder.fsName + ": " + saved.join(", ") + ".";
     if (saveErrors.length)
       message += " Lỗi " + saveErrors.length + " file: " + saveErrors.join(" | ");
     return message;
@@ -20290,37 +20424,129 @@ function dcLuuCtlOffsetPDF(totalText, jobsText) {
 //  TEST: Dàn CATALOGUE KEO GÁY (dán keo gáy, in offset khổ lớn 65×86)
 //  Khác signature đóng gáy giữa: TUẦN TỰ, KHÔNG bóp, KHÔNG khe.
 //
-//  CHIA TAY (tuần tự, mỗi tay 16 trang liên tiếp):
-//    - Ruột 1 = trang 1..16; ruột 2 = 17..32; ruột 3 = 33..48...
-//    - Mỗi tay = 2 mặt (A, B), mỗi mặt 2 hàng × 4 cột (8 trang).
-//    - Hàng trên xoay 180°, hàng dưới xuôi. Các trang SÁT NHAU (không khe).
+//  Mỗi tay giữ form 16 trang. A4: một tay/tờ AB; A5: hai tay liên tiếp
+//  trên cùng tờ AB (32 trang), xoay cụm 90° để vừa tờ, B đảo cụm/góc xoay.
+//  Dàn AB trước, phần dư tự trở TT16 (A5), rồi TT8/TT4 ở cuối.
 //
 //  CÔNG THỨC SIGNATURE 16 KEO GÁY (local 1..16 theo mỗi tay), khớp file mẫu:
 //    Mặt A: trên(180)=[5,12,9,8]  dưới=[4,13,16,1]
 //    Mặt B: trên(180)=[7,10,11,6] dưới=[2,15,14,3]
 //    (trang thật = base + local, base = 16*(tay-1))
 //
-//  BỐ TRÍ: mỗi tay 2 artboard: mặt A trái, mặt B phải.
+//  BỐ TRÍ: mỗi tờ AB 2 artboard: mặt A trái, mặt B phải.
 //  KÍCH THƯỚC: trang căn giữa ngang; mép trên bài dàn cách mép trên
 //              artboard 2.37cm. KHÔNG bóp.
 //  PON: tự vẽ theo hai form ruột 65×43 / 65×86, không hỏi chọn file.
 //  GHI CHÚ: "RUỘT N" (+ chữ thêm), vị trí như signature (mép trái vào 2cm,
 //           mép trên xuống 1.1cm). Điền mặt A của mỗi tay.
 //
-//  *** BẢN NHÁP - bìa KHÔNG dàn (tự dàn tay). Phần lẻ 4/8 tự trở làm sau. ***
+//  Bìa tự dàn tay; không bóp hoặc tự thêm trang trắng.
 //
 //  Cách dùng:
-//   1. Chọn N trang ruột theo thứ tự đọc (bội số của 16).
+//   1. Chọn N trang ruột theo thứ tự đọc (bội số của 4).
 //   2. File > Scripts > chạy script.
 //   3. Nhập kích thước 1 trang (cm).
 //   4. Tool tự vẽ PON đúng loại tờ.
 //   5. Nhập ghi chú (RUỘT N + chữ thêm).
 // ============================================================
 
-var dcKeoGayAutoPonVersion = 6;
+var dcKeoGayAutoPonVersion = 8;
+
+// A5 packs TWO unchanged A4-style 16-page signatures on one A/B sheet.
+// This is not a new 32-page folding signature. B reverses the block order
+// and rotation for horizontal sheet turning; partial sheets follow all AB.
+function dcKeoGayPlan(pageCount, smallA5) {
+  if (!(pageCount > 0) || pageCount % 4 !== 0)
+    throw new Error("So trang ruot phai la boi so cua 4.");
+  var sig = {
+    A: { top: [5, 12, 9, 8], bottom: [4, 13, 16, 1] },
+    B: { top: [7, 10, 11, 6], bottom: [2, 15, 14, 3] }
+  };
+  function block(base, side, rotation) {
+    var result = { top: [], bottom: [], rotation: rotation };
+    for (var c = 0; c < 4; c++) {
+      result.top.push(base + sig[side].top[c]);
+      result.bottom.push(base + sig[side].bottom[c]);
+    }
+    return result;
+  }
+  var faces = [], sheetNo = 0, capacity = smallA5 ? 32 : 16;
+  var full = Math.floor(pageCount / capacity), base;
+  for (var t = 0; t < full; t++) {
+    base = t * capacity;
+    sheetNo++;
+    var a = block(base, "A", 90), b = block(base, "B", -90);
+    var faceA = { type: "AB", sheetNo: sheetNo, label: "Ruột" + sheetNo + "-A" };
+    var faceB = { type: "AB", sheetNo: sheetNo, label: "Ruột" + sheetNo + "-B" };
+    if (smallA5) {
+      faceA.blocks = [a, block(base + 16, "A", 90)];
+      faceB.blocks = [block(base + 16, "B", -90), b];
+    } else {
+      faceA.top = a.top; faceA.bottom = a.bottom;
+      faceB.top = b.top; faceB.bottom = b.bottom;
+    }
+    faces.push(faceA, faceB);
+  }
+  var remainder = pageCount - full * capacity;
+  base = full * capacity;
+  if (smallA5 && remainder >= 16) {
+    sheetNo++;
+    faces.push({
+      type: "TT16", sheetNo: sheetNo, label: "Ruột" + sheetNo + " TT16",
+      blocks: [block(base, "A", 90), block(base, "B", -90)]
+    });
+    base += 16;
+    remainder -= 16;
+  }
+  // Preserve the existing nested TT8 + TT4 order for a 12-page remainder.
+  var first = base + 1, last = pageCount;
+  if (remainder >= 8) {
+    sheetNo++;
+    faces.push({
+      type: "TT8", sheetNo: sheetNo, label: "Ruột" + sheetNo + " TT8",
+      top: [last - 3, first + 3, first + 2, last - 2],
+      bottom: [last, first, first + 1, last - 1],
+      smallSelfTurn: !!smallA5
+    });
+    first += 4; last -= 4; remainder -= 8;
+  }
+  if (remainder === 4) {
+    sheetNo++;
+    faces.push({
+      type: "TT4", sheetNo: sheetNo, label: "Ruột" + sheetNo + " TT4",
+      row: [first, last, first + 1, last - 1]
+    });
+  }
+  return faces;
+}
+
+// Coordinates of the two rotated 16-page blocks, shared by render/tests.
+// Each block keeps its original SIG16 page order and fold directions.
+function dcKeoGayPackedGrid(face, pageW, pageH, rect, topGap) {
+  var width = face.blocks.length * 2 * pageH, height = 4 * pageW;
+  var left = (rect[0] + rect[2] - width) / 2, top = rect[1] - topGap;
+  var cells = [];
+  for (var bi = 0; bi < face.blocks.length; bi++) {
+    var block = face.blocks[bi], ccw = block.rotation === 90;
+    for (var r = 0; r < 2; r++) {
+      var row = r === 0 ? block.top : block.bottom;
+      for (var c = 0; c < 4; c++) {
+        var col = ccw ? r : 1 - r, rr = ccw ? 3 - c : c;
+        cells.push({
+          page: row[c], angle: (r === 0 ? 180 : 0) + block.rotation,
+          cx: left + (bi * 2 + col + 0.5) * pageH,
+          cy: top - (rr + 0.5) * pageW
+        });
+      }
+    }
+  }
+  return { left: left, top: top, width: width, height: height, cells: cells };
+}
 
 function dcRunKeoGay(wCm, hCm) {
+  var previousKeoCoordinates = app.coordinateSystem;
   try {
+    app.coordinateSystem = CoordinateSystem.DOCUMENTCOORDINATESYSTEM;
     var MM = 2.834645669;
 
     // ---------- BẢNG NHẬP KÍCH THƯỚC (cm) ----------
@@ -20377,6 +20603,17 @@ function dcRunKeoGay(wCm, hCm) {
     var PAGE_W = _si.w,
       PAGE_H = _si.h;
 
+    var SOURCE_PAGE_W = PAGE_W, SOURCE_PAGE_H = PAGE_H;
+    // Same A5 family/allowance as CTL staple imposition. Sideways sources
+    // are resized in their entered direction before turning to portrait.
+    var IS_SMALL_A5 = Math.min(PAGE_W, PAGE_H) <= 150 &&
+      Math.max(PAGE_W, PAGE_H) <= 211.5;
+    var SMALL_SOURCE_IS_LANDSCAPE = IS_SMALL_A5 && PAGE_W > PAGE_H;
+    if (SMALL_SOURCE_IS_LANDSCAPE) {
+      PAGE_W = SOURCE_PAGE_H;
+      PAGE_H = SOURCE_PAGE_W;
+    }
+
     var TOP_GAP = 23.7 * MM; // mép trên bài dàn cách mép trên artboard 2.37cm
 
     // PON is generated from the supplied 65x43 and 65x86 inner-sheet forms.
@@ -20397,15 +20634,7 @@ function dcRunKeoGay(wCm, hCm) {
       alert("Số trang phải là BỘI SỐ CỦA 4.\nĐang chọn: " + N);
       return "OK: (dừng)";
     }
-    var _du = N % 16;
-    if (_du !== 0 && _du !== 4 && _du !== 8 && _du !== 12) {
-      alert(
-        "Số trang không hợp lệ (dư " +
-          _du +
-          " khi chia 16).\nChỉ hỗ trợ dư 0/4/8/12.",
-      );
-      return "OK: (dừng)";
-    }
+    var faces = dcKeoGayPlan(N, IS_SMALL_A5);
 
     // ---------- Gom + sắp theo VỊ TRÍ (thứ tự đọc) ----------
     var arr = [];
@@ -20568,138 +20797,60 @@ function dcRunKeoGay(wCm, hCm) {
     //  BƯỚC 1: raster từng trang + phóng về PAGE_W x PAGE_H
     // ============================================================
     var processed = [];
-    for (var p = 0; p < pages.length; p++) {
-      var item = pages[p];
-      var s0 = sizeMM(item);
-      var frame = s0.b.slice(0);
-      var flat = dcFlattenForImposition(doc, item, frame, 300);
-      var gb;
-      try {
-        gb = flat.geometricBounds;
-      } catch (e) {
-        gb = null;
+    function prepareKeoGayPages() {
+      for (var p = 0; p < pages.length; p++) {
+        var item = pages[p];
+        var s0 = sizeMM(item);
+        var flat = dcFlattenForImposition(doc, item, s0.b.slice(0), 300);
+        var gb = flat.geometricBounds;
+        var cw = (gb[2] - gb[0]) / MM, ch = (gb[1] - gb[3]) / MM;
+        if (!(cw > 0 && ch > 0))
+          throw new Error("Khong do duoc kich thuoc trang ruot " + (p + 1));
+        flat.resize((SOURCE_PAGE_W / cw) * 100, (SOURCE_PAGE_H / ch) * 100);
+        if (SMALL_SOURCE_IS_LANDSCAPE) flat.rotate(90);
+        processed.push(flat);
       }
-      if (gb) {
-        var cw = (gb[2] - gb[0]) / MM,
-          ch = (gb[1] - gb[3]) / MM;
-        if (cw > 0 && ch > 0) {
-          try {
-            flat.resize((PAGE_W / cw) * 100, (PAGE_H / ch) * 100);
-          } catch (e) {}
-        }
-      }
-      processed.push(flat);
     }
 
     // ============================================================
-    //  BƯỚC 2: CHIA TAY + TỰ TRỞ
-    //  - Phần bội 16 (từ đầu): các tay AB tuần tự (signature 16 keo gáy).
-    //  - Phần dư (cuối): tự trở lồng nhau (TT8 lớp ngoài, TT4 lớp trong).
-    //    dư 12 = TT8 + TT4; dư 8 = TT8; dư 4 = TT4.
-    //  *** SỬA Ở ĐÂY nếu số trang lệch ô ***
-    //  Công thức signature 16 AB (local 1..16, trang thật = base + local):
+    //  A4: 16 pages per A/B sheet. A5: two SIG16 blocks, 32 per A/B sheet.
+    //  Remaining A5 pages use TT16, then the legacy nested TT8/TT4 forms.
     // ============================================================
-    var SIG16 = {
-      A: { top: [5, 12, 9, 8], bottom: [4, 13, 16, 1] }, // top xoay 180
-      B: { top: [7, 10, 11, 6], bottom: [2, 15, 14, 3] },
-    };
-
-    //  faces[]: mỗi face = 1 artboard. Dùng TRANG THẬT (1-based) trong top/bottom.
-    //  type: "AB" (65x86, 4 cột sát nhau) / "TT8" (65x86) / "TT4" (65x43, xoay 90).
-    //  sheetNo dùng cho ghi chú "RUỘT N".
-    var faces = [];
-    var du = N % 16;
-    var nAB = N - du; // số trang làm AB (bội 16), từ đầu
-    var numTay = nAB / 16;
-    var sheetNo = 0;
-
-    function mkAB(base, side) {
-      var s = SIG16[side];
-      var top = [],
-        bot = [];
-      for (var i = 0; i < 4; i++) {
-        top.push(base + s.top[i]);
-        bot.push(base + s.bottom[i]);
-      }
-      return { top: top, bottom: bot };
-    }
-    for (var ty = 0; ty < numTay; ty++) {
-      sheetNo++;
-      var base = ty * 16;
-      var A = mkAB(base, "A"),
-        B = mkAB(base, "B");
-      faces.push({
-        type: "AB",
-        sheetNo: sheetNo,
-        label: "Ruột" + sheetNo + "-A",
-        top: A.top,
-        bottom: A.bottom,
-      });
-      faces.push({
-        type: "AB",
-        sheetNo: sheetNo,
-        label: "Ruột" + sheetNo + "-B",
-        top: B.top,
-        bottom: B.bottom,
-      });
-    }
-
-    // Phần dư (cuối) -> tự trở lồng nhau. Khối [_a.._b] (trang thật 1-based).
-    var _a = nAB + 1,
-      _b = N;
-    var ttOrder = [];
-    if (du === 12) ttOrder = [8, 4];
-    else if (du === 8) ttOrder = [8];
-    else if (du === 4) ttOrder = [4];
-    for (var oi = 0; oi < ttOrder.length; oi++) {
-      sheetNo++;
-      if (ttOrder[oi] === 8) {
-        // TT8 (65x86): công thức đóng gáy giữa lớp ngoài khối dư.
-        faces.push({
-          type: "TT8",
-          sheetNo: sheetNo,
-          label: "Ruột" + sheetNo + " TT8",
-          top: [_b - 3, _a + 3, _a + 2, _b - 2],
-          bottom: [_b, _a, _a + 1, _b - 1],
-        });
-        _a += 4;
-        _b -= 4;
-      } else {
-        // TT4 (65x43): trái(_a trên, _b dưới), phải(_a+1 trên, _b-1 dưới), xoay 90.
-        faces.push({
-          type: "TT4",
-          sheetNo: sheetNo,
-          label: "Ruột" + sheetNo + " TT4",
-          row: [_a, _b, _a + 1, _b - 1],
-        }); // [trái-trên, trái-dưới, phải-trên, phải-dưới]
-        _a += 2;
-        _b -= 2;
-      }
-    }
     var numFaces = faces.length;
 
     // ============================================================
-    //  BƯỚC 3: IMPORT PON -> artboard theo pon -> đặt trang -> pon lên trên
+    //  Plan canvas -> create frames -> place pages -> generate PON on top.
     // ============================================================
-    var pb = processed[0].geometricBounds;
-    var pageWpt = pb[2] - pb[0],
-      pageHpt = pb[1] - pb[3];
+    var pageWpt = PAGE_W * MM, pageHpt = PAGE_H * MM;
 
     var GAP_ROW = 12 * MM;
     var GAP_COL = 20 * MM;
-    var MID_GAP_TT4 = 6 * MM; // khe TT4 (65x43) = 6mm
+    var MID_GAP_TT4 = (IS_SMALL_A5 ? 5 : 6) * MM; // A5 giống bấm ghim: khe 5mm
 
     var oldAb = doc.artboards.length;
 
-    // Fixed paper sizes from the supplied inner-sheet PON forms. The artwork
-    // size and all crop axes below remain calculated from PAGE_W/PAGE_H.
-    // Exact artboard sizes measured from the supplied PON forms, including
-    // their outer bleed. Do not round these down to the nominal paper size.
-    var ponMain = { W: 2436.1, H: 1775.62 };
-    var ponTT4 = { W: 1838.85, H: 1186.88 };
+    // Cùng khổ giấy thực với Đóng ghim giữa, đo qua TIM của 4 PON giấy.
+    // Tên form 65x86 / 65x43 / 43x32.5 không phải kích thước artboard.
+    var ponMain = { W: 858 * MM, H: 638 * MM };
+    var ponTT4 = { W: 648 * MM, H: 418 * MM };
+    var ponSmall4 = { W: 428 * MM, H: 313 * MM };
+    // Small TT8 is centred on 65x43 when the complete artwork AND marks fit.
+    // An oversized/bleed-inclusive TT8 uses the larger sheet, never squeezed.
+    var smallTT8Fits = pageWpt * 4 + 4 * MM + 1 <= ponTT4.W &&
+      pageHpt * 2 + 4 * MM + 1 <= ponTT4.H;
     function ponFor(face) {
-      return face.type === "TT4" ? ponTT4 : ponMain;
+      if (face.type === "TT4") return IS_SMALL_A5 ? ponSmall4 : ponTT4;
+      return face.smallSelfTurn && smallTT8Fits ? ponTT4 : ponMain;
     }
+    var tt4Paper = IS_SMALL_A5 ? ponSmall4 : ponTT4;
+    for (var paperCheck = 0; paperCheck < faces.length; paperCheck++)
+      if (faces[paperCheck].type === "TT4" &&
+          (2 * pageHpt + MID_GAP_TT4 > tt4Paper.W + 0.01 ||
+           2 * pageWpt + 4 * MM + 1 > tt4Paper.H))
+        throw new Error("Khổ trang không vừa tờ tự trở 4 trang; hãy giảm khổ trang.");
+    if (IS_SMALL_A5 && (pageHpt * 4 + 4 * MM + 1 > ponMain.W ||
+        pageWpt * 4 + TOP_GAP + 2 * MM + 1 > ponMain.H))
+      throw new Error("Kho trang A5 khong vua to AB 65 x 86; hay giam kho trang.");
 
     function createAutoPonLayer(layerName) {
       for (var li = doc.layers.length - 1; li >= 0; li--) {
@@ -20720,8 +20871,8 @@ function dcRunKeoGay(wCm, hCm) {
     }
 
     var artworkLayer = doc.activeLayer;
-    var paperPonLayer = createAutoPonLayer("Pon CTL Keo Gay tu dong");
-    var cutPonLayer = createAutoPonLayer("Pon cat CTL Keo Gay tu dong");
+    var paperPonLayer = null;
+    var cutPonLayer = null;
     try {
       doc.activeLayer = artworkLayer;
     } catch (restoreArtworkLayerError) {
@@ -20752,7 +20903,7 @@ function dcRunKeoGay(wCm, hCm) {
       return black;
     }
 
-    // Paper-edge PON copied by measurement from the two supplied forms.
+    // Cùng độ dài/nét với Bấm ghim; tim dấu nằm đúng 4 góc artboard.
     function addAutoPaperPon(layer, rect, isTT4) {
       var horizontalLength = isTT4 ? 14.173 : 18.766;
       var verticalLength = isTT4 ? 14.106 : 21.091;
@@ -20769,13 +20920,10 @@ function dcRunKeoGay(wCm, hCm) {
         mark.strokeColor = black;
         mark.strokeWidth = strokeWidth;
       }
-      // The original forms keep each stroke half its width inside the paper,
-      // rather than centring it on the artboard boundary.
-      var inset = strokeWidth / 2;
-      var left = rect[0] + inset,
-        top = rect[1] - inset,
-        right = rect[2] - inset,
-        bottom = rect[3] + inset;
+      var left = rect[0],
+        top = rect[1],
+        right = rect[2],
+        bottom = rect[3];
       draw(left, top, left + horizontalLength, top);
       draw(left, top, left, top - verticalLength);
       draw(right - horizontalLength, top, right, top);
@@ -20794,12 +20942,36 @@ function dcRunKeoGay(wCm, hCm) {
       var markLength = face.type === "TT4" ? 5.642 : 2 * MM;
       var black = makeBlack();
       function draw(p1, p2) {
+        // A5 TT4 có thể vừa khít chiều ngang tờ 42.8. Dấu ở biên phải
+        // giữ cả nét trong giấy, không để allowance cắt 0.2mm lòi ra ngoài.
+        function safePoint(p) {
+          return [Math.max(rect[0] + 0.5, Math.min(rect[2] - 0.5, p[0])),
+            Math.max(rect[3] + 0.5, Math.min(rect[1] - 0.5, p[1]))];
+        }
         var mark = layer.pathItems.add();
-        mark.setEntirePath([p1, p2]);
+        mark.setEntirePath([safePoint(p1), safePoint(p2)]);
         mark.filled = false;
         mark.stroked = true;
         mark.strokeColor = black;
         mark.strokeWidth = 1;
+      }
+      if (face.blocks) {
+        var grid = dcKeoGayPackedGrid(face, pageWpt, pageHpt, rect, TOP_GAP);
+        // Đánh biên cả 4 cột để cắt ra các cụm 2 trang. Hai trục cột
+        // 1 và 3 thêm dấu ở trên/dưới (4 nét); không vẽ xuyên vào artwork.
+        var axes = [grid.left, grid.left + grid.width / 4,
+          grid.left + grid.width / 2, grid.left + grid.width * 3 / 4,
+          grid.left + grid.width];
+        var ys = [grid.top, grid.top - grid.height / 2, grid.top - grid.height];
+        for (var ax = 0; ax < axes.length; ax++) {
+          draw([axes[ax], ys[0] + markLength], [axes[ax], ys[0]]);
+          draw([axes[ax], ys[2]], [axes[ax], ys[2] - markLength]);
+        }
+        for (var yy = 0; yy < ys.length; yy++) {
+          draw([axes[0] - markLength, ys[yy]], [axes[0], ys[yy]]);
+          draw([axes[4], ys[yy]], [axes[4] + markLength, ys[yy]]);
+        }
+        return 16;
       }
       if (face.type === "TT4") {
         var acx4 = (rect[0] + rect[2]) / 2;
@@ -20834,7 +21006,8 @@ function dcRunKeoGay(wCm, hCm) {
       var left8 = acx8 - pageWpt * 2;
       var centre8 = acx8;
       var right8 = acx8 + pageWpt * 2;
-      var yTop8 = rect[1] - TOP_GAP;
+      var yTop8 = face.smallSelfTurn ?
+        (rect[1] + rect[3]) / 2 + pageHpt : rect[1] - TOP_GAP;
       var yMiddle8 = yTop8 - pageHpt;
       var yBottom8 = yTop8 - pageHpt * 2;
       var axes8 = [left8, centre8, right8];
@@ -20979,19 +21152,22 @@ function dcRunKeoGay(wCm, hCm) {
       }
     }
 
-    // Tạo artboard (chưa nhân bản pon).
-    for (var k = 0; k < numFaces; k++) {
-      try {
-        doc.artboards.add(abPos[k]);
-      } catch (e) {}
-    }
-    if (doc.artboards.length > numFaces) {
-      for (var a2 = oldAb - 1; a2 >= 0; a2--) {
-        try {
-          doc.artboards.remove(a2);
-        } catch (e) {}
+    // Create every result frame before consuming source pages. A canvas/API
+    // failure removes only frames from this run and keeps all source frames.
+    try {
+      for (var k = 0; k < numFaces; k++) {
+        var newBoard = doc.artboards.add(abPos[k]);
+        newBoard.name = faces[k].label;
       }
+    } catch (keoArtboardError) {
+      for (var rollbackAb = doc.artboards.length - 1; rollbackAb >= oldAb; rollbackAb--)
+        doc.artboards[rollbackAb].remove();
+      throw keoArtboardError;
     }
+    prepareKeoGayPages();
+    paperPonLayer = createAutoPonLayer("Pon CTL Keo Gay tu dong");
+    cutPonLayer = createAutoPonLayer("Pon cat CTL Keo Gay tu dong");
+    doc.activeLayer = artworkLayer;
 
     // ---------- HÀM ĐẶT TRANG ----------
     function centerItem(it, cx, cy) {
@@ -21029,9 +21205,19 @@ function dcRunKeoGay(wCm, hCm) {
       }
     }
     function placeFace48(face, pos) {
-      var cumTop = pos[1] - TOP_GAP; // đỉnh cụm cách đỉnh artboard 2.37cm
+      var cumTop = face.smallSelfTurn ?
+        (pos[1] + pos[3]) / 2 + pageHpt : pos[1] - TOP_GAP;
       placeRow4(face.top, true, pos, cumTop, true);
       placeRow4(face.bottom, false, pos, cumTop, false);
+    }
+    function placePackedFace(face, pos) {
+      var grid = dcKeoGayPackedGrid(face, pageWpt, pageHpt, pos, TOP_GAP);
+      for (var ci = 0; ci < grid.cells.length; ci++) {
+        var cell = grid.cells[ci], it = processed[cell.page - 1];
+        if (!it) throw new Error("Thieu trang ruot " + cell.page);
+        it.rotate(cell.angle);
+        centerItem(it, cell.cx, cell.cy);
+      }
     }
     //  TT4 (65x43): 2 cụm 2-trang, xoay 90 (trái CCW, phải CW), căn giữa, khe 0.76cm.
     function buildPair(pageL, pageR) {
@@ -21097,7 +21283,8 @@ function dcRunKeoGay(wCm, hCm) {
     }
 
     for (var ff = 0; ff < numFaces; ff++) {
-      if (faces[ff].type === "TT4") placeFace4(faces[ff], abPos[ff]);
+      if (faces[ff].blocks) placePackedFace(faces[ff], abPos[ff]);
+      else if (faces[ff].type === "TT4") placeFace4(faces[ff], abPos[ff]);
       else placeFace48(faces[ff], abPos[ff]);
     }
 
@@ -21105,7 +21292,7 @@ function dcRunKeoGay(wCm, hCm) {
     var cutPonCount = 0;
     for (var kp = 0; kp < numFaces; kp++) {
       var posP = abPos[kp];
-      var isTT4Pon = faces[kp].type === "TT4";
+      var isTT4Pon = ponFor(faces[kp]) !== ponMain;
       addAutoPaperPon(paperPonLayer, posP, isTT4Pon);
       cutPonCount += addAutoCutPon(cutPonLayer, faces[kp], posP);
     }
@@ -21123,11 +21310,13 @@ function dcRunKeoGay(wCm, hCm) {
     // ============================================================
     var hasTT4Ruot = false;
     var hasTT8Ruot = false;
+    var hasTT16Ruot = false;
     var hasABRuot = false;
     for (var noteFaceIndex = 0; noteFaceIndex < numFaces; noteFaceIndex++) {
       var noteFace = faces[noteFaceIndex];
       if (noteFace.type === "TT4") hasTT4Ruot = true;
       else if (noteFace.type === "TT8") hasTT8Ruot = true;
+      else if (noteFace.type === "TT16") hasTT16Ruot = true;
       else if (noteFace.type === "AB") hasABRuot = true;
     }
 
@@ -21150,19 +21339,28 @@ function dcRunKeoGay(wCm, hCm) {
       }
       var edTT4 = null;
       var edTT8 = null;
+      var edTT16 = null;
       var edAB = null;
       if (hasTT4Ruot) {
-        addRedLabel("Ghi chú TỰ TRỞ 65 × 43 (4 trang):");
+        addRedLabel(IS_SMALL_A5 ? "Ghi chú TỰ TRỞ 43 × 32,5 (4 trang):" :
+          "Ghi chú TỰ TRỞ 65 × 43 (4 trang):");
         edTT4 = w.add("edittext", undefined, "");
         edTT4.characters = 40;
       }
       if (hasTT8Ruot) {
-        addRedLabel("Ghi chú TỰ TRỞ 65 × 86 (8 trang):");
+        addRedLabel(IS_SMALL_A5 && smallTT8Fits ?
+          "Ghi chú TỰ TRỞ 65 × 43 (8 trang):" :
+          "Ghi chú TỰ TRỞ 65 × 86 (8 trang):");
         edTT8 = w.add("edittext", undefined, "");
         edTT8.characters = 40;
       }
+      if (hasTT16Ruot) {
+        addRedLabel("Ghi chú TỰ TRỞ 65 × 86 (16 trang):");
+        edTT16 = w.add("edittext", undefined, "");
+        edTT16.characters = 40;
+      }
       if (hasABRuot) {
-        addRedLabel("Ghi chú TỜ AB (16 trang, chỉ mặt A):");
+        addRedLabel("Ghi chú TỜ AB (" + (IS_SMALL_A5 ? 32 : 16) + " trang, chỉ mặt A):");
         edAB = w.add("edittext", undefined, "");
         edAB.characters = 40;
       }
@@ -21177,6 +21375,7 @@ function dcRunKeoGay(wCm, hCm) {
         res = {
           tt4: edTT4 ? edTT4.text : "",
           tt8: edTT8 ? edTT8.text : "",
+          tt16: edTT16 ? edTT16.text : "",
           ab: edAB ? edAB.text : "",
         };
         w.close();
@@ -21301,7 +21500,8 @@ function dcRunKeoGay(wCm, hCm) {
         }
       } catch (e) {}
     }
-    //  Ghi chú DỌC (TT4, 65x43): xoay 90 CCW, mép dưới lên 1.5cm, mép trái vào 0.9cm.
+    // Ghi chú dọc cho tờ nhỏ. A5 TT4 hết lề trái thì dùng dải trắng trên,
+    // vì thu tờ từ 65x43 về 43x32.5 không được để ghi chú đè vào bài.
     function addNote4(text, pos, isRed) {
       if (!text) return;
       try {
@@ -21323,6 +21523,24 @@ function dcRunKeoGay(wCm, hCm) {
         var tb = tf.visibleBounds;
         var targetLeft = pos[0] + 9 * MM;
         var targetBottom = pos[3] + 15 * MM;
+        var isSmall4Note = IS_SMALL_A5 && Math.abs(pos[2] - pos[0] - ponSmall4.W) < 0.01;
+        var small4GridLeft = (pos[0] + pos[2] - (2 * pageHpt + MID_GAP_TT4)) / 2;
+        if (isSmall4Note && targetLeft + tb[2] - tb[0] + 2 * MM > small4GridLeft) {
+          tf.rotate(-90);
+          tb = tf.visibleBounds;
+          var iw = icon ? icon.geometricBounds[2] - icon.geometricBounds[0] : 0;
+          var availableH = (pos[1] - pos[3] - 2 * pageWpt) / 2 - 3 * MM;
+          var availableW = pos[2] - pos[0] - 40 * MM - (icon ? iw + 3 : 0);
+          var noteScale = Math.min(1, availableH / (tb[1] - tb[3]), availableW / (tb[2] - tb[0]));
+          if (!(noteScale > 0) || iconH > availableH) throw new Error("Không đủ lề trắng để đặt ghi chú A5.");
+          if (noteScale < 1) tf.textRange.characterAttributes.size = 13 * noteScale;
+          tb = tf.visibleBounds;
+          var noteLeft = pos[0] + 20 * MM;
+          var noteTop = pos[1] - 0.5 * MM;
+          tf.translate(noteLeft + (icon ? iw + 3 : 0) - tb[0], noteTop - tb[1]);
+          if (icon) moveCenterTo(icon, noteLeft + iw / 2, noteTop - Math.max(iconH, tb[1] - tb[3]) / 2);
+          return;
+        }
         var textBottom = targetBottom + (icon ? iconH + 3 : 0);
         tf.translate(targetLeft - tb[0], textBottom - tb[3]);
         if (icon) {
@@ -21342,11 +21560,12 @@ function dcRunKeoGay(wCm, hCm) {
         var specificText = "";
         if (face.type === "TT4") specificText = note.tt4;
         else if (face.type === "TT8") specificText = note.tt8;
+        else if (face.type === "TT16") specificText = note.tt16;
         else if (face.type === "AB") specificText = note.ab;
         var isSpecificRed = specificText ? true : false;
         var txt =
           "RUỘT " + face.sheetNo + (specificText ? " " + specificText : "");
-        if (face.type === "TT4") addNote4(txt, abPos[ni], isSpecificRed);
+        if (ponFor(face) !== ponMain) addNote4(txt, abPos[ni], isSpecificRed);
         else addNote8(txt, abPos[ni], isSpecificRed);
       }
       try {
@@ -21355,16 +21574,24 @@ function dcRunKeoGay(wCm, hCm) {
       noteIconTemplate = null;
     }
 
+    var keoCleanup = dcRemoveOldCanvasArtboards(doc, oldAb);
+    // PDF lookup must use the same document coordinates as abPos, before
+    // finally restores the user's artboard-coordinate mode.
+    var keoPdfSuffix = dcCtlOffsetPdfPlan(doc, faces, abPos);
     app.redraw();
     alert(
       "Đã dàn keo gáy: " +
         numFaces +
         " artboard.\n" +
-        "AB tuần tự 16 trang/tay; phần dư tự trở (TT8/TT4) ở cuối.\n" +
+        (IS_SMALL_A5 ?
+          "A5: 32 trang/tờ AB (2 tay 16); phần dư tự trở TT16/TT8/TT4.\n" :
+          "A4: 16 trang/tờ AB; phần dư tự trở TT8/TT4.\n") +
         "PON tu dong nam tren cung. Ghi chu RUOT N da dien (mat A).",
     );
   } catch (e) {
     return "ERR: keo gáy: " + e.toString();
+  } finally {
+    app.coordinateSystem = previousKeoCoordinates;
   }
   // Kèm danh sách khổ vừa dàn để panel hiện nút Lưu PDF cho từng khổ.
   return (
@@ -21372,8 +21599,11 @@ function dcRunKeoGay(wCm, hCm) {
     usedColumns +
     " cot canvas; da ve " +
     cutPonCount +
-    " net PON cat." +
-    dcCtlOffsetPdfPlan(doc, faces, abPos)
+    " net PON cat. " +
+    (IS_SMALL_A5 ? "A5: 32 trang/to AB (2 tay 16), AB truoc, tu tro sau." :
+      "A4: 16 trang/to AB, AB truoc, tu tro sau.") +
+    (keoCleanup.warning ? " " + keoCleanup.warning : "") +
+    keoPdfSuffix
   );
 }
 
@@ -22271,11 +22501,117 @@ function dcXoaPreviewMau(pathsText) {
 }
 
 // ---------- FILE 2: ÁP MẪU ----------
-var dcDanTheoMauVersion = 1;
+var dcDanTheoMauVersion = 2;
+// Read only the small AI metadata prefix: never probe limits by creating or
+// resizing artboards in the user's document. Adjust the saved canvas origin
+// for a changed document ruler, keeping KTS's conservative 14400 pt span.
+function dcDanTheoMauReadCanvasBounds(doc) {
+  var file = null, opened = false;
+  try {
+    file = new File(doc.fullName);
+    if (!file.exists || !/\.ai$/i.test(file.name)) return null;
+    file.encoding = "BINARY";
+    opened = file.open("r");
+    if (!opened) return null;
+    var header = file.read(1024 * 1024);
+    var number = "([+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:[eE][+-]?\\d+)?)";
+    var template = new RegExp("%AI3_TemplateBox:\\s*" + number + "\\s+" + number + "\\s+" + number + "\\s+" + number).exec(header);
+    var page = new RegExp("%%PageOrigin:\\s*" + number + "\\s+" + number).exec(header);
+    if (!template || !page) return null;
+    var x = Number(template[1]), y = Number(template[2]);
+    // A non-empty template layer has a real bounds box, not the canvas marker.
+    if (Math.abs(x - Number(template[3])) > 0.01 ||
+        Math.abs(y - Number(template[4])) > 0.01) return null;
+    var livePage = doc.pageOrigin, half = 7200;
+    x += livePage[0] - Number(page[1]);
+    y += livePage[1] - Number(page[2]);
+    if (doc.scaleFactor > 0 && doc.scaleFactor < 1) half /= doc.scaleFactor;
+    if (!isFinite(x) || !isFinite(y) || !isFinite(half)) return null;
+    return [x - half, y + half, x + half, y - half];
+  } catch (readError) {
+    // Unsaved/unsupported files retain the legacy KTS origin. Native artboard
+    // creation is still guarded and rolls back if that canvas is unavailable.
+    return null;
+  } finally {
+    if (opened) file.close();
+  }
+}
+// Pure canvas planning: same upper-left start and 10 mm sheet gap as KTS.
+// Reserve a whole front/back pair before wrapping, even with different PON sizes.
+function dcDanTheoMauOutputPositions(frontW, frontH, backW, backH, count, scaleFactor, existingRects, sourceBounds, canvasRect) {
+  var MM = 2.834645669, EPS = 0.01, halfSize = 7200, gap = 10 * MM;
+  var twoSided = backW !== null && backW !== undefined;
+  if (isFinite(scaleFactor) && scaleFactor > 0 && scaleFactor < 1)
+    halfSize /= scaleFactor;
+  var left = -halfSize + gap, top = halfSize - gap;
+  var right = halfSize - gap, bottom = -halfSize + gap;
+  if (canvasRect) {
+    left = canvasRect[0] + gap; top = canvasRect[1] - gap;
+    right = canvasRect[2] - gap; bottom = canvasRect[3] + gap;
+  }
+  var bundleW = frontW, bundleH = frontH;
+  if (twoSided) {
+    bundleW += gap + backW;
+    bundleH = Math.max(frontH, backH);
+  }
+  if (!isFinite(frontW) || !isFinite(frontH) || frontW <= 0 || frontH <= 0 ||
+      (twoSided && (!isFinite(backW) || !isFinite(backH) || backW <= 0 || backH <= 0)) ||
+      !isFinite(count) || count < 1 || Math.floor(count) !== count ||
+      bundleW > right - left + EPS || bundleH > top - bottom + EPS)
+    throw new Error("Khổ PON/cặp hai mặt vượt giới hạn canvas. Hãy giảm khổ hoặc mở Large Canvas.");
+  function overlaps(a, b) {
+    return a[0] < b[2] - EPS && a[2] > b[0] + EPS &&
+      a[3] < b[1] - EPS && a[1] > b[3] + EPS;
+  }
+  function contains(a, b) {
+    return a[0] <= b[0] + EPS && a[1] >= b[1] - EPS &&
+      a[2] >= b[2] - EPS && a[3] <= b[3] + EPS;
+  }
+  var occupied = [], positions = [], i;
+  for (i = 0; i < existingRects.length; i++) {
+    var existing = existingRects[i];
+    // Ignore a whole-canvas work frame, not a wide/narrow printed sheet.
+    if (existing[2] - existing[0] >= (right - left + 2 * gap) * 0.92 &&
+        existing[1] - existing[3] >= (top - bottom + 2 * gap) * 0.92) continue;
+    occupied.push(existing.slice(0));
+  }
+  if (sourceBounds) {
+    var covered = false;
+    for (i = 0; i < occupied.length; i++) {
+      if (contains(occupied[i], sourceBounds)) { covered = true; break; }
+    }
+    if (!covered) occupied.push(sourceBounds.slice(0));
+  }
+  var cursorLeft = left, cursorTop = top;
+  for (var sheet = 0; sheet < count; sheet++) {
+    var x = cursorLeft, y = cursorTop, reserved = false;
+    for (var attempt = 0; attempt < 5000; attempt++) {
+      if (x + bundleW > right + EPS) {
+        x = left; y -= bundleH + gap; continue;
+      }
+      if (y - bundleH < bottom - EPS)
+        throw new Error("Không còn chỗ trong canvas để tạo đủ tờ. Hãy bớt artboard cũ hoặc mở Large Canvas.");
+      var bundle = [x, y, x + bundleW, y - bundleH], blocker = null;
+      for (i = 0; i < occupied.length; i++) {
+        if (overlaps(bundle, occupied[i])) { blocker = occupied[i]; break; }
+      }
+      if (blocker) { x = blocker[2] + gap; continue; }
+      var front = [x, y, x + frontW, y - frontH], back = null;
+      if (twoSided)
+        back = [front[2] + gap, y, front[2] + gap + backW, y - backH];
+      positions.push({ frontRect: front, backRect: back });
+      occupied.push(bundle);
+      cursorLeft = x + bundleW + gap; cursorTop = y;
+      reserved = true; break;
+    }
+    if (!reserved)
+      throw new Error("Không tìm được vị trí trong canvas để đặt artboard mới.");
+  }
+  return positions;
+}
 function dcApMau(multiSourcePerArtboard) {
-  // Artboard coordinates are local to EACH active artboard. Reading a PON
-  // there, then applying those numbers in another document, moves the first
-  // result to the source's origin instead of the PON's document position.
+  // PON offsets, source bounds and canvas positions use document coordinates,
+  // independent of the active artboard or a custom ruler origin.
   var previousCoordinates = app.coordinateSystem;
   try {
     app.coordinateSystem = CoordinateSystem.DOCUMENTCOORDINATESYSTEM;
@@ -22835,7 +23171,6 @@ function dcApMauCore(multiSourcePerArtboard) {
   var sourceItems = [];
   for (var si = 0; si < sel.length; si++) sourceItems.push(sel[si]);
   var outLayer = outputLayer(doc);
-  clearPreviousOutput(outLayer, sourceItems);
   var errors = [];
   var filledSlotCount = 0,
     outputBatchCount = 0;
@@ -22933,13 +23268,56 @@ function dcApMauCore(multiSourcePerArtboard) {
     }
   }
 
-  // Lấy tâm artboard PON, không lấy tâm artwork. Nhờ vậy PON trắng vẫn
-  // tạo được artboard, còn artwork PON giữ đúng offset so với artboard.
-  var startCx = ponF.cx;
-  var startCy = ponF.cy;
-
-  var ARTBOARDS_PER_COLUMN = 15;
   var oldAb = doc.artboards.length;
+
+  function planOutputPositions(count) {
+    var existingRects = [], sourceBounds = null, scaleFactor = 1;
+    app.activeDocument = doc;
+    for (var ai = 0; ai < oldAb; ai++)
+      existingRects.push(doc.artboards[ai].artboardRect.slice(0));
+    for (var si = 0; si < sourceItems.length; si++) {
+      var sb = bnd(sourceItems[si]);
+      if (!sb) throw new Error("Không đo được biên dạng bài nguồn để tránh khi dàn.");
+      if (!sourceBounds) sourceBounds = sb.slice(0);
+      else {
+        sourceBounds[0] = Math.min(sourceBounds[0], sb[0]);
+        sourceBounds[1] = Math.max(sourceBounds[1], sb[1]);
+        sourceBounds[2] = Math.max(sourceBounds[2], sb[2]);
+        sourceBounds[3] = Math.min(sourceBounds[3], sb[3]);
+      }
+    }
+    try { scaleFactor = doc.scaleFactor; } catch (scaleError) {}
+    var canvasRect = dcDanTheoMauReadCanvasBounds(doc);
+    var backW = null, backH = null;
+    if (ponB) { backW = ponB.W; backH = ponB.H; }
+    return dcDanTheoMauOutputPositions(ponF.W, ponF.H, backW, backH,
+      count, scaleFactor, existingRects, sourceBounds, canvasRect);
+  }
+
+  function canvasFailure(error) {
+    removePonCopy(ponF);
+    removePonCopy(ponB);
+    try { doc.selection = sourceItems; } catch (restoreSelectionError) {}
+    return "ERR: " + String(error);
+  }
+
+  function createPlannedArtboards(jobs) {
+    // A failed add must not silently lose a sheet or clear previous artwork.
+    try {
+      for (var ji = 0; ji < jobs.length; ji++)
+        addAB(jobs[ji].cx, jobs[ji].cy, jobs[ji].pon.W, jobs[ji].pon.H);
+    } catch (createError) {
+      for (var ai = doc.artboards.length - 1; ai >= oldAb; ai--) {
+        try { doc.artboards.remove(ai); } catch (removeError) {}
+      }
+      throw new Error("Không tạo được đủ artboard đã tính trong canvas: " + createError);
+    }
+    // Keep the temporary PON prototypes needed for filling the new sheets.
+    var keep = sourceItems.slice(0);
+    if (ponF.dup) keep.push(ponF.dup);
+    if (ponB && ponB.dup) keep.push(ponB.dup);
+    clearPreviousOutput(outLayer, keep);
+  }
 
   // Một job tạo một artboard. Ở chế độ nhiều mẫu, mỗi slot nhận nguồn tương ứng;
   // ở chế độ gốc, tất cả slot dùng cùng một nguồn.
@@ -23139,9 +23517,7 @@ function dcApMauCore(multiSourcePerArtboard) {
   }
 
   function addAB(cx, cy, w, h) {
-    try {
-      doc.artboards.add([cx - w / 2, cy + h / 2, cx + w / 2, cy - h / 2]);
-    } catch (e) {}
+    doc.artboards.add([cx - w / 2, cy + h / 2, cx + w / 2, cy - h / 2]);
   }
 
   // Nguồn được đọc theo thứ tự từ trên xuống, trong cùng hàng từ trái sang phải.
@@ -23262,22 +23638,24 @@ function dcApMauCore(multiSourcePerArtboard) {
       ? buildSourceBatches(orderedSources, blocks.F.slots.length)
       : buildSingleSourceBatches(orderedSources, blocks.F.slots.length);
     outputBatchCount = sourceBatches.length;
+    var positions;
+    try { positions = planOutputPositions(sourceBatches.length); }
+    catch (planError) { return canvasFailure(planError); }
     var jobs = [];
     for (var bi = 0; bi < sourceBatches.length; bi++) {
-      var colI = Math.floor(bi / ARTBOARDS_PER_COLUMN);
-      var rowI = bi % ARTBOARDS_PER_COLUMN;
+      var rect = positions[bi].frontRect;
       jobs.push({
         sources: sourceBatches[bi].sources,
-        cx: startCx + colI * ponF.W,
-        cy: startCy - rowI * ponF.H,
+        cx: (rect[0] + rect[2]) / 2,
+        cy: (rect[1] + rect[3]) / 2,
         block: blocks.F,
         pon: ponF,
         tag: bi + 1,
       });
       filledSlotCount += sourceBatches[bi].extra;
     }
-    for (var ji = 0; ji < jobs.length; ji++)
-      addAB(jobs[ji].cx, jobs[ji].cy, ponF.W, ponF.H);
+    try { createPlannedArtboards(jobs); }
+    catch (createError) { return canvasFailure(createError); }
     for (var jj = 0; jj < jobs.length; jj++)
       danMotCon(
         jobs[jj].block,
@@ -23359,18 +23737,17 @@ function dcApMauCore(multiSourcePerArtboard) {
         );
     outputBatchCount = pairBatches.length;
 
-    var stepX = ponF.W + ponB.W;
+    var pairPositions;
+    try { pairPositions = planOutputPositions(pairBatches.length); }
+    catch (planError) { return canvasFailure(planError); }
     var jobs2 = [];
     for (var pi2 = 0; pi2 < pairBatches.length; pi2++) {
-      var colP = Math.floor(pi2 / ARTBOARDS_PER_COLUMN);
-      var rowP = pi2 % ARTBOARDS_PER_COLUMN;
-      var cyRow = startCy - rowP * ponF.H;
-      var cxF = startCx + colP * stepX;
-      var cxB = cxF + ponF.W;
+      var frontRect = pairPositions[pi2].frontRect;
+      var backRect = pairPositions[pi2].backRect;
       jobs2.push({
         sources: pairBatches[pi2].front,
-        cx: cxF,
-        cy: cyRow,
+        cx: (frontRect[0] + frontRect[2]) / 2,
+        cy: (frontRect[1] + frontRect[3]) / 2,
         block: blocks.F,
         pon: ponF,
         tag: pi2 * 2 + 1,
@@ -23379,8 +23756,8 @@ function dcApMauCore(multiSourcePerArtboard) {
       });
       jobs2.push({
         sources: pairBatches[pi2].back,
-        cx: cxB,
-        cy: cyRow,
+        cx: (backRect[0] + backRect[2]) / 2,
+        cy: (backRect[1] + backRect[3]) / 2,
         block: blocks.B,
         pon: ponB,
         tag: pi2 * 2 + 2,
@@ -23389,8 +23766,8 @@ function dcApMauCore(multiSourcePerArtboard) {
       });
       filledSlotCount += pairBatches[pi2].extra * 2;
     }
-    for (var ja = 0; ja < jobs2.length; ja++)
-      addAB(jobs2[ja].cx, jobs2[ja].cy, jobs2[ja].w, jobs2[ja].h);
+    try { createPlannedArtboards(jobs2); }
+    catch (createError) { return canvasFailure(createError); }
     for (var jb = 0; jb < jobs2.length; jb++)
       danMotCon(
         jobs2[jb].block,
@@ -23408,13 +23785,12 @@ function dcApMauCore(multiSourcePerArtboard) {
   try {
     if (ponB && ponB.dup) ponB.dup.remove();
   } catch (e) {}
-  if (doc.artboards.length > oldAb) {
-    for (var a2 = oldAb - 1; a2 >= 0; a2--) {
-      try {
-        doc.artboards.remove(a2);
-      } catch (e) {}
-    }
-  }
+  var artboardCleanupWarning = "";
+  if (errors.length === 0) {
+    var cleanup = dcRemoveOldCanvasArtboards(doc, oldAb);
+    artboardCleanupWarning = cleanup.warning;
+    try { doc.artboards.setActiveArtboardIndex(cleanup.firstNewIndex); } catch (selectNewBoardError) {}
+  } else artboardCleanupWarning = " Chưa xóa artboard cũ vì dàn còn lỗi.";
 
   // Giữ toàn bộ artwork vừa dàn ở trạng thái chọn để chạy Đặt pon ngay.
   try {
@@ -23459,6 +23835,7 @@ function dcApMauCore(multiSourcePerArtboard) {
       filledSlotCount +
       " slot còn thiếu bằng con cuối rồi gần cuối của từng lô nguồn.";
   if (errors.length > 0) msg += "\n\nLưu ý:\n- " + errors.join("\n- ");
+  msg += artboardCleanupWarning;
   alert(msg);
   return (
     "OK: " +
@@ -23476,7 +23853,7 @@ function dcApMauCore(multiSourcePerArtboard) {
         " cặp artboard (" +
         (useMultiSource ? "nhiều mẫu/1 artboard" : "1 mẫu/1 artboard") +
         ")." +
-        (errors.length ? " (" + errors.length + " lưu ý)" : ""))
+        (errors.length ? " (" + errors.length + " lưu ý)" : "")) + artboardCleanupWarning
   );
 }
 

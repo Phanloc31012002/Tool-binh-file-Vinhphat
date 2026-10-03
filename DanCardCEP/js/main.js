@@ -1364,11 +1364,18 @@
     // ExtendScript hiểu \U \A... là escape rồi nuốt mất dấu \).
     return "'" + String(s).replace(/\\/g, "\\\\").replace(/'/g, "\\'") + "'";
   }
+  function loadAutoCutMarksJsx() {
+    try {
+      var extensionRoot = cs.getSystemPath(SystemPath.EXTENSION).replace(/\\/g, "/");
+      var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
+      return "if (typeof dcThemDauCatTuDong !== 'function' || typeof dcAutoCutMarksVersion === 'undefined' || dcAutoCutMarksVersion < 1) { $.evalFile(" + jsStr(jsxPath) + "); } ";
+    } catch (e) { return ""; }
+  }
   function loadDanTheoMauJsx() {
     try {
       var extensionRoot = cs.getSystemPath(SystemPath.EXTENSION).replace(/\\/g, "/");
       var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
-      return "if (typeof dcApMau !== 'function' || typeof dcDanTheoMauVersion === 'undefined' || dcDanTheoMauVersion < 1) { $.evalFile(" + jsStr(jsxPath) + "); } ";
+      return "if (typeof dcApMau !== 'function' || typeof dcDanTheoMauVersion === 'undefined' || dcDanTheoMauVersion < 2) { $.evalFile(" + jsStr(jsxPath) + "); } ";
     } catch (e) { return ""; }
   }
   function loadDanToiUuJsx() {
@@ -1381,10 +1388,10 @@
       var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
       var danBeBridgePath = extensionRoot + "/jsx/dan_be_bridge.jsx";
       return (
-        "if (typeof dcDanToiUu !== 'function' || typeof dcCopyToiUuNoteToAllArtboards !== 'function' || typeof dcCopyToiUuNoteToOddArtboards !== 'function' || typeof dcDanToiUuVersion === 'undefined' || dcDanToiUuVersion < 17) { $.evalFile(" +
+        "if (typeof dcDanToiUu !== 'function' || typeof dcCopyToiUuNoteToAllArtboards !== 'function' || typeof dcCopyToiUuNoteToOddArtboards !== 'function' || typeof dcDanToiUuVersion === 'undefined' || dcDanToiUuVersion < 18) { $.evalFile(" +
         jsStr(jsxPath) +
         "); } " +
-        "if (typeof dcDanBePrepare !== 'function' || typeof dcDanBeRender !== 'function' || typeof dcDanBeNestingVersion === 'undefined' || dcDanBeNestingVersion < 7) { $.evalFile(" +
+        "if (typeof dcDanBePrepare !== 'function' || typeof dcDanBeRender !== 'function' || typeof dcDanBeNestingVersion === 'undefined' || dcDanBeNestingVersion < 8) { $.evalFile(" +
         jsStr(danBeBridgePath) + "); } "
       );
     } catch (e) {
@@ -1458,7 +1465,7 @@
         .replace(/\\/g, "/");
       var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
       return (
-        "if (typeof dcRunKeoGay !== 'function' || typeof dcKeoGayAutoPonVersion === 'undefined' || dcKeoGayAutoPonVersion < 6) { $.evalFile(" +
+        "if (typeof dcRunKeoGay !== 'function' || typeof dcKeoGayAutoPonVersion === 'undefined' || dcKeoGayAutoPonVersion < 8) { $.evalFile(" +
         jsStr(jsxPath) +
         "); } "
       );
@@ -1473,7 +1480,7 @@
         .replace(/\\/g, "/");
       var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
       return (
-        "if (typeof dcLuuCtlOffsetPDF !== 'function' || typeof dcCtlOffsetPdfVersion === 'undefined' || dcCtlOffsetPdfVersion < 2) { $.evalFile(" +
+        "if (typeof dcLuuCtlOffsetAI !== 'function' || typeof dcCtlOffsetPdfVersion === 'undefined' || dcCtlOffsetPdfVersion < 3) { $.evalFile(" +
         jsStr(jsxPath) +
         "); } "
       );
@@ -1488,7 +1495,7 @@
         .replace(/\\/g, "/");
       var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
       return (
-        "if (typeof dcDanTuTro !== 'function' || typeof dcDanTuTroVersion === 'undefined' || dcDanTuTroVersion < 10) { $.evalFile(" +
+        "if (typeof dcDanTuTro !== 'function' || typeof dcDanTuTroVersion === 'undefined' || dcDanTuTroVersion < 11) { $.evalFile(" +
         jsStr(jsxPath) +
         "); } "
       );
@@ -1555,7 +1562,7 @@
       show(outCutMarks, "Đang tạo dấu cắt…");
       btnCutMarks.disabled = true;
       cs.evalScript(
-        "dcThemDauCatTuDong(" +
+        loadAutoCutMarksJsx() + "dcThemDauCatTuDong(" +
           jsStr(length) +
           ", " +
           jsStr(edge) +
@@ -1765,12 +1772,13 @@
 
   var btnCopyToiUuNote = document.getElementById("btnCopyToiUuNote");
   var btnCopyToiUuNoteOneSide = document.getElementById("btnCopyToiUuNoteOneSide");
+  var outCopyDanMauNote = document.getElementById("outCopyDanMauNote");
   function wireToiUuNoteButton(button, twoSided) {
-    if (!button || !outDanToiUu) return;
+    if (!button || !outCopyDanMauNote) return;
     button.addEventListener("click", function () {
       var notePrefixInput = document.getElementById("autoSheetNotePrefixes");
       var notePrefixes = notePrefixInput ? notePrefixInput.value || "" : "";
-      show(outDanToiUu, twoSided ? "Đang điền ghi chú bài 2 mặt (1, 3, 5…)…" : "Đang điền ghi chú bài 1 mặt (1, 2, 3…)…");
+      show(outCopyDanMauNote, twoSided ? "Đang điền ghi chú bài 2 mặt (1, 3, 5…)…" : "Đang điền ghi chú bài 1 mặt (1, 2, 3…)…");
       if (btnCopyToiUuNote) btnCopyToiUuNote.disabled = true;
       if (btnCopyToiUuNoteOneSide) btnCopyToiUuNoteOneSide.disabled = true;
       cs.evalScript(
@@ -1781,7 +1789,7 @@
         function (res) {
           if (btnCopyToiUuNote) btnCopyToiUuNote.disabled = false;
           if (btnCopyToiUuNoteOneSide) btnCopyToiUuNoteOneSide.disabled = false;
-          handleRes(outDanToiUu, res);
+          handleRes(outCopyDanMauNote, res);
         },
       );
     });
@@ -3579,9 +3587,9 @@
   var btnOffset = document.getElementById("btnOffset");
   var outOffset = document.getElementById("outOffset");
 
-  // ---- Lưu PDF theo khổ (Đóng ghim giữa + Keo gáy) ----
+  // ---- Lưu AI theo khổ (Đóng ghim giữa + Keo gáy) ----
   //  Dàn xong, JSX gắn đuôi "||CTLPDF:{json}" sau chuỗi OK, liệt kê từng khổ
-  //  có trong bài. Bài có khổ nào thì hiện nút Lưu PDF của khổ đó, giống bảng
+  //  có trong bài. Bài có khổ nào thì hiện nút Lưu AI của khổ đó, giống bảng
   //  ghi chú chỉ hiện ô của loại tờ thật sự có.
   var offsetPdfBox = document.getElementById("offsetPdfBox");
   var offsetPdfButtons = document.getElementById("offsetPdfButtons");
@@ -3590,6 +3598,7 @@
     BIA: "Bìa",
     TT4: "Tự trở 4 trang",
     TT8: "Tự trở 8 trang",
+    TT16: "Tự trở 16 trang",
     AB: "Tờ AB",
     SMALL4: "Tự trở 4 trang",
     SMALL8: "Tự trở 8 trang",
@@ -3610,10 +3619,10 @@
       for (var i = 0; i < buttons.length; i++) buttons[i].disabled = disabled;
     }
     setDisabled(true);
-    show(outOffsetPdf, "Mở cửa sổ chọn nơi lưu PDF " + label + "…");
+    show(outOffsetPdf, "Mở cửa sổ chọn nơi lưu AI " + label + "…");
     cs.evalScript(
       loadOffsetPdfJsx() +
-        "dcLuuCtlOffsetPDF(" +
+        "dcLuuCtlOffsetAI(" +
         jsStr(total) +
         ", " +
         jsStr(jobsText) +
@@ -3632,7 +3641,7 @@
       var first = group.jobs[0];
       var label = OFFSET_PDF_LABELS[group.key] || group.key;
       var text =
-        "Lưu PDF " +
+        "Lưu AI " +
         label +
         " — " +
         offsetPdfCm(first.w) +
@@ -3640,7 +3649,7 @@
         offsetPdfCm(first.h) +
         " cm";
       if (group.jobs.length > 1) text += " (" + group.jobs.length + " file)";
-      // Mỗi phần "TÊN=artboard,artboard@rộngxcao" là một file PDF.
+      // Mỗi phần "TÊN=artboard,artboard@rộngxcao" là một file AI.
       var jobsText = group.jobs
         .map(function (job) {
           return job.name + "=" + job.ab.join(",") + "@" + job.w + "x" + job.h;

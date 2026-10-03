@@ -4,7 +4,7 @@
 // ExtendScript đọc path, tự tạo PON và render. Phần tối ưu hình học chạy ở
 // Chromium của CEP để Illustrator không bị treo khi thử nhiều bố cục.
 // ============================================================
-var dcDanBeNestingVersion = 7;
+var dcDanBeNestingVersion = 8;
 if (typeof dcDanBeJobs === "undefined") var dcDanBeJobs = {};
 if (typeof dcDanBeJobCounter === "undefined") var dcDanBeJobCounter = 1;
 
@@ -664,12 +664,21 @@ function dcDanBeRender(jobId, slotsText, reportText) {
         finishFace(backFace);
       }
     }
-    try { doc.artboards.setActiveArtboardIndex(firstNewIndex); } catch (artboardSelectError) {}
+    // Only now is the complete single/duplex batch rendered successfully.
+    // Remove old frames, never any source object/layer. No cleanup on failure.
+    var removedOldBoards = 0;
+    for (var oldBoard = firstNewIndex - 1; oldBoard >= 0; oldBoard--) {
+      try { doc.artboards[oldBoard].remove(); removedOldBoards++; } catch (oldBoardRemoveError) {}
+    }
+    var remainingOldBoards = firstNewIndex - removedOldBoards;
+    try { doc.artboards.setActiveArtboardIndex(remainingOldBoards); } catch (artboardSelectError) {}
     try { doc.selection = null; } catch (selectionClearError) {}
     var detail = separate ?
       ("Đã tạo " + sheets.length + (twoSided ? " cặp artboard trước/sau" : " artboard riêng") + "; tổng " + totalCount + " con. " + counts.join("; ") + ".") :
       (report && report.detail ? report.detail : ("Dàn silhouette thật: " + totalCount + " con."));
     detail += " Khuôn và Bài nằm ở layer riêng; PON giữ ở layer trên cùng.";
+    if (remainingOldBoards > 0)
+      detail += " Chưa xóa được " + remainingOldBoards + " artboard cũ; kết quả mới vẫn được giữ.";
     if (twoSided) {
       if (!separate) detail += " Đã tạo " + sheets.length + " cặp artboard trước/sau.";
       detail += " Hai mặt dùng chung bố cục khuôn, đối xứng lật ngang; không lật gương chữ/hình.";
