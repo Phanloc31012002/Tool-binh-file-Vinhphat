@@ -155,7 +155,7 @@ assert.match(html, /id="btnCopyToiUuNoteOneSide"[^]*?ﾄ進盻］ ghi chﾃｺ bﾃi 1 m蘯
 assert.match(html, /id="btnCopyToiUuNote"[^]*?ﾄ進盻］ ghi chﾃｺ bﾃi 2 m蘯ｷt/);
 assert.match(main, /wireToiUuNoteButton\(btnCopyToiUuNote, true\)/);
 assert.match(main, /wireToiUuNoteButton\(btnCopyToiUuNoteOneSide, false\)/);
-assert.match(main, /dcDanToiUuVersion < 19/);
+assert.match(main, /dcDanToiUuVersion < 22/);
 console.log(
   "KTS notes: all/odd boards, F1/F2 mapping, plain copy, font/offsets, even source, one board, validation, rollback and two-button wiring passed.",
 );

@@ -3688,7 +3688,7 @@ function dcDanToiUuV2(pageWidthText, pageHeightText) {
 //  - Artboard moi tu xep theo luoi canvas, trai sang phai roi xuong hang.
 //  - Tach hinh chu nhat de tan dung khoang trong chu L, van cat dao duoc.
 // ============================================================
-var dcDanToiUuVersion = 19;
+var dcDanToiUuVersion = 22;
 // Called only after successful rendering. Remove frames, never their artwork.
 function dcRemoveOldCanvasArtboards(doc, oldCount) {
   var removed = 0;
@@ -3958,27 +3958,529 @@ function dcKtsPairSourceRecords(records, epsilon) {
   return pairs;
 }
 
-// Bounded, deterministic mixed-rectangle search. Geometry is in pt, with
-// top-left local coordinates; the existing KTS renderer owns all app writes.
+// Find a straight-knife extraction sequence, minimizing cuts amongst the
+// explored slicing orders. Cuts never pass through any finished rectangle.
+// null means no proven sequence within this bounded search (not safe to use).
+function dcKtsKnifePlan(slots, width, height) {
+  var EPS = 0.01, budget = 30000, memo = {};
+  if(!slots.length || slots.length > 128) return null;
+  function lengthOf(cuts) {
+    var n = 0;
+    for(var i = 0; i < cuts.length; i++) n += cuts[i].axis === "H" ? cuts[i].w : cuts[i].h;
+    return n;
+  }
+  function trim(bounds, region) {
+    var r = {x:region.x,y:region.y,w:region.w,h:region.h}, cuts = [];
+    function add(axis,at) { cuts.push({axis:axis,at:at,x:r.x,y:r.y,w:r.w,h:r.h}); }
+    if(bounds.x > r.x+EPS) { add("V",bounds.x); r.w -= bounds.x-r.x; r.x = bounds.x; }
+    if(bounds.x+bounds.w < r.x+r.w-EPS) { add("V",bounds.x+bounds.w); r.w = bounds.w; }
+    if(bounds.y > r.y+EPS) { add("H",bounds.y); r.h -= bounds.y-r.y; r.y = bounds.y; }
+    if(bounds.y+bounds.h < r.y+r.h-EPS) { add("H",bounds.y+bounds.h); r.h = bounds.h; }
+    return cuts;
+  }
+  function cutPattern(cuts, region) {
+    function q(n) { return Math.round(n*100); }
+    var parts = [q(region.w),q(region.h)];
+    for(var i = 0; i < cuts.length; i++) {
+      var c = cuts[i];
+      parts.push(c.axis,q(c.at-(c.axis === "H" ? region.y : region.x)),
+        q(c.x-region.x),q(c.y-region.y),q(c.w),q(c.h));
+    }
+    return parts.join(",");
+  }
+  function solve(ids) {
+    var key = "p"+ids.join(",");
+    if(memo[key] !== undefined) return memo[key];
+    var x = width, y = height, right = 0, bottom = 0;
+    for(var i = 0; i < ids.length; i++) {
+      var s = slots[ids[i]];
+      x = Math.min(x,s.x); y = Math.min(y,s.y);
+      right = Math.max(right,s.x+s.w); bottom = Math.max(bottom,s.y+s.h);
+    }
+    var bounds = {x:x,y:y,w:right-x,h:bottom-y};
+    if(ids.length === 1) return memo[key] = {bounds:bounds,cuts:[],cutLength:0,workCount:0};
+    var best = null;
+    for(var axis = 0; axis < 2 && budget > 0; axis++) {
+      var edges = [], low = axis ? y : x, high = axis ? bottom : right;
+      for(i = 0; i < ids.length; i++) {
+        s = slots[ids[i]];
+        edges.push(axis ? s.y : s.x);
+        edges.push(axis ? s.y+s.h : s.x+s.w);
+      }
+      edges.sort(function(a,b) { return a-b; });
+      for(var ei = 0; ei < edges.length && budget > 0; ei++) {
+        var at = edges[ei];
+        if(at <= low+EPS || at >= high-EPS || (ei && Math.abs(at-edges[ei-1]) <= EPS)) continue;
+        var first = [], second = [], crossed = false;
+        for(i = 0; i < ids.length; i++) {
+          if(--budget <= 0) { crossed = true; break; }
+          s = slots[ids[i]];
+          var start = axis ? s.y : s.x, end = start+(axis ? s.h : s.w);
+          if(start < at-EPS && end > at+EPS) { crossed = true; break; }
+          if(end <= at+EPS) first.push(ids[i]); else second.push(ids[i]);
+        }
+        if(crossed || !first.length || !second.length) continue;
+        var a = solve(first), b = solve(second);
+        if(!a || !b) continue;
+        var ar = {x:x,y:y,w:axis ? bounds.w : at-x,h:axis ? at-y : bounds.h};
+        var br = {x:axis ? x : at,y:axis ? at : y,w:axis ? bounds.w : right-at,h:axis ? bottom-at : bounds.h};
+        var cut = {axis:axis ? "H" : "V",at:at,x:x,y:y,w:bounds.w,h:bounds.h};
+        var trimA = trim(a.bounds,ar), trimB = trim(b.bounds,br);
+        var ac = trimA.concat(a.cuts), bc = trimB.concat(b.cuts);
+        var cuts = [cut].concat(ac,bc);
+        var cutLength = lengthOf(cuts);
+        var workA = trimA.length+a.workCount, workB = trimB.length+b.workCount;
+        // Identical separated pieces can be stacked and cut together.
+        // Count this reusable sequence once rather than once per copy.
+        var workCount = 1+workA+workB;
+        if(cutPattern(ac,ar) === cutPattern(bc,br)) workCount = 1+Math.max(workA,workB);
+        var improve = false;
+        if(best === null) improve = true;
+        else if(workCount < best.workCount) improve = true;
+        else if(workCount === best.workCount) {
+          if(cuts.length < best.cuts.length) improve = true;
+          else if(cuts.length === best.cuts.length && cutLength < best.cutLength-EPS) improve = true;
+        }
+        if(improve) best = {bounds:bounds,cuts:cuts,cutLength:cutLength,workCount:workCount};
+      }
+    }
+    memo[key] = best;
+    return best;
+  }
+  var ids = [];
+  for(var i = 0; i < slots.length; i++) ids.push(i);
+  var result = solve(ids);
+  if(!result) return null;
+  var edgeCuts = trim(result.bounds,{x:0,y:0,w:width,h:height});
+  var cuts = edgeCuts.concat(result.cuts);
+  return {cuts:cuts,cutCount:cuts.length,cutLength:lengthOf(cuts),workCount:edgeCuts.length+result.workCount};
+}
+
+// Reorder whole, independently extractable bands. Equal cutting patterns
+// become adjacent blocks (e.g. all four large rows above the small row).
+// This changes neither the counts nor the physical dimensions of any model.
+function dcKtsKnifeBandVariants(slots) {
+  var EPS = 0.01, variants = [];
+  for(var axis = 0; axis < 2; axis++) {
+    var borders = [0];
+    for(var i = 0; i < slots.length; i++) {
+      var s = slots[i], start = axis ? s.x : s.y, end = start+(axis ? s.w : s.h);
+      borders.push(start,end);
+    }
+    borders.sort(function(a,b) { return a-b; });
+    var edges = [];
+    for(i = 0; i < borders.length; i++) {
+      var at = borders[i], crossed = false;
+      if(edges.length && at <= edges[edges.length-1]+EPS) continue;
+      for(var si = 0; si < slots.length; si++) {
+        s = slots[si]; start = axis ? s.x : s.y; end = start+(axis ? s.w : s.h);
+        if(start < at-EPS && end > at+EPS) { crossed = true; break; }
+      }
+      if(!crossed) edges.push(at);
+    }
+    if(edges.length < 3) continue;
+    var bands = [];
+    for(var ei = 1; ei < edges.length; ei++) {
+      var from = edges[ei-1], to = edges[ei], band = {from:from,size:to-from,cells:[],area:0,key:"",order:ei};
+      var signatures = [];
+      for(si = 0; si < slots.length; si++) {
+        s = slots[si]; start = axis ? s.x : s.y; end = start+(axis ? s.w : s.h);
+        if(start < from-EPS || end > to+EPS || (start+end)/2 < from || (start+end)/2 >= to) continue;
+        band.cells.push(s); band.area = Math.max(band.area,s.w*s.h);
+        signatures.push([Math.round((axis ? s.y : s.x)*100),Math.round((start-from)*100),
+          Math.round(s.w*100),Math.round(s.h*100)].join(","));
+      }
+      signatures.sort(); band.key = signatures.join("|"); bands.push(band);
+    }
+    bands.sort(function(a,b) {
+      if(Math.abs(a.area-b.area) > EPS) return b.area-a.area;
+      if(a.key < b.key) return -1;
+      if(a.key > b.key) return 1;
+      return a.order-b.order;
+    });
+    var reordered = [], offset = 0;
+    for(var bi = 0; bi < bands.length; bi++) {
+      var b = bands[bi];
+      for(si = 0; si < b.cells.length; si++) {
+        s = b.cells[si];
+        reordered.push({x:s.x+(axis ? offset-b.from : 0),y:s.y+(axis ? 0 : offset-b.from),
+          w:s.w,h:s.h,angle:s.angle,modelIndex:s.modelIndex});
+      }
+      offset += b.size;
+    }
+    if(reordered.length === slots.length) variants.push(reordered);
+  }
+  return variants;
+}
+
+// Bounded, deterministic guillotine search. Each free region is a separate
+// piece reachable by straight knife cuts, never an overlapping MaxRects hole.
+// Geometry is in pt; the existing KTS renderer owns all app writes.
+// Pure ES3 candidate generator; no Illustrator/document/application writes.
+// Return one slicing layout per exact quantity of the larger geometry group.
+// By default every original design is represented at least once. With
+// allowPartialCoverage, maximize the larger geometry before smaller fillers.
+// repeatLargest allows templates to repeat beyond the selected quantity.
+// Root should audit
+// and rank these candidates with dcKtsKnifePlan before using the renderer.
+// null is an explicit bounded-search fallback, never a claim of infeasibility.
+function dcKtsSlicingProfilePlan(specs, width, height, options) {
+  var EPS = 0.0001, groups = [], i, j, k;
+  var maxPoints = 56, maxStates = 2800, maxTransitions = 5000000;
+  var maxProfile = 40, maxCopies = 128;
+  options = options || {};
+  if (!specs || !specs.length || !(width > EPS && height > EPS) ||
+      !isFinite(width) || !isFinite(height)) return null;
+
+  for (i = 0; i < specs.length; i++) {
+    var spec = specs[i];
+    if (!spec || !(spec.w > EPS && spec.h > EPS) ||
+        !isFinite(spec.w) || !isFinite(spec.h)) return null;
+    var shortEdge = Math.min(spec.w, spec.h), longEdge = Math.max(spec.w, spec.h);
+    var found = -1;
+    for (j = 0; j < groups.length; j++) {
+      if (Math.abs(groups[j].w - longEdge) <= EPS &&
+          Math.abs(groups[j].h - shortEdge) <= EPS) { found = j; break; }
+    }
+    if (found < 0) {
+      if (groups.length >= 2) return null;
+      found = groups.length;
+      groups.push({w:longEdge, h:shortEdge, area:longEdge*shortEdge,
+        modelIndices:[], minimum:0});
+    }
+    groups[found].modelIndices.push(i);
+    groups[found].minimum++;
+  }
+  if (groups.length !== 2) return null;
+  // Exact-profile axis is the larger shape, keeping the quantity dimension
+  // small even when many copies of the smaller shape fit in a leftover strip.
+  if (groups[0].area < groups[1].area) groups = [groups[1], groups[0]];
+  var partial = options.allowPartialCoverage === true;
+  var minimumA = groups[0].minimum, minimumB = groups[1].minimum;
+  if (partial) { minimumA = 0; minimumB = 0; }
+  var maximumA = Math.floor((width*height - minimumB*groups[1].area + EPS) / groups[0].area);
+  if (partial && options.repeatLargest !== true) maximumA = Math.min(maximumA,groups[0].minimum);
+  if (partial && options.desiredGroupCounts && options.desiredGroupCounts[0] !== undefined &&
+      options.desiredGroupCounts[0] !== null)
+    maximumA = Math.min(maximumA,Math.floor(options.desiredGroupCounts[0]));
+  var copyBound = Math.floor(width*height / Math.min(groups[0].area, groups[1].area) + EPS);
+  if (maximumA < minimumA || maximumA > maxProfile || copyBound > maxCopies) return null;
+
+  var edges = [];
+  function addEdge(value) {
+    for (var ei = 0; ei < edges.length; ei++) if (Math.abs(edges[ei]-value) <= EPS) return;
+    edges.push(value);
+  }
+  addEdge(groups[0].w); addEdge(groups[0].h);
+  addEdge(groups[1].w); addEdge(groups[1].h);
+  edges.sort(function(a,b) { return a-b; });
+  function normalPositions(maximum) {
+    var positions = [0];
+    // Normal-pattern coordinates are sums of finished rectangle edge lengths.
+    // Insertion only occurs after the current position, so expansion is finite
+    // and ordered without quantizing/changing the finished artwork dimensions.
+    for (var pi = 0; pi < positions.length; pi++) {
+      for (var ei = 0; ei < edges.length; ei++) {
+        var at = positions[pi]+edges[ei];
+        if (at > maximum+EPS) continue;
+        if (Math.abs(at-maximum) <= EPS) at = maximum;
+        var place = 0;
+        while (place < positions.length && positions[place] < at-EPS) place++;
+        if (place < positions.length && Math.abs(positions[place]-at) <= EPS) continue;
+        if (positions.length >= maxPoints) return null;
+        positions.splice(place,0,at);
+      }
+    }
+    if (maximum > positions[positions.length-1]+EPS) {
+      if (positions.length >= maxPoints) return null;
+      positions.push(maximum);
+    }
+    return positions;
+  }
+  var xs = normalPositions(width), ys = normalPositions(height);
+  if (!xs || !ys || xs.length*ys.length > maxStates) return null;
+  function floorPosition(positions, available) {
+    var low = 0, high = positions.length-1;
+    while (low < high) {
+      var mid = Math.floor((low+high+1)/2);
+      if (positions[mid] <= available+EPS) low = mid;
+      else high = mid-1;
+    }
+    return low;
+  }
+  function q(value) { return Math.round(value*10000); }
+  function signatureLeaf(w,h,pw,ph) {
+    return "L,"+[q(w),q(h),q(pw),q(ph)].join(",");
+  }
+  function preferred(candidate, previous) {
+    if (!previous) return true;
+    if (candidate.small !== previous.small) return candidate.small > previous.small;
+    if (candidate.work !== previous.work) return candidate.work < previous.work;
+    if (candidate.cutCount !== previous.cutCount) return candidate.cutCount < previous.cutCount;
+    return candidate.cutLength < previous.cutLength-EPS;
+  }
+
+  var dp = [], transitions = 0, stopped = false;
+  for (i = 0; i < xs.length; i++) {
+    dp[i] = [];
+    for (j = 0; j < ys.length; j++) {
+      var regionW = xs[i], regionH = ys[j], records = [];
+      for (k = 0; k <= maximumA; k++) records.push(null);
+      records[0] = {small:0,total:0,tree:null,cutCount:0,cutLength:0,work:0,signature:"E"};
+      dp[i][j] = records;
+      for (var groupIndex = 0; groupIndex < 2; groupIndex++) {
+        var group = groups[groupIndex];
+        for (var orientation = 0; orientation < 2; orientation++) {
+          var leafW = group.w, leafH = group.h;
+          if (orientation === 1) { leafW = group.h; leafH = group.w; }
+          if (leafW > regionW+EPS || leafH > regionH+EPS) continue;
+          var aQuantity = 0, bQuantity = 1;
+          if (groupIndex === 0) { aQuantity = 1; bQuantity = 0; }
+          if (aQuantity > maximumA) continue;
+          var leafCuts = 0, leafLength = 0;
+          if (regionW > leafW+EPS) { leafCuts++; leafLength += regionH; }
+          if (regionH > leafH+EPS) { leafCuts++; leafLength += leafW; }
+          var leaf = {small:bQuantity,total:1,cutCount:leafCuts,cutLength:leafLength,work:leafCuts,
+            signature:signatureLeaf(regionW,regionH,leafW,leafH),
+            tree:{groupIndex:groupIndex,w:leafW,h:leafH,regionW:regionW,regionH:regionH}};
+          if (preferred(leaf,records[aQuantity])) records[aQuantity] = leaf;
+        }
+      }
+
+      // Trim an outer blank strip once for the whole existing layout, instead
+      // of forcing that blank space to appear in every leaf extraction route.
+      // This is important for aligned repeated rows and stacked knife work.
+      function adoptTrimmed(source,axis,capacity) {
+        var trimLength = regionH;
+        if (axis === "H") trimLength = regionW;
+        for (var quantity = 0; quantity <= maximumA; quantity++) {
+          var inner = source[quantity];
+          if (!inner || !inner.total) continue;
+          if (++transitions > maxTransitions) { stopped = true; return; }
+          var trimmed = {small:inner.small,total:inner.total,cutCount:inner.cutCount+1,
+            cutLength:inner.cutLength+trimLength,work:inner.work+1};
+          if (!preferred(trimmed,records[quantity])) continue;
+          trimmed.tree = {trimAxis:axis,at:capacity,a:inner.tree,regionW:regionW,regionH:regionH};
+          trimmed.signature = "T"+axis+","+[q(regionW),q(regionH),q(capacity)].join(",")+
+            "("+inner.signature+")";
+          records[quantity] = trimmed;
+        }
+      }
+      for (var tx = 1; tx < i && !stopped; tx++) adoptTrimmed(dp[tx][j],"V",xs[tx]);
+      for (var ty = 1; ty < j && !stopped; ty++) adoptTrimmed(dp[i][ty],"H",ys[ty]);
+      if (stopped) return null;
+
+      function combine(first, second, axis, at, secondCapacity, secondAvailable) {
+        var residualTrim = 0, residualLength = 0;
+        if (secondAvailable > secondCapacity+EPS) {
+          residualTrim = 1;
+          residualLength = regionH;
+          if (axis === "H") residualLength = regionW;
+        }
+        for (var qa = 0; qa <= maximumA; qa++) {
+          var left = first[qa];
+          if (!left || !left.total) continue;
+          for (var qb = 0; qa+qb <= maximumA; qb++) {
+            var right = second[qb];
+            if (!right || !right.total) continue;
+            if (++transitions > maxTransitions) { stopped = true; return; }
+            var total = left.total+right.total;
+            if (total > maxCopies) continue;
+            var outputQuantity = qa+qb, small = left.small+right.small;
+            if (options.desiredGroupCounts && options.desiredGroupCounts[1] !== undefined &&
+                options.desiredGroupCounts[1] !== null && small > options.desiredGroupCounts[1]) continue;
+            var previous = records[outputQuantity];
+            if (previous && small < previous.small) continue;
+            var cutCount = 1+left.cutCount+right.cutCount+residualTrim;
+            var work = 1+left.work+right.work+residualTrim;
+            // Equal already-separated pieces with identical complete routes
+            // may be stacked. Geometry, not artwork identity, defines equality.
+            if (!residualTrim && left.signature === right.signature) work = 1+Math.max(left.work,right.work);
+            var cutLength = regionH;
+            if (axis === "H") cutLength = regionW;
+            cutLength += left.cutLength+right.cutLength+residualLength;
+            var candidate = {small:small,total:total,cutCount:cutCount,cutLength:cutLength,work:work};
+            if (!preferred(candidate,previous)) continue;
+            candidate.tree = {axis:axis,at:at,a:left.tree,b:right.tree,
+              secondCapacity:secondCapacity,secondAvailable:secondAvailable,
+              regionW:regionW,regionH:regionH};
+            candidate.signature = axis+","+[q(regionW),q(regionH),q(at),q(secondCapacity)].join(",")+
+              "("+left.signature+")("+right.signature+")";
+            records[outputQuantity] = candidate;
+          }
+        }
+      }
+      for (var xi = 1; xi < i && !stopped; xi++) {
+        var rightIndex = floorPosition(xs,regionW-xs[xi]);
+        if (rightIndex) combine(dp[xi][j],dp[rightIndex][j],"V",xs[xi],xs[rightIndex],regionW-xs[xi]);
+      }
+      for (var yi = 1; yi < j && !stopped; yi++) {
+        var bottomIndex = floorPosition(ys,regionH-ys[yi]);
+        if (bottomIndex) combine(dp[i][yi],dp[i][bottomIndex],"H",ys[yi],ys[bottomIndex],regionH-ys[yi]);
+      }
+      if (stopped) return null;
+    }
+  }
+
+  var plans = [], resultRecords = dp[xs.length-1][ys.length-1];
+  function expand(tree,x,y,slots,cuts) {
+    if (!tree) return;
+    var w = tree.regionW, h = tree.regionH;
+    function cut(axis,at,rx,ry,rw,rh) {
+      cuts.push({axis:axis,at:at,x:rx,y:ry,w:rw,h:rh});
+    }
+    if (tree.trimAxis !== undefined) {
+      var absoluteAt = x+tree.at;
+      if (tree.trimAxis === "H") absoluteAt = y+tree.at;
+      cut(tree.trimAxis,absoluteAt,x,y,w,h);
+      expand(tree.a,x,y,slots,cuts);
+      return;
+    }
+    if (tree.groupIndex !== undefined) {
+      slots.push({x:x,y:y,w:tree.w,h:tree.h,groupIndex:tree.groupIndex});
+      if (w > tree.w+EPS) { cut("V",x+tree.w,x,y,w,h); w = tree.w; }
+      if (h > tree.h+EPS) cut("H",y+tree.h,x,y,w,h);
+      return;
+    }
+    if (tree.axis === "V") {
+      cut("V",x+tree.at,x,y,w,h);
+      expand(tree.a,x,y,slots,cuts);
+      var bx = x+tree.at, bw = w-tree.at;
+      if (tree.secondAvailable > tree.secondCapacity+EPS)
+        cut("V",bx+tree.secondCapacity,bx,y,bw,h);
+      expand(tree.b,bx,y,slots,cuts);
+    } else {
+      cut("H",y+tree.at,x,y,w,h);
+      expand(tree.a,x,y,slots,cuts);
+      var by = y+tree.at, bh = h-tree.at;
+      if (tree.secondAvailable > tree.secondCapacity+EPS)
+        cut("H",by+tree.secondCapacity,x,by,w,bh);
+      expand(tree.b,x,by,slots,cuts);
+    }
+  }
+  var largestAvailable = maximumA;
+  if (partial) {
+    // Do not trade a larger copy for several smaller copies. Expose only
+    // the maximum feasible larger-geometry profile to callers.
+    while (largestAvailable >= 0 &&
+           (!resultRecords[largestAvailable] || !resultRecords[largestAvailable].total)) largestAvailable--;
+    if (largestAvailable < 0) return null;
+    minimumA = largestAvailable; maximumA = largestAvailable;
+  }
+  for (k = minimumA; k <= maximumA; k++) {
+    var record = resultRecords[k];
+    if (!record || record.small < minimumB) continue;
+    // null/undefined leaves that geometry free to repeat. For example,
+    // [groups[0].minimum, null] keeps every prepared large design exactly once
+    // and maximizes only the smaller design copies.
+    if (options.desiredGroupCounts) {
+      if (!partial && options.desiredGroupCounts[0] !== undefined && options.desiredGroupCounts[0] !== null &&
+          options.desiredGroupCounts[0] !== k) continue;
+      if (options.desiredGroupCounts[1] !== undefined && options.desiredGroupCounts[1] !== null &&
+          options.desiredGroupCounts[1] !== record.small) continue;
+    }
+    var slots = [], cuts = [], counts = [], assigned = [0,0], area = 0;
+    for (i = 0; i < specs.length; i++) counts.push(0);
+    expand(record.tree,0,0,slots,cuts);
+    for (i = 0; i < slots.length; i++) {
+      var slot = slots[i], gid = slot.groupIndex, groupModels = groups[gid].modelIndices;
+      slot.modelIndex = groupModels[assigned[gid] % groupModels.length];
+      assigned[gid]++; counts[slot.modelIndex]++;
+      var original = specs[slot.modelIndex];
+      slot.angle = 0;
+      if (Math.abs(slot.w-original.w) > EPS || Math.abs(slot.h-original.h) > EPS) slot.angle = 90;
+      delete slot.groupIndex;
+      area += slot.w*slot.h;
+    }
+    var minimum = counts[0];
+    for (i = 1; i < counts.length; i++) minimum = Math.min(minimum,counts[i]);
+    var length = 0;
+    for (i = 0; i < cuts.length; i++) {
+      if (cuts[i].axis === "H") length += cuts[i].w;
+      else length += cuts[i].h;
+    }
+    var coverageCounts = [];
+    var unplacedModelIndices = [];
+    for (i = 0; i < counts.length; i++) {
+      if (counts[i] > 0) coverageCounts.push(1);
+      else { coverageCounts.push(0); unplacedModelIndices.push(i); }
+    }
+    plans.push({slots:slots,counts:counts,count:slots.length,minimum:minimum,area:area,
+      balancedCounts:coverageCounts,groupCounts:assigned,cuts:cuts,cutCount:cuts.length,
+      cutLength:length,workCount:record.work,estimatedWorkCount:record.work,
+      unplacedModelIndices:unplacedModelIndices,partialCoverage:partial,
+      source:"normal-pattern-slicing"});
+  }
+  if (!plans.length) return null;
+  plans.sort(function(a,b) {
+    if (a.count !== b.count) return b.count-a.count;
+    if (a.workCount !== b.workCount) return a.workCount-b.workCount;
+    if (a.cutCount !== b.cutCount) return a.cutCount-b.cutCount;
+    if (Math.abs(a.cutLength-b.cutLength) > EPS) return a.cutLength-b.cutLength;
+    return a.groupCounts[0]-b.groupCounts[0];
+  });
+  return {plans:plans,best:plans[0],groups:groups,operations:transitions,
+    stateCount:xs.length*ys.length,normalWidths:xs,normalHeights:ys};
+}
+
 function dcKtsMixedSizePlan(specs, width, height) {
-  var EPS = 0.01, totalArea = 0;
+  var EPS = 0.01, smallestArea = Infinity, largestArea = 0, largestSpec = null, fittingSources = 0;
   if (!(width > EPS && height > EPS) || !isFinite(width) || !isFinite(height) || !specs || !specs.length)
     throw new Error("Khong co vung in/mau hop le.");
   for (var si = 0; si < specs.length; si++) {
     var s = specs[si];
     if (!(s.w > EPS && s.h > EPS) || !isFinite(s.w) || !isFinite(s.h))
       throw new Error("Khong do duoc kich thuoc mau " + (si + 1) + ".");
-    if (!(s.w <= width + EPS && s.h <= height + EPS) &&
-        !(s.h <= width + EPS && s.w <= height + EPS))
-      throw new Error("Mau " + (si + 1) + " khong vua vung in; khong tu thu nho bai.");
-    totalArea += s.w * s.h;
+    if ((s.w <= width + EPS && s.h <= height + EPS) ||
+        (s.h <= width + EPS && s.w <= height + EPS)) fittingSources++;
+    smallestArea = Math.min(smallestArea, s.w * s.h);
+    if(s.w*s.h > largestArea) { largestArea = s.w*s.h; largestSpec = s; }
   }
-  // No rasterization, recursion, exhaustive permutations or host redraw in
-  // this search. Explicit caps prevent very small input from freezing JSX.
-  var limit = Math.ceil(width * height / totalArea) * specs.length;
-  if (limit > 10000 || specs.length > 100)
+  if(!fittingSources) throw new Error("Mau khong vua vung in; khong tu thu nho bai.");
+  // Every source is now repeatable. Prioritize descending size tiers; balance
+  // identities only within a tier. Tolerate normal Illustrator bounds dust.
+  var sizeOrder = [], priorityGroups = [], priorityIndex = [];
+  var areaTolerance = 0.2*(largestSpec.w+largestSpec.h)+0.04;
+  for(si = 0; si < specs.length; si++) sizeOrder.push(si);
+  sizeOrder.sort(function(a,b) {
+    var difference = specs[b].w*specs[b].h-specs[a].w*specs[a].h;
+    if(Math.abs(difference) > EPS) return difference;
+    return a-b;
+  });
+  for(var oi = 0; oi < sizeOrder.length; oi++) {
+    si = sizeOrder[oi];
+    var sourceArea = specs[si].w*specs[si].h;
+    if(!priorityGroups.length || priorityGroups[priorityGroups.length-1]-sourceArea > areaTolerance)
+      priorityGroups.push(sourceArea);
+    priorityIndex[si] = priorityGroups.length-1;
+  }
+  function tierCounts(counts) {
+    var totals = [];
+    for(var ti = 0; ti < priorityGroups.length; ti++) totals.push(0);
+    for(var mi = 0; mi < counts.length; mi++) totals[priorityIndex[mi]] += counts[mi];
+    return totals;
+  }
+  // Packing trials do not rasterize or redraw the host. Knife verification
+  // uses bounded memoized slicing, at most 128 rectangles per verification.
+  // Explicit caps prevent very small input from freezing JSX.
+  // Repeat the larger templates until no more fit, then fill with smaller
+  // templates. A smaller source is not guaranteed a slot on a full large grid.
+  var theoreticalLimit = Math.ceil(width * height / smallestArea);
+  if (theoreticalLimit > 10000 || specs.length > 100)
     throw new Error("Qua nhieu vi tri/mau de ghep; hay chia thanh nhom nho hon.");
-  var best = null;
+  var limit = Math.min(theoreticalLimit,128);
+  var best = null, knifeCache = {};
+  function knifeFor(cells) {
+    var geometry = [];
+    for(var i = 0; i < cells.length; i++) {
+      var c = cells[i];
+      geometry.push([Math.round(c.x*10000),Math.round(c.y*10000),
+        Math.round(c.w*10000),Math.round(c.h*10000)].join(","));
+    }
+    var key = "k"+geometry.join("|");
+    if(knifeCache[key] === undefined) knifeCache[key] = dcKtsKnifePlan(cells,width,height);
+    return knifeCache[key];
+  }
   function less(a, b) {
     if (!b) return true;
     for(var i = 0; i < a.length; i++) {
@@ -3987,42 +4489,97 @@ function dcKtsMixedSizePlan(specs, width, height) {
     }
     return false;
   }
-  function splitFree(free, cell) {
-    var next = [], x2 = cell.x + cell.w, y2 = cell.y + cell.h;
+  function preferPlan(candidate, previous) {
+    if(previous === null) return true;
+    // Larger tiers win before any smaller tier, not a total-copy trade-off.
+    for(var ti = 0; ti < priorityGroups.length; ti++)
+      if(candidate.priorityCounts[ti] !== previous.priorityCounts[ti])
+        return candidate.priorityCounts[ti] > previous.priorityCounts[ti];
+    // With that priority fixed, more filler copies wins, followed by
+    // fewer stacked-knife operations, fewer cuts, and shorter cutting length.
+    if(candidate.count !== previous.count) return candidate.count > previous.count;
+    if(candidate.workCount !== previous.workCount) return candidate.workCount < previous.workCount;
+    if(candidate.cutCount !== previous.cutCount) return candidate.cutCount < previous.cutCount;
+    if(Math.abs(candidate.cutLength-previous.cutLength) > EPS) return candidate.cutLength < previous.cutLength;
+    return candidate.area > previous.area+EPS;
+  }
+  // Repack whole regions, not just the greedy holes. This bounded normal-
+  // pattern DP maximizes repeated larger quantities and proves a slicing
+  // tree. Unsupported/more-than-two geometries use the general search below.
+  var profiles = dcKtsSlicingProfilePlan(specs,width,height,
+    {allowPartialCoverage:true,repeatLargest:true});
+  if(profiles) {
+    for(var pi = 0; pi < profiles.plans.length; pi++) {
+      var profile = profiles.plans[pi];
+      profile.priorityCounts = tierCounts(profile.counts);
+      profile.largeCount = profile.priorityCounts[0];
+      var profileKnife = knifeFor(profile.slots);
+      if(profileKnife && profileKnife.workCount <= profile.workCount) {
+        profile.cuts = profileKnife.cuts; profile.cutCount = profileKnife.cutCount;
+        profile.cutLength = profileKnife.cutLength; profile.workCount = profileKnife.workCount;
+      }
+      if(preferPlan(profile,best)) best = profile;
+    }
+  }
+  function splitFree(free, index, cell, splitRule, cuts) {
+    var r = free[index], dw = r.w-cell.w, dh = r.h-cell.h;
+    var x2 = cell.x+cell.w, y2 = cell.y+cell.h;
+    free.splice(index,1);
+    function add(x,y,w,h) { if(w > EPS && h > EPS) free.push({x:x,y:y,w:w,h:h}); }
+    function cut(axis, at, region) { cuts.push({axis:axis,at:at,
+      x:region.x,y:region.y,w:region.w,h:region.h}); }
+    // Two possible straight-cut orders; try both long/short residual rules,
+    // as well as fixed row/column strips to align neighbouring trim edges.
+    // Explicit branches: legacy ExtendScript can mis-evaluate chained
+    // ternaries containing relational comparisons (notably rule zero).
+    var horizontal = false;
+    if(splitRule === 0) horizontal = dw <= dh;
+    else if(splitRule === 1) horizontal = dw > dh;
+    else if(splitRule === 2) horizontal = true;
+    if(horizontal) {
+      if(dh > EPS) cut("H",y2,r);
+      if(dw > EPS) cut("V",x2,{x:r.x,y:r.y,w:r.w,h:cell.h});
+      add(x2,r.y,dw,cell.h);
+      add(r.x,y2,r.w,dh);
+    } else {
+      if(dw > EPS) cut("V",x2,r);
+      if(dh > EPS) cut("H",y2,{x:r.x,y:r.y,w:cell.w,h:r.h});
+      add(r.x,y2,cell.w,dh);
+      add(x2,r.y,dw,r.h);
+    }
+  }
+  function splitMaxRects(free, cell) {
+    var next = [], x2 = cell.x+cell.w, y2 = cell.y+cell.h;
     function add(x,y,w,h) { if(w > EPS && h > EPS) next.push({x:x,y:y,w:w,h:h}); }
     for(var i = 0; i < free.length; i++) {
-      var r = free[i], rx2 = r.x + r.w, ry2 = r.y + r.h;
-      if(cell.x >= rx2 - EPS || x2 <= r.x + EPS || cell.y >= ry2 - EPS || y2 <= r.y + EPS) {
+      var r = free[i], rx2 = r.x+r.w, ry2 = r.y+r.h;
+      if(cell.x >= rx2-EPS || x2 <= r.x+EPS || cell.y >= ry2-EPS || y2 <= r.y+EPS) {
         next.push(r); continue;
       }
-      if(cell.x > r.x + EPS) add(r.x,r.y,cell.x-r.x,r.h);
-      if(x2 < rx2 - EPS) add(x2,r.y,rx2-x2,r.h);
-      if(cell.y > r.y + EPS) add(r.x,r.y,r.w,cell.y-r.y);
-      if(y2 < ry2 - EPS) add(r.x,y2,r.w,ry2-y2);
+      if(cell.x > r.x+EPS) add(r.x,r.y,cell.x-r.x,r.h);
+      if(x2 < rx2-EPS) add(x2,r.y,rx2-x2,r.h);
+      if(cell.y > r.y+EPS) add(r.x,r.y,r.w,cell.y-r.y);
+      if(y2 < ry2-EPS) add(r.x,y2,r.w,ry2-y2);
     }
-    for(i = next.length - 1; i >= 0; i--) {
-      for(var j = 0; j < next.length; j++) {
-        if(i === j) continue;
-        var a = next[i], b = next[j];
-        if(a.x >= b.x - EPS && a.y >= b.y - EPS &&
-           a.x+a.w <= b.x+b.w+EPS && a.y+a.h <= b.y+b.h+EPS) {
-          next.splice(i,1); break;
-        }
+    for(i = next.length-1; i >= 0; i--) for(var j = 0; j < next.length; j++) {
+      if(i === j) continue;
+      var a = next[i], b = next[j];
+      if(a.x >= b.x-EPS && a.y >= b.y-EPS && a.x+a.w <= b.x+b.w+EPS && a.y+a.h <= b.y+b.h+EPS) {
+        next.splice(i,1); break;
       }
     }
     return next;
   }
   var operations = 0;
   for(var strategy = 0; strategy < 4; strategy++) {
+    for(var splitRule = 0; splitRule < 5; splitRule++) {
     for(var seed = 0; seed < Math.min(specs.length,4); seed++) {
       var free = [{x:0,y:0,w:width,h:height}], slots = [], counts = [], area = 0;
+      var cuts = [];
       for(si = 0; si < specs.length; si++) counts.push(0);
       while(slots.length < limit && operations < 400000) {
-        var minimum = counts[0];
-        for(si = 1; si < counts.length; si++) minimum = Math.min(minimum,counts[si]);
         var chosen = null, chosenScore = null;
         for(si = 0; si < specs.length; si++) {
-          if(counts[si] !== minimum) continue; // counts always differ by at most one
           s = specs[si];
           for(var fi = 0; fi < free.length; fi++) {
             var r = free[fi];
@@ -4037,9 +4594,13 @@ function dcKtsMixedSizePlan(specs, width, height) {
               else if(strategy === 1) score = [waste,shortSide,longSide,order,r.y,r.x,rotation];
               else if(strategy === 2) score = [r.y,r.x,-w*h,order,rotation];
               else score = [-w*h,shortSide,longSide,order,r.y,r.x,rotation];
+              // Exhaust the largest fitting tier first, repeating its models
+              // fairly. Only then may a smaller tier occupy residual space.
+              score = [priorityIndex[si],counts[si]].concat(score);
               if(less(score,chosenScore)) {
                 chosenScore = score;
                 chosen = {x:r.x,y:r.y,w:w,h:h,angle:rotation?90:0,modelIndex:si};
+                var chosenFreeIndex = fi;
               }
             }
           }
@@ -4047,25 +4608,80 @@ function dcKtsMixedSizePlan(specs, width, height) {
         if(!chosen) break;
         slots.push(chosen); counts[chosen.modelIndex]++;
         area += chosen.w*chosen.h;
-        free = splitFree(free,chosen);
+        if(splitRule === 4) free = splitMaxRects(free,chosen);
+        else splitFree(free,chosenFreeIndex,chosen,splitRule,cuts);
       }
-      var minCount = counts[0];
+      var minCount = counts[0], priorities = tierCounts(counts);
       for(si = 1; si < counts.length; si++) minCount = Math.min(minCount,counts[si]);
-      // Keep the null guard separate: Illustrator's legacy ExtendScript
-      // can eagerly evaluate property access in this compound expression.
-      var improve = false;
-      if(minCount > 0) {
-        if(best === null) improve = true;
-        else if(minCount > best.minimum) improve = true;
-        else if(minCount === best.minimum) {
-          if(slots.length > best.count) improve = true;
-          else if(slots.length === best.count && area > best.area + EPS) improve = true;
+      if(!slots.length) continue;
+      var knife = knifeFor(slots);
+      if(knife) cuts = knife.cuts;
+      else if(splitRule === 4) continue; // A dense arrangement without a proven knife route is invalid.
+      var workCount = knife ? knife.workCount : cuts.length;
+      var bandVariants = dcKtsKnifeBandVariants(slots);
+      for(var vi = 0; vi < bandVariants.length; vi++) {
+        var bandKnife = knifeFor(bandVariants[vi]);
+        if(bandKnife && (bandKnife.workCount < workCount ||
+           (bandKnife.workCount === workCount && bandKnife.cutCount < cuts.length))) {
+          slots = bandVariants[vi]; cuts = bandKnife.cuts; workCount = bandKnife.workCount;
         }
       }
-      if(improve) best = {slots:slots,counts:counts,count:slots.length,minimum:minCount,area:area};
+      var cutLength = 0;
+      for(var ci = 0; ci < cuts.length; ci++) cutLength += cuts[ci].axis === "H" ? cuts[ci].w : cuts[ci].h;
+      var trial = {slots:slots,counts:counts,count:slots.length,minimum:minCount,area:area,largeCount:priorities[0],priorityCounts:priorities,
+        balancedCounts:counts.slice(0),cuts:cuts,cutCount:cuts.length,cutLength:cutLength,workCount:workCount};
+      if(preferPlan(trial,best)) best = trial;
+    }
     }
   }
-  if(!best) throw new Error("Khong ghep du moi mau tren mot to; hay tang kho giay hoac bot mau.");
+  if(!best) throw new Error("Khong ghep duoc mau tren mot to; hay tang kho giay hoac bot mau.");
+  // Fixed guillotine subdivisions can leave neighbouring blank pieces that
+  // could be used together by changing the cutting order. Check the actual
+  // remaining geometry, but accept a new copy only with a proven knife route.
+  var holeChecks = 0;
+  while(best.count < Math.min(limit,128) && holeChecks < 128) {
+    var actualFree = [{x:0,y:0,w:width,h:height}];
+    for(var bi = 0; bi < best.slots.length; bi++) actualFree = splitMaxRects(actualFree,best.slots[bi]);
+    var extra = null, extraKnife = null, extraScore = null;
+    for(si = 0; si < specs.length; si++) for(var ri = 0; ri < 2; ri++) {
+      var ew = ri ? specs[si].h : specs[si].w, eh = ri ? specs[si].w : specs[si].h;
+      if(extraScore && (priorityIndex[si] > extraScore[0] ||
+         (priorityIndex[si] === extraScore[0] && best.counts[si] > extraScore[1]))) continue;
+      for(var afi = 0; afi < actualFree.length && holeChecks < 128; afi++) {
+        var ar = actualFree[afi];
+        if(ew > ar.w+EPS || eh > ar.h+EPS) continue;
+        var candidate = {x:ar.x,y:ar.y,w:ew,h:eh,angle:ri ? 90 : 0,modelIndex:si};
+        holeChecks++;
+        var candidateKnife = knifeFor(best.slots.concat([candidate]));
+        if(!candidateKnife) continue;
+        var extraCandidateScore = [priorityIndex[si],best.counts[si],candidateKnife.workCount,candidateKnife.cutCount,candidateKnife.cutLength,ar.y,ar.x,ri];
+        if(less(extraCandidateScore,extraScore)) {
+          extra = candidate; extraKnife = candidateKnife; extraScore = extraCandidateScore;
+        }
+      }
+    }
+    if(!extra) break;
+    best.slots.push(extra); best.counts[extra.modelIndex]++; best.count++;
+    best.priorityCounts[priorityIndex[extra.modelIndex]]++;
+    best.largeCount = best.priorityCounts[0];
+    best.area += extra.w*extra.h;
+    best.cuts = extraKnife.cuts; best.cutCount = extraKnife.cutCount; best.cutLength = extraKnife.cutLength;
+    best.workCount = extraKnife.workCount;
+    best.minimum = best.counts[0];
+    for(si = 1; si < best.counts.length; si++) best.minimum = Math.min(best.minimum,best.counts[si]);
+  }
+  var finalBands = dcKtsKnifeBandVariants(best.slots);
+  for(var fbi = 0; fbi < finalBands.length; fbi++) {
+    var finalKnife = knifeFor(finalBands[fbi]);
+    if(finalKnife && (finalKnife.workCount < best.workCount ||
+       (finalKnife.workCount === best.workCount && finalKnife.cutCount < best.cutCount))) {
+      best.slots = finalBands[fbi]; best.cuts = finalKnife.cuts;
+      best.workCount = finalKnife.workCount; best.cutCount = finalKnife.cutCount; best.cutLength = finalKnife.cutLength;
+    }
+  }
+  best.capacityLimited = best.count >= limit && theoreticalLimit > limit;
+  best.unplacedModelIndices = [];
+  for(si = 0; si < best.counts.length; si++) if(best.counts[si] === 0) best.unplacedModelIndices.push(si);
   return best;
 }
 
@@ -5017,6 +5633,22 @@ function dcDanToiUu(
 
     var cleanup = dcRemoveOldCanvasArtboards(doc, oldCanvasArtboardCount);
     firstFrontIndex = cleanup.firstNewIndex;
+    var removedSourceCount = 0, remainingSourceCount = 0, sourceCleanupWarnings = 0;
+    if(mixedSizes) {
+      // Delete a source only after every planned front/back copy has been
+      // rendered successfully. An unused source is never moved or removed.
+      // Any template may have many copies but is removed only once.
+      for(mi = 0; mi < models.length; mi++) {
+        if(mixedPlan.counts[mi] === 0) { remainingSourceCount++; continue; }
+        var removedPair = true;
+        try { models[mi].front.remove(); } catch(removeFrontError) { removedPair = false; }
+        if(twoSided) {
+          try { models[mi].back.remove(); } catch(removeBackError) { removedPair = false; }
+        }
+        if(removedPair) removedSourceCount++;
+        else sourceCleanupWarnings++;
+      }
+    }
     var outputWasSelected = false;
     try {
       doc.artboards.setActiveArtboardIndex(firstFrontIndex);
@@ -5042,6 +5674,10 @@ function dcDanToiUu(
         " cap artboard truoc/sau doi xung va canh giua artwork; cac cap da tu xuong hang khi het be ngang.";
     if(mixedSizes) {
       detail += " Ghep nhieu kich thuoc; so con tung mau: " + mixedPlan.counts.join(", ") + ".";
+      detail += " Tu nhan ban toi da con lon truoc, roi lap con nho.";
+      detail += " Da xoa " + removedSourceCount + " mau nguon da dan; con " + remainingSourceCount + " mau chua dan duoc giu nguyen.";
+      if(sourceCleanupWarnings) detail += " Khong xoa duoc het nguon cua " + sourceCleanupWarnings + " mau; hay kiem tra layer khoa.";
+      if(mixedPlan.capacityLimited) detail += " Da dat gioi han 128 con/to cua tim kiem ghep; chua lap het phan du.";
     } else if (multiPerArtboard && models.length > 1) {
       if (multiExtraSlots === 0)
         detail += " Da dan deu " + models.length + " mau.";
@@ -17854,7 +18490,7 @@ function dcRunCatalogueAuto(wCm, hCm) {
 // 65 x 86 source; they are never pulled inward by the squeezed ruot.  A
 // centred 2-page squeeze also receives the tiny nominal-bottom compensation
 // required to keep the first inner sheet inside its fixed artboard.
-var dcSignature8AutoPonVersion = 38;
+var dcSignature8AutoPonVersion = 40;
 
 function dcRunSignature8(wCm, hCm, coBia) {
   var previousSignatureCoordinates = app.coordinateSystem;
@@ -18312,7 +18948,7 @@ function dcRunSignature8(wCm, hCm, coBia) {
     // Phần còn lại (ruot) = số trang từ _a den _b.
     if (IS_SMALL_A5) {
       // A5 and smaller: 4 pp = 42.8 x 31.3, 8 pp = 64.8 x 41.8,
-      // 16 pp = 85.8 x 63.8 self-turn, 32 pp = 85.8 x 63.8 A/B.
+      // 16 pp = 85.8 x 63.8 self-turn, 32 pp = 85.8 x 62.5 A/B.
       var nSmallRemain = _b - _a + 1;
       var smallRemainder = nSmallRemain % 32;
       var smallOrder = [];
@@ -18364,7 +19000,7 @@ function dcRunSignature8(wCm, hCm, coBia) {
       }
 
       // Each 32-page signature has two sides (A/B).  Every side holds two
-      // nested 8-page panels on the same 85.8 x 63.8 artboard.
+      // nested 8-page panels on the same 85.8 x 62.5 artboard.
       var smallToNo = 0;
       while (_a < _b) {
         smallToNo++;
@@ -18497,9 +19133,10 @@ function dcRunSignature8(wCm, hCm, coBia) {
     //  KHỔ GIẤY CỐ ĐỊNH
     //  Offset chạy tờ giấy cố định, không co giãn theo khổ trang.
     //  Nhập trang nhỏ thì lề rộng ra, chứ tờ giấy vẫn nguyên.
-    //  Thực chất chỉ có BA tờ, năm form dùng chung ba tờ này:
+    //  Các form dùng khổ giấy cố định; tờ AB có khổ riêng:
     // ==========================================================
-    var SHEET_65x86 = { W: 858 * MM, H: 638 * MM }; // ruột A5, A4 main
+    var SHEET_65x86 = { W: 858 * MM, H: 638 * MM }; // giữ khổ các tờ tự trở
+    var SHEET_AB = { W: 858 * MM, H: 625 * MM }; // AB A4/A5: 85.8 × 62.5 cm
     var SHEET_65x43 = { W: 648 * MM, H: 418 * MM }; // tự trở 8 A5, TT4
     var SHEET_43x32 = { W: 428 * MM, H: 313 * MM }; // bìa A5
 
@@ -18594,8 +19231,8 @@ function dcRunSignature8(wCm, hCm, coBia) {
     //    cornerLegs  : có chân ngang (chữ L) kèm nét dọc không
     //    anchor      : "bottom" = lưới tì vào MÉP DƯỚI artboard (họ A5 —
     //                  mọi khổ trang đều bắt đầu từ đáy tờ, lề thừa dồn
-    //                  lên trên); "top" = treo từ mép trên xuống, chừa
-    //                  lề nhíp cố định (họ A4)
+    //                  lên trên); "top" = chừa lề nhíp (AB/TT8 A4);
+    //                  "center" = canh giữa như artwork TT4 A4 thực tế.
     //    pageAxes    : có đánh PON ở biên trang BÊN TRONG mỗi nửa không
     //                  (form tự trở A5 cần, để cắt ra cụm 2 rồi xếp lại;
     //                   form đóng ghim giữa A4 không cần vì chỗ đó là nếp gấp)
@@ -18642,7 +19279,7 @@ function dcRunSignature8(wCm, hCm, coBia) {
           rotated: true,
           gutter: MID_GAP_A5_MAIN,
           rowGap: A5_MAIN_ROW_GAP,
-          sheet: SHEET_65x86,
+          sheet: type === "SMALLAB" ? SHEET_AB : SHEET_65x86,
           anchor: "bottom",
           trimCut: 0,
           pon: "large",
@@ -18659,8 +19296,8 @@ function dcRunSignature8(wCm, hCm, coBia) {
           gutter: MID_GAP_TT4,
           rowGap: 0,
           sheet: SHEET_65x43,
-          anchor: "top",
-          top: 9 * MM,
+          anchor: "center",
+          top: 0,
           trimCut: 0,
           pon: "small",
           midAxis: true,
@@ -18676,7 +19313,7 @@ function dcRunSignature8(wCm, hCm, coBia) {
         rotated: false,
         gutter: MID_GAP,
         rowGap: 0,
-        sheet: SHEET_65x86,
+        sheet: type === "AB" ? SHEET_AB : SHEET_65x86,
         anchor: "top",
         top: TOP_GAP,
         trimCut: 0,
@@ -18723,7 +19360,8 @@ function dcRunSignature8(wCm, hCm, coBia) {
 
       // Bài phải lọt tờ giấy. Thà báo lỗi rõ còn hơn âm thầm phình
       // artboard ra một khổ giấy không có thật.
-      var topGap = spec.anchor === "bottom" ? 0 : spec.top;
+      var topGap = 0;
+      if(spec.anchor === "top") topGap = spec.top;
       var overW = grid.contentW - grid.paperW;
       var overH = grid.contentH + topGap - grid.paperH;
       if (overW > 0.5 || overH > 0.5) {
@@ -18759,11 +19397,14 @@ function dcRunSignature8(wCm, hCm, coBia) {
       grid.gridLeft = grid.left + (grid.paperW - grid.contentW) / 2;
       grid.gridRight = grid.gridLeft + grid.contentW;
       // Chiều dọc: họ A5 tì vào MÉP DƯỚI artboard, lề thừa dồn lên trên,
-      // nên PON đáy luôn bắt đầu từ đáy tờ với mọi khổ trang. Họ A4 vẫn
-      // treo từ mép trên xuống, chừa lề nhíp cố định.
+      // nên PON đáy luôn bắt đầu từ đáy tờ với mọi khổ trang. AB/TT8 A4
+      // giữ lề nhíp cố định; TT4 A4 canh giữa để PON khớp artwork.
       if (spec.anchor === "bottom") {
         grid.gridBottom = grid.bottom;
         grid.gridTop = grid.gridBottom + grid.contentH;
+      } else if (spec.anchor === "center") {
+        grid.gridTop = grid.cy + grid.contentH / 2;
+        grid.gridBottom = grid.cy - grid.contentH / 2;
       } else {
         grid.gridTop = grid.top - spec.top;
         grid.gridBottom = grid.gridTop - grid.contentH;
@@ -18837,8 +19478,8 @@ function dcRunSignature8(wCm, hCm, coBia) {
       }
     // Artboard dimensions are the rectangle through the CENTRE of the four
     // paper-PON strokes.  Do not derive them from visible artwork or crop PON.
-    // Form A4 65 x 86: khổ giấy chuẩn 85.8 x 63.8 cm.  Chiều cao 62.5 cm
-    // là form cũ, khiến artboard và toàn bộ mốc dàn bị sai.
+    // AB A4/A5 now uses 85.8 x 62.5 cm per the requested paper size.
+    // Other forms keep their previous dimensions; PON follows each rect.
 
     function createAutoPonLayer(layerName) {
       for (var li = doc.layers.length - 1; li >= 0; li--) {
@@ -20765,19 +21406,19 @@ function dcLuuCtlOffsetFiles(totalText, jobsText, format, suffixText) {
 //   5. Nhập ghi chú (RUỘT N + chữ thêm).
 // ============================================================
 
-var dcKeoGayAutoPonVersion = 11;
+var dcKeoGayAutoPonVersion = 13;
 
-// mm throughout. A4 uses the entered size as a containing frame: any spare
-// space is centred, never filled by stretching X/Y independently. Keep the
-// existing exact-aspect policy (0.2 mm allowance) for the A5 folding forms.
-function dcKeoGayPageScale(w, h, targetW, targetH, fitFrame) {
+// mm throughout. The panel now specifies BOTH exact page dimensions.
+// Independent document-axis scales also correct raster pixel rounding;
+// this intentionally replaces the former proportional containing-frame fit.
+function dcKeoGayPageScales(w, h, targetW, targetH) {
   if (!(w > 0 && h > 0 && targetW > 0 && targetH > 0) ||
       !isFinite(w) || !isFinite(h) || !isFinite(targetW) || !isFinite(targetH))
     throw new Error("Không đo được kích thước trang ruột.");
-  var scale = Math.min(targetW / w, targetH / h);
-  if (!fitFrame && (targetW - w * scale > 0.2 || targetH - h * scale > 0.2))
-    throw new Error("Tỷ lệ nguồn không khớp khổ nhập; Keo gáy không bóp bài. Hãy kiểm tra khổ/khung trang.");
-  return scale * 100;
+  var x = targetW / w * 100, y = targetH / h * 100;
+  if (!(x > 0 && y > 0) || !isFinite(x) || !isFinite(y))
+    throw new Error("Không tính được tỷ lệ kích thước trang ruột.");
+  return { x: x, y: y };
 }
 
 // Apply the smaller-paper allowance to the whole frame, preserving aspect.
@@ -20950,7 +21591,7 @@ function dcRunKeoGay(wCm, hCm) {
       PAGE_H = SOURCE_PAGE_W;
     }
     if (!IS_SMALL_A5 && (PAGE_W > 212 + 0.000001 || PAGE_H > 300 + 0.000001))
-      throw new Error("Khung A4 tối đa 21,2 × 30 cm (rộng × cao). Keo gáy không bóp bài.");
+      throw new Error("Khung A4 tối đa 21,2 × 30 cm (rộng × cao).");
 
     var TOP_GAP = 23.7 * MM; // mép trên bài dàn cách mép trên artboard 2.37cm
 
@@ -21133,13 +21774,13 @@ function dcRunKeoGay(wCm, hCm) {
 
     // ============================================================
     //  BƯỚC 1: kiểm tra tất cả trang trước khi raster/tạo khung.
-    //  A4 fit trong khung nhập; A5 giữ kiểm tra tỷ lệ của form gấp cũ.
+    //  Khớp hai cạnh theo panel; kiểm tra nguồn trước khi thay đổi bài.
     // ============================================================
     var processed = [];
     var sourcePageSizes = [];
     for (var checkPage = 0; checkPage < pages.length; checkPage++) {
       var sourceSize = sizeMM(pages[checkPage]);
-      try { dcKeoGayPageScale(sourceSize.w, sourceSize.h, SOURCE_PAGE_W, SOURCE_PAGE_H, !IS_SMALL_A5); }
+      try { dcKeoGayPageScales(sourceSize.w, sourceSize.h, SOURCE_PAGE_W, SOURCE_PAGE_H); }
       catch (ratioError) { throw new Error("Trang ruột " + (checkPage + 1) + ": " + ratioError.message); }
       sourcePageSizes.push(sourceSize);
     }
@@ -21152,14 +21793,20 @@ function dcRunKeoGay(wCm, hCm) {
         var cw = flatSize.w, ch = flatSize.h;
         if (!(cw > 0 && ch > 0))
           throw new Error("Khong do duoc kich thuoc trang ruot " + (p + 1));
-        // Source/frame policy was validated for EVERY page before mutation. A new
-        // bitmap can gain a rounded edge pixel; do not reject half-way through
-        // a batch because that pixel grows when a small source is enlarged.
+        // Measure after flattening: rounded bitmap pixels must not change the
+        // requested physical page size. Apply a document-axis matrix rather
+        // than local-axis resize, so existing rotated rasters work as well.
         var targetFrame = pageFrames[p];
         var targetW = SMALL_SOURCE_IS_LANDSCAPE ? targetFrame.h : targetFrame.w;
         var targetH = SMALL_SOURCE_IS_LANDSCAPE ? targetFrame.w : targetFrame.h;
-        var uniformScale = Math.min(targetW / cw, targetH / ch) * 100;
-        flat.resize(uniformScale, uniformScale);
+        var scales = dcKeoGayPageScales(cw, ch, targetW, targetH);
+        flat.transform(app.getScaleMatrix(scales.x, scales.y),
+          true, true, true, true, 100, Transformation.CENTER);
+        var exactSize = sizeMM(flat);
+        if (!isFinite(exactSize.w) || !isFinite(exactSize.h) ||
+            Math.abs(exactSize.w - targetW) > 0.01 ||
+            Math.abs(exactSize.h - targetH) > 0.01)
+          throw new Error("Trang ruột " + (p + 1) + ": không khớp kích thước đã nhập.");
         if (SMALL_SOURCE_IS_LANDSCAPE) flat.rotate(90);
         processed.push(flat);
       }
@@ -21185,6 +21832,7 @@ function dcRunKeoGay(wCm, hCm) {
     // Cùng khổ giấy thực với Đóng ghim giữa, đo qua TIM của 4 PON giấy.
     // Tên form 65x86 / 65x43 / 43x32.5 không phải kích thước artboard.
     var ponMain = { W: 858 * MM, H: 638 * MM };
+    var ponAB = { W: 858 * MM, H: 625 * MM };
     var ponTT4 = { W: 648 * MM, H: 418 * MM };
     var ponSmall4 = { W: 428 * MM, H: 313 * MM };
     // At 14.5x20.7 cm, centred TT8 has 2 mm above/below. Shorten crop
@@ -21193,13 +21841,18 @@ function dcRunKeoGay(wCm, hCm) {
     var smallTT8Fits = pageWpt * 4 + 4 * MM + 1 <= ponTT4.W &&
       pageHpt * 2 + 1 <= ponTT4.H;
     function ponFor(face) {
+      if (face.type === "AB") return ponAB;
       if (face.type === "TT4") return IS_SMALL_A5 ? ponSmall4 : ponTT4;
       return face.smallSelfTurn && smallTT8Fits ? ponTT4 : ponMain;
+    }
+    function isSmallKeoPaper(face) {
+      var paper = ponFor(face);
+      return paper === ponSmall4 || paper === ponTT4;
     }
     var faceFrames = [], pageFrames = [];
     for (var paperCheck = 0; paperCheck < faces.length; paperCheck++) {
       var checkedFace = faces[paperCheck], checkedPaper = ponFor(checkedFace);
-      var frame = dcKeoGayFrameForPaper(PAGE_W, PAGE_H, IS_SMALL_A5, checkedPaper !== ponMain);
+      var frame = dcKeoGayFrameForPaper(PAGE_W, PAGE_H, IS_SMALL_A5, isSmallKeoPaper(checkedFace));
       faceFrames.push(frame);
       var framePages = [];
       if (checkedFace.blocks) {
@@ -21213,14 +21866,17 @@ function dcRunKeoGay(wCm, hCm) {
           (2 * frame.h * MM + MID_GAP_TT4 > checkedPaper.W + 0.01 ||
            2 * frame.w * MM + (IS_SMALL_A5 ? 4 * MM + 1 : 0) > checkedPaper.H + 0.01))
         throw new Error("Khổ trang không vừa tờ tự trở 4 trang; hãy giảm khổ trang.");
+      if (checkedFace.blocks &&
+          (frame.h * 4 * MM + 4 * MM + 1 > checkedPaper.W ||
+           frame.w * 4 * MM + TOP_GAP + 0.5 > checkedPaper.H))
+        throw new Error("Khổ trang A5 không vừa tờ " +
+          (checkedFace.type === "AB" ? "AB 85,8 × 62,5 cm" : "tự trở 65 × 86") +
+          "; hãy giảm khổ trang.");
     }
     function useFaceFrame(index) {
       pageWpt = faceFrames[index].w * MM;
       pageHpt = faceFrames[index].h * MM;
     }
-    if (IS_SMALL_A5 && (pageHpt * 4 + 4 * MM + 1 > ponMain.W ||
-        pageWpt * 4 + TOP_GAP + 2 * MM + 1 > ponMain.H))
-      throw new Error("Kho trang A5 khong vua to AB 65 x 86; hay giam kho trang.");
 
     function createAutoPonLayer(layerName) {
       for (var li = doc.layers.length - 1; li >= 0; li--) {
@@ -21626,7 +22282,7 @@ function dcRunKeoGay(wCm, hCm) {
     for (var kp = 0; kp < numFaces; kp++) {
       useFaceFrame(kp);
       var posP = abPos[kp];
-      var isTT4Pon = ponFor(faces[kp]) !== ponMain;
+      var isTT4Pon = isSmallKeoPaper(faces[kp]);
       addAutoPaperPon(paperPonLayer, posP, isTT4Pon);
       cutPonCount += addAutoCutPon(cutPonLayer, faces[kp], posP);
     }
@@ -21900,7 +22556,7 @@ function dcRunKeoGay(wCm, hCm) {
         var isSpecificRed = specificText ? true : false;
         var txt =
           "RUỘT " + face.sheetNo + (specificText ? " " + specificText : "");
-        if (ponFor(face) !== ponMain) addNote4(txt, abPos[ni], isSpecificRed);
+        if (isSmallKeoPaper(face)) addNote4(txt, abPos[ni], isSpecificRed);
         else addNote8(txt, abPos[ni], isSpecificRed);
       }
       try {

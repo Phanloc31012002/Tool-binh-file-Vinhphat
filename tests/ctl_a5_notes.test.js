@@ -202,7 +202,7 @@ for (const [type, paper, artwork] of [
   ["SMALL4", [0, 313, 428, 0], [11.5, 280, 416.5, 0]],
   ["SMALL8", [0, 418, 648, 0], [40, 397.5, 608, 0]],
   ["SMALL16", [0, 638, 858, 0], [26, 575, 832, 0]],
-  ["SMALLAB", [0, 638, 858, 0], [26, 575, 832, 0]],
+  ["SMALLAB", [0, 625, 858, 0], [26, 575, 832, 0]],
 ]) {
   const fixture = makeFixture(type, paper, artwork);
   fixture.context.addNoteA5("RUỘT 2", fixture.paper, false, fixture.face);

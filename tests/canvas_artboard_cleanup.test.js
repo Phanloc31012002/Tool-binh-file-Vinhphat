@@ -136,7 +136,7 @@ assert.ok(
     bridge.indexOf("finishFace(backFace);"),
   "Bế cleanup follows final face rendering",
 );
-assert.match(main, /dcDanToiUuVersion[^\n]*19/);
+assert.match(main, /dcDanToiUuVersion[^\n]*22/);
 assert.match(main, /dcDanTuTroVersion[^\n]*11/);
 assert.match(main, /dcDanBeNestingVersion[^\n]*8/);
 console.log(

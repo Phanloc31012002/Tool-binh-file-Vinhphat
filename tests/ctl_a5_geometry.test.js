@@ -51,11 +51,15 @@ const helpers = [
   "centerItem",
   "placeRow8",
   "placeFace8",
+  "buildPairGroup",
+  "centerGroupAt",
+  "placeFace4",
   "squeezeAboutCentre",
   "groupPages",
   "ungroupInto",
   "ctlBlack",
   "addAutoCutPon",
+  "addAutoPon",
 ]
   .map((name) => functionText(signature, name))
   .join("\n");
@@ -66,6 +70,7 @@ const constants = [
   "MID_GAP_A5_MAIN",
   "MID_GAP_A5_COVER",
   "SHEET_65x86",
+  "SHEET_AB",
   "SHEET_65x43",
   "SHEET_43x32",
   "A5_MAIN_ROW_GAP",
@@ -73,6 +78,7 @@ const constants = [
   "BOP_PER_SHEET",
   "CUT_MARK",
   "CUT_STROKE",
+  "PON_PAPER",
 ]
   .map((name) => {
     const match = signature.match(new RegExp(`\\bvar ${name}\\s*=[^;]+;`));
@@ -129,11 +135,29 @@ class Box {
   }
   rotate(angle) {
     assert.strictEqual(
-      Math.abs(angle) % 180,
+      Math.abs(angle) % 90,
       0,
-      "SMALL8 only rotates pages 180 degrees",
+      "CTL helpers only require right-angle affine rotations",
     );
+    const b = this.geometricBounds;
+    this._rotate((b[0] + b[2]) / 2, (b[1] + b[3]) / 2, angle);
+  }
+  _rotate(cx, cy, angle) {
     this.angle += angle;
+    if (this.pageItems) {
+      for (const item of this.pageItems) item._rotate(cx, cy, angle);
+    } else {
+      const b = this.bounds, a = angle * Math.PI / 180;
+      const corners = [[b[0], b[1]], [b[2], b[1]], [b[2], b[3]], [b[0], b[3]]]
+        .map(([x, y]) => [
+          cx + (x - cx) * Math.cos(a) - (y - cy) * Math.sin(a),
+          cy + (x - cx) * Math.sin(a) + (y - cy) * Math.cos(a)
+        ]);
+      this.bounds = [
+        Math.min(...corners.map(p => p[0])), Math.max(...corners.map(p => p[1])),
+        Math.max(...corners.map(p => p[0])), Math.min(...corners.map(p => p[1]))
+      ];
+    }
   }
   move(parent) {
     if (this.parent)
@@ -207,6 +231,98 @@ function cropPaths(c, face, rect) {
 function centreX(items) {
   const b = boundsUnion(items);
   return (b[0] + b[2]) / 2;
+}
+function paperPaths(c, rect, kind) {
+  const paths = [];
+  const layer = { pathItems: { add() {
+    const path = { setEntirePath(points) {
+      this.points = points.map(p => [...p]);
+    } };
+    paths.push(path);
+    return path;
+  } } };
+  c.addAutoPon(layer, rect, kind);
+  return paths.map(path => ({ points: path.points, stroke: path.strokeWidth }));
+}
+
+// A4 cover/self-turn TT4 already centres the two rotated page pairs. Its
+// nominal grid must use that same vertical centre instead of reserving a
+// nonexistent 9 mm top gripper and rejecting a true 209 x 300 mm input.
+for (const widthMm of [200, 209]) for (const heightMm of [270, 300])
+for (const sheetNo of [0, 2]) {
+  const { c, processed } = context(widthMm, heightMm, 4);
+  const rect = [-37 * MM, 501 * MM, (648 - 37) * MM, (501 - 418) * MM];
+  const face = { type: "TT4", row: [1, 2, 3, 4], sheetNo };
+  const grid = c.nominalGridFor(face, rect);
+  const ponBefore = cropPaths(c, face, rect);
+  const paperBefore = paperPaths(c, rect, "small");
+  near(grid.paperW / MM, 648, "TT4 keeps its fixed paper width");
+  near(grid.paperH / MM, 418, "TT4 keeps its fixed paper height");
+  near(grid.contentH / MM, 2 * widthMm, "TT4 rotated pairs retain the full entered width");
+  near(grid.contentW / MM, 2 * heightMm + c.MID_GAP_TT4 / MM,
+    "TT4 rotated pair width and original gutter remain unchanged");
+  near(grid.gridTop, grid.cy + widthMm * MM, "TT4 crop grid begins at the centred artwork top");
+  near(grid.gridBottom, grid.cy - widthMm * MM, "TT4 crop grid ends at the centred artwork bottom");
+  assert.strictEqual(ponBefore.length, 10, "TT4 retains its existing ten vertical crop ticks");
+  for (const points of ponBefore) {
+    assert(Math.abs(points[0][1] - grid.gridTop) < 0.001 ||
+      Math.abs(points[0][1] - grid.gridBottom) < 0.001,
+      "Every nominal crop tick starts at a real unsqueezed top/bottom cut edge");
+    near(points[0][0], points[1][0], "TT4 retains its vertical-only crop marks");
+    assert(points.every(p => p[0] >= rect[0] - 0.001 && p[0] <= rect[2] + 0.001 &&
+      p[1] >= rect[3] - 0.001 && p[1] <= rect[1] + 0.001), "TT4 crop ticks stay inside paper");
+  }
+  assert.strictEqual(paperBefore.length, 8);
+  const paperStyle = c.PON_PAPER.small;
+  for (const path of paperBefore) {
+    near(path.stroke, paperStyle.stroke, "Paper PON keeps its original stroke width");
+    const [[x1, y1], [x2, y2]] = path.points;
+    near(Math.hypot(x2 - x1, y2 - y1), x1 === x2 ? paperStyle.leg : paperStyle.arm,
+      "Paper PON legs are neither moved nor resized");
+  }
+  for (const corner of [[rect[0], rect[1]], [rect[2], rect[1]],
+    [rect[0], rect[3]], [rect[2], rect[3]]])
+    assert.strictEqual(paperBefore.filter(path => path.points.some(p =>
+      Math.hypot(p[0] - corner[0], p[1] - corner[1]) < 0.001)).length, 2,
+      "Both unshifted paper-PON centrelines meet the exact artboard corner");
+  c.placeFace4(face, rect);
+  const actual = boundsUnion(processed);
+  const inset = sheetNo * c.BOP_PER_SHEET / 2;
+  near(actual[0], grid.gridLeft, "TT4 artwork left matches nominal cut axis");
+  near(actual[2], grid.gridRight, "TT4 artwork right matches nominal cut axis");
+  near(actual[1], grid.gridTop - inset, "Only existing centre-based sheet creep changes top edge");
+  near(actual[3], grid.gridBottom + inset, "Only existing centre-based sheet creep changes bottom edge");
+  for (const [i, item] of processed.entries()) {
+    const b = item.geometricBounds;
+    near((b[2] - b[0]) / MM, heightMm,
+      "TT4 preserves entered height as the rotated page's horizontal edge");
+    near((b[1] - b[3]) / MM, widthMm - sheetNo * c.BOP_PER_SHEET / MM / 2,
+      "Cover input stays exact; inner pages retain only the established creep allowance");
+    assert.strictEqual(item.angle, i < 2 ? 90 : -90);
+    assert(b[0] >= rect[0] - 0.01 && b[2] <= rect[2] + 0.01 &&
+      b[1] <= rect[1] + 0.01 && b[3] >= rect[3] - 0.01, "Every TT4 page remains inside paper");
+  }
+  near(centreX(processed.slice(0, 2)), grid.gridLeft + grid.cellW / 2,
+    "Left rotated pair remains on its nominal horizontal centre");
+  near(centreX(processed.slice(2)), grid.gapRight + grid.cellW / 2,
+    "Right rotated pair remains on its nominal horizontal centre");
+  assert.strictEqual(JSON.stringify(c.nominalGridFor(face, rect)), JSON.stringify(grid),
+    "TT4 nominal crop grid must not read squeezed bounds");
+  assert.deepStrictEqual(cropPaths(c, face, rect), ponBefore,
+    "All crop PON remain on nominal edges after pair creep");
+  assert.deepStrictEqual(paperPaths(c, rect, "small"), paperBefore,
+    "TT4 placement does not shift paper PON or change the paper rectangle");
+  assert.strictEqual(c.ponClampCount, 0, "No TT4 mark may be clamped to conceal a placement leak");
+}
+{
+  const { c, processed } = context(210, 300, 4);
+  const before = processed.map(p => p.geometricBounds);
+  assert.throws(() => c.nominalGridFor({ type: "TT4", row: [1, 2, 3, 4], sheetNo: 0 }),
+    /Khổ trang nhập quá lớn/,
+    "A true 210 mm width still needs 420 mm on 418 mm paper and must not be silently squeezed");
+  assert.deepStrictEqual(processed.map(p => p.geometricBounds), before,
+    "Oversized TT4 preflight must fail before any page transform/grouping");
+  assert(processed.every(p => p.angle === 0));
 }
 
 for (const [widthMm, heightMm] of [
@@ -367,20 +483,64 @@ assert.match(
 // Larger A4 form still uses full-height rows from its fixed top gripper.
 for (const type of ["TT8", "AB"]) {
   const { c, processed } = context(200, 290);
-  const rect = [0, 638 * MM, 858 * MM, 0];
+  const paperH = type === "AB" ? 625 : 638;
+  const rect = [0, paperH * MM, 858 * MM, 0];
   const face = { type, top: [1, 2, 3, 4], bottom: [5, 6, 7, 8], sheetNo: 2 };
   const grid = c.nominalGridFor(face, rect);
   c.placeFace8(face, rect);
   const b = boundsUnion(processed);
   near(grid.contentH / MM, 580, "A4 nominal row height remains full size");
   near((rect[1] - b[1]) / MM, 23, "A4 keeps its 23mm top gripper");
-  near(b[3] / MM, 35, "A4 lower artwork position is unchanged");
+  near(b[3] / MM, paperH - 23 - 580, "A4 artwork keeps its size on the chosen paper");
   near(
     (processed[4].geometricBounds[1] - processed[0].geometricBounds[3]) / MM,
     0,
     "A4 rows stay touching, not overlapping",
   );
 }
+// Only AB changes height. Test both families at their largest supported
+// frames; PON/grid must use the new rect, never a shrunken artwork bound.
+for (const [type,w,h,paperH] of [["AB",212,300,625],["SMALLAB",150,211.5,625],
+  ["TT8",212,300,638],["SMALL16",150,211.5,638]]) {
+  const {c}=context(w,h);
+  const rect=[91*MM,1000*MM,(91+858)*MM,(1000-paperH)*MM];
+  const face={type}, grid=c.nominalGridFor(face,rect);
+  near(grid.paperW,858*MM,"Large form width");
+  near(grid.paperH,paperH*MM,"Only AB uses 625 mm height");
+  assert(grid.gridLeft>=rect[0] && grid.gridRight<=rect[2]);
+  assert(grid.gridBottom>=rect[3]-.001 && grid.gridTop<=rect[1]);
+  near(grid.pageW,w*MM,"AB does not resize input width");
+  near(grid.pageH,h*MM,"AB does not resize input height");
+  const marks=[];
+  const layer={pathItems:{add(){const mark={setEntirePath(points){this.points=points.map(p=>[...p]);}};marks.push(mark);return mark;}}};
+  c.addAutoPon(layer,rect,"large");
+  assert.equal(marks.length,8);
+  for(const corner of [[rect[0],rect[1]],[rect[2],rect[1]],[rect[0],rect[3]],[rect[2],rect[3]]])
+    assert.equal(marks.filter(m=>m.points.some(p=>Math.hypot(p[0]-corner[0],p[1]-corner[1])<.001)).length,2,"Both paper PON legs meet each new corner");
+  for(const points of cropPaths(c,face,rect))
+    assert(points.every(p=>p[0]>=rect[0]-.001 && p[0]<=rect[2]+.001 && p[1]<=rect[1]+.001 && p[1]>=rect[3]-.001));
+}
+for (const sheetNo of [0, 2]) {
+  const { c, processed } = context(212, 300);
+  const rect = [91 * MM, 1000 * MM, (91 + 858) * MM, (1000 - 625) * MM];
+  const face = { type: "AB", top: [1, 2, 3, 4], bottom: [5, 6, 7, 8], sheetNo };
+  const grid = c.nominalGridFor(face, rect);
+  const beforePon = cropPaths(c, face, rect);
+  c.placeFace8(face, rect);
+  const actual = boundsUnion(processed);
+  near(actual[1], rect[1] - 23 * MM, "Maximum A4 AB retains its established top gripper");
+  near(actual[3], actual[1] - 600 * MM, "Maximum A4 AB retains both full 300 mm rows");
+  for (const page of processed) {
+    const b = page.geometricBounds;
+    near((b[2] - b[0]) / MM, 212 - sheetNo * c.BOP_PER_SHEET / MM / 2,
+      "Maximum A4 AB remains exact before only the established inner-pair creep");
+    near((b[1] - b[3]) / MM, 300, "TT4 repair never resizes A4 AB page height");
+    assert(b[0] >= rect[0] - 0.01 && b[2] <= rect[2] + 0.01 &&
+      b[1] <= rect[1] + 0.01 && b[3] >= rect[3] - 0.01);
+  }
+  assert.strictEqual(JSON.stringify(c.nominalGridFor(face, rect)), JSON.stringify(grid));
+  assert.deepStrictEqual(cropPaths(c, face, rect), beforePon);
+}
 console.log(
-  "CTL A5: 14x20/max15x21.15 full-page fit, conditional allowance, internal overlap, centred pair creep, immutable PON and unchanged A4 rows verified.",
+  "CTL geometry: exact centred A4 TT4 20.9x30 cover, unchanged inner creep/PON, true oversized preflight, A5 full-page fit/allowance and unchanged AB/A4 rows verified.",
 );

@@ -2,6 +2,72 @@
 
 _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
+## v2.16.10 — phát hành sau oke test
+
+- phát hành sau oke test
+
+---
+
+## v2.16.9 — KTS tự nhân tối đa con lớn trước, con nhỏ sau (05/10/2026)
+
+- Theo yêu cầu mới, bỏ giới hạn con lớn bằng số object đã chọn trong chế độ ghép nhiều kích thước. Tự nhân mẫu lớn đến mức tối đa tìm được, rồi mới nhân mẫu nhỏ lấp phần còn lại; không lấy nhiều con nhỏ để đổi bớt con lớn. Có hơn hai nhóm kích thước thì ưu tiên lần lượt từ lớn xuống nhỏ, chia bản sao tương đối đều trong cùng nhóm. Mẫu nhỏ có thể chưa được dàn nếu con lớn đã lấp kín tờ.
+- Đổi ghi chú in đậm trên panel thành **“Tự nhân bản tối đa con lớn trước, rồi nhân bản con nhỏ lấp phần còn lại.”** Giữ nguyên kích thước thật, lề 3 mm, đường ra dao thẳng, gom cụm và ưu tiên ít công cắt trong các phương án cùng số con. Chỉ xóa nguồn đã dùng sau khi tạo đủ bản sao trước/sau; giữ nguyên nguồn không lọt.
+- Giấy **33 × 35,4 cm**: một mẫu hoặc 5/6 mẫu lớn **18,4 × 5,6 cm** + mẫu nhỏ **9,2 × 5,6 cm** → **8 lớn + 3 nhỏ**. Ca 6 mẫu lớn **15,2 × 7,2 cm** cũng → **8 lớn + 3 nhỏ**. Không bắt chuẩn bị đủ object lớn trước như v2.16.7.
+- Nạp engine KTS 22; giữ giới hạn tìm kiếm 128 con/tờ và cảnh báo khi chạm giới hạn. Đây là tìm kiếm có giới hạn với đường cắt đã kiểm chứng, không cam kết tối ưu toán học tuyệt đối. Không đổi Dàn bế, CTL, raster/JPG hay chế độ mỗi mẫu một tờ. Chỉ cài local, chưa phát hành GitHub.
+- Kiểm chứng: 30 bộ kiểm thử tự động qua; có ca một mẫu lớn tự nhân lên 8 con, nhiều mẫu lớn chia bản sao, nguồn nhỏ dọc, ưu tiên ba nhóm kích thước, nguồn dư/quá khổ, 128 con, hai mặt và lỗi tạo bản sao không xóa nguồn. Phát lại độc lập từng đường dao để kiểm tra không cắt qua bài. Đã chuẩn bị 12 ca native; chưa chạy trực tiếp bản này vì Illustrator đang đóng/không có kết nối COM, không tự mở ứng dụng hay sửa tài liệu người dùng.
+
+---
+
+## v2.16.8 — Đóng ghim A4: TT4 đúng khung 20,9 × 30 cm (05/10/2026)
+
+- Sửa kiểm tra TT4 A4 trên tờ **64,8 × 41,8 cm**: artwork vốn canh giữa, nhưng lưới kiểm tra/PON lại chừa cố định 9 mm trên. Khung **20,9 × 30 cm** xoay ra cao đúng **41,8 cm**, không cần cộng thêm 9 mm thành 427 mm rồi báo vượt giấy. Lưới danh định TT4 nay canh giữa cùng artwork; PON cắt bám đúng lưới mới.
+- Giữ nguyên kích thước nhập, không thu **20,9 × 30 cm** xuống nhỏ hơn. Trang nhỏ hơn tự có lề trên/dưới bằng nhau; **20 × 30 cm** vẫn chừa 9 mm mỗi đầu. Khổ thực sự quá lớn vẫn báo trước khi raster hoặc sửa nguồn. Không đổi bù độ dày gáy của ruột, A5, AB **85,8 × 62,5 cm**, vị trí ghi chú/icon hay lưu AI/JPG/ZIP.
+- Nạp lại engine Đóng ghim 40. Chỉ cài local, chưa phát hành GitHub.
+- Kiểm chứng: 30 bộ kiểm thử tự động qua; 4 ca trên Illustrator qua (bìa 20,9 × 30 cm, bìa 20 × 29,7 cm, từ chối khung 21 × 30 cm thực sự vượt TT4 trước khi raster, AB 21,2 × 30 cm không đổi). Đo bốn trang bìa TT4 đúng 20,9 × 30 cm sau xoay; PON cắt/giấy, ghi chú và kế hoạch lưu đúng. Các tài liệu người dùng đang mở và trạng thái ứng dụng được giữ nguyên.
+
+---
+
+## v2.16.7 — KTS ưu tiên số con lớn đã chuẩn bị, con nhỏ lấp phần dư (05/10/2026)
+
+- In đậm trên panel: **“Tối ưu con lớn trước, con nhỏ sau. Hãy chuẩn bị đúng số lượng cần của con lớn trước.”** Chỉ áp dụng cách xử lý mới cho ghép **nhiều kích thước** chung tờ; chế độ cùng kích thước/mỗi mẫu một tờ giữ nguyên.
+- Không tự nhân thêm con lớn. Ưu tiên dàn nhiều nhất các object lớn đã chọn, mỗi object lớn tối đa một lần; thiếu chỗ thì giữ nguyên object chưa dàn để làm tiếp. Sau đó mới nhân mẫu nhỏ lấp phần dư. Chỉ xóa nguồn đã dùng sau khi tất cả bản sao trước/sau đã tạo xong; mẫu nhỏ dù nhân nhiều bản cũng chỉ xóa nguồn một lần. Nếu tạo bản sao lỗi, chưa xóa nguồn; nếu không xóa được nguồn thì báo rõ trên panel.
+- Bổ sung tìm kiếm chia vùng theo kích thước thật cho hai nhóm kích thước, phối hợp tìm kiếm chung và gom cụm cắt. Phương án phải có thứ tự tách bằng dao thẳng, không khóa đường cắt. Ưu tiên số con lớn, số con nhỏ, rồi công hạ dao/đường cắt. Giữ kích thước, xoay 0°/90°, lề 3 mm và đăng ký hai mặt; không thu nhỏ bài. Tìm kiếm có giới hạn, không cam kết tối ưu toán học tuyệt đối. Giới hạn ghép 128 con/tờ và báo nếu chạm giới hạn này, tránh nhân hàng nghìn mẫu nhỏ làm treo Illustrator.
+- Giấy **33 × 35,4 cm**: 5 object lớn **18,4 × 5,6 cm** + mẫu nhỏ **9,2 × 5,6 cm** → **5 lớn + 10 nhỏ**; chuẩn bị 6 lớn → **6 lớn + 7 nhỏ**. Chọn 9 lớn chỉ lọt 8 → **8 lớn + 3 nhỏ**, giữ lại 1 nguồn lớn. Ca 6 lớn **15,2 × 7,2 cm** → **6 lớn + 7 nhỏ**; chọn 9 → **8 lớn + 3 nhỏ**, giữ lại 1 nguồn lớn.
+- Nạp lại engine KTS 21. Chỉ cài local, chưa phát hành GitHub; không thay Dàn bế, CTL hay raster/JPG.
+- Kiểm chứng: 30 bộ kiểm thử tự động qua; 10 ca trên Illustrator qua (1/2 mặt, nhiều nhóm, 5/6 con lớn, mẫu nhỏ nguồn dọc, chọn dư 9 con lớn). Đúng số con, kích thước và đăng ký hai mặt; chỉ xóa nguồn đã dàn sau khi tạo đủ hai mặt, giữ nguyên nguồn chưa dàn. Các tài liệu người dùng đang mở không đổi. Kiểm thử độc lập phát lại từng đường dao, có ca lỗi tạo bản sao giữ toàn bộ nguồn, nguồn quá khổ và cảnh báo 128 con.
+
+---
+
+## v2.16.6 — KTS nhiều kích thước: lấp khe và có đường cắt dao (05/10/2026)
+
+- Sửa việc dừng nhân mẫu nhỏ khi các mẫu lớn hết chỗ: chia số con tương đối đều trước, sau đó lấp phần trống bằng mẫu còn vừa, không giới hạn mẫu nhỏ chỉ được dư 1 con. Giữ kích thước thật, lề 3 mm và đăng ký trước/sau.
+- Phương án ghép phải có thứ tự cắt dao thẳng, không xếp khóa nhau. So sánh các phương án theo số con, diện tích sử dụng rồi công cắt: gom các hàng/cột cùng kích thước liền nhau, ưu tiên các cụm có thể chồng và dùng chung lần cắt. Không chỉ đếm đoạn cắt từng ô. Đây là tìm kiếm có giới hạn, không cam kết tối ưu toán học tuyệt đối cho mọi bộ mẫu.
+- Ca 6 mẫu **15,2 × 7,2 cm** và 1 mẫu **9,2 × 5,6 cm**, giấy **33 × 35,4 cm**: dàn **8 con lớn thành cụm 2 cột × 4 hàng phía trên**, **3 con nhỏ cùng một hàng dưới cùng**, tổng 11 con. Không để hàng nhỏ chen giữa cụm lớn. Thứ tự tách từng vùng có 13 đường; ước tính 9 lần hạ dao khi chồng các cụm đồng dạng, chưa tính xén lề 3 mm của giấy. Không vẽ thêm đường lên artwork.
+- Nạp lại engine KTS 20; không thay Dàn bế, CTL hay raster/JPG. Chỉ cài local, chưa phát hành GitHub.
+- Kiểm chứng: 30 bộ kiểm thử tự động qua; chạy riêng trên Illustrator cả ca nhiều kích thước thông thường và ca 6 lớn + 1 nhỏ, mỗi ca 1/2 mặt. Ca người dùng đều ra 11 con, đúng cụm lớn trên/nhỏ dưới, không đổi kích thước, không chồng bài, đăng ký hai mặt đúng; các tài liệu đang mở của người dùng không đổi. Kiểm thử độc lập phát lại từng đường dao và loại bố cục khóa đường cắt.
+
+---
+
+## v2.16.5 — Keo gáy khớp chính xác kích thước panel (05/10/2026)
+
+- Theo xác nhận mới **“Khớp chính xác hai cạnh theo panel”**, Keo gáy lấy rộng/cao nhập làm kích thước thật của object, thay chế độ giữ tỷ lệ trong khung tối đa. Không thêm khung trắng. Nguồn khác tỷ lệ sẽ được chỉnh hai trục cho khớp.
+- Bù chênh kích thước bitmap sau raster: nhập **21,2 × 30 cm** cho AB thì object ra đúng **21,2 × 30 cm**, không còn 29,9716 cm do tỷ lệ 3722 × 5262 pixel. Scale theo trục tài liệu để xử lý cả ảnh nguồn đã xoay.
+- Giữ AB **85,8 × 62,5 cm**, thứ tự trang/A–B, PON giấy/cắt và ghi chú. Tờ nhỏ giữ mức thu khung về cạnh **20,9 cm** trước khi khớp object vào khung đó; không thu các trang AB. Không đổi Đóng ghim giữa hay raster 500 ppi/JPG 300 ppi.
+- Nạp lại engine Keo gáy 13. Chỉ cài local, chưa phát hành GitHub.
+- Kiểm chứng: 30 bộ kiểm thử tự động qua, có ca bitmap 3722 × 5262 pixel và nguồn xoay. Ba bài mẫu riêng trên Illustrator qua: bitmap xoay AB + tự trở 4, nguồn vector/bốn tỷ lệ khác nhau AB + tự trở 4, A5 tự trở 4 khổ tối đa. Đo AB ra 21,2000 × 30,0000 cm; PON, A/B, tâm ô, ghi chú và khổ tờ nhỏ đúng. Không chạy sửa trên bài người dùng đang mở.
+
+---
+
+## v2.16.4 — AB CTL 85,8 × 62,5 cm (05/10/2026)
+
+- Đổi riêng **tờ AB A4/A5** của cả **Đóng ghim giữa và Keo gáy** sang rộng **85,8 cm**, cao **62,5 cm**, đúng số đã xác nhận. Giữ nguyên kích thước bài, thứ tự trang và đăng ký A/B; không đổi khổ bìa hay tờ tự trở.
+- PON giấy bám bốn góc của artboard mới, PON cắt bám lưới bài. Canvas và các nút lưu lấy khổ AB mới từ kết quả dàn. Keo gáy không nhận nhầm AB ngắn hơn là tờ nhỏ để thu bài về 20,9 cm.
+- Theo xác nhận bổ sung, **giữ nguyên cách đặt ghi chú và icon hiện tại**, không đổi vị trí tương đối/cỡ chữ/kích thước icon. Đóng ghim giữ lề nhíp A4/lưới A5 hiện tại; Keo gáy giữ lề trên 23,7 mm và kiểm tra trang A5 lớn vẫn vừa tờ mới. Không bóp/di chuyển ghi chú cùng khung giấy.
+- Nạp lại engine Đóng ghim 39 / Keo gáy 12. Chỉ cài local, chưa phát hành GitHub.
+- Kiểm chứng: 30 bộ kiểm thử tự động qua. Illustrator chạy bốn bài mẫu riêng: ghim AB A4 21,2 × 30 cm/A5 15 × 21,15 cm; keo gáy A4 AB + tự trở 4/A5 AB + tự trở 8. Đo khổ AB, trang nằm trong giấy, PON ở góc mới, ghi chú và khổ tự trở không đổi. Các file người dùng đang mở được giữ nguyên.
+
+---
+
 ## v2.16.3 — PHÁT HÀNH BẢN SAVE PDF CTL
 
 - PHÁT HÀNH BẢN SAVE PDF CTL

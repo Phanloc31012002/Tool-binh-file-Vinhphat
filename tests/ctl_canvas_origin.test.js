@@ -141,8 +141,8 @@ const main = fs.readFileSync(
   require.resolve("../DanCardCEP/js/main.js"),
   "utf8",
 );
-assert.match(main, /dcSignature8AutoPonVersion < 38/);
-assert.match(main, /dcKeoGayAutoPonVersion < 11/);
+assert.match(main, /dcSignature8AutoPonVersion < 40/);
+assert.match(main, /dcKeoGayAutoPonVersion < 13/);
 console.log(
   "CTL: shifted saved canvas, exact source anchor, genuine-edge preflight without source/PON mutation, creation rollback and coordinate restoration passed.",
 );

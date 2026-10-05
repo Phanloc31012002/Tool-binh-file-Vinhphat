@@ -1,9 +1,9 @@
 {
     "product":  "com.locdev.dancard",
-    "version":  "2.16.3",
-    "title":  "PHÁT HÀNH BẢN SAVE PDF CTL",
-    "description":  "PHÁT HÀNH BẢN SAVE PDF CTL",
-    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.16.3.zip",
-    "sha256":  "4A8ECD6567F52DA03E588CDE27F1E02CFF2699D5F1A5B25107097E8DE28D9D34",
-    "publishedUtc":  "2026-10-03T11:22:22.1077296Z"
+    "version":  "2.16.10",
+    "title":  "phát hành sau oke test",
+    "description":  "phát hành sau oke test",
+    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.16.10.zip",
+    "sha256":  "F3A9442E45B0ADA9493D5DBAA10562257C4DB8E13209007D7DC933B4D576E946",
+    "publishedUtc":  "2026-10-05T06:15:19.9426153Z"
 }

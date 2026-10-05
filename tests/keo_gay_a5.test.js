@@ -37,7 +37,6 @@ function fixture(n, w = 14, h = 20, left = 100, sourceHeight = 60 * h / w) {
     flatCalls = [];
   f.doc.artboards.remove = (i) => f.doc.artboards[i].remove();
   function resize(sx, sy) {
-    assert.equal(sx,sy,"Keo gay must never squeeze X/Y independently");
     const b = this.geometricBounds,
       cx = (b[0] + b[2]) / 2,
       cy = (b[1] + b[3]) / 2;
@@ -254,7 +253,7 @@ for (const [w, h] of [
         Math.min(w, h) * 40 * MM + 4 * MM + 1 <= 648 * MM &&
         Math.max(w, h) * 20 * MM + 1 <= 418 * MM;
       const sheet =
-        face.type === "TT4" ? [428, 313] : tt8Small ? [648, 418] : [858, 638];
+        face.type === "TT4" ? [428, 313] : tt8Small ? [648, 418] : [858, face.type === "AB" ? 625 : 638];
       near(r[2] - r[0], sheet[0] * MM);
       near(r[1] - r[3], sheet[1] * MM);
       for (const page of numbers(plan[bi])) {
@@ -385,7 +384,7 @@ for (const n of [16, 32, 48, 64]) {
   assert.ok(f.labels.includes("Ghi chú TỜ AB (16 trang, chỉ mặt A):"));
   for (const ab of f.doc.artboards) {
     near(ab.artboardRect[2] - ab.artboardRect[0], 858 * MM);
-    near(ab.artboardRect[1] - ab.artboardRect[3], 638 * MM);
+    near(ab.artboardRect[1] - ab.artboardRect[3], 625 * MM);
   }
 }
 const a4tt4 = fixture(4, 20, 28);
@@ -442,39 +441,47 @@ const main = fs.readFileSync(
   require.resolve("../DanCardCEP/js/main.js"),
   "utf8",
 );
-assert.match(main, /dcKeoGayAutoPonVersion < 11/);
+assert.match(main, /dcKeoGayAutoPonVersion < 13/);
 assert.match(main, /TT16: "Tự trở 16 trang"/);
 const squeeze = fixture(4,14,20,100,90);
-const beforeSqueeze = JSON.stringify(squeeze.originals.map(p=>p.geometricBounds));
-assert.match(squeeze.run(),/^ERR:.*Trang ruột 1:.*không bóp bài/);
-assert.equal(squeeze.flatCalls.length,0,"mismatch must be rejected before rasterizing any page");
+assert.match(squeeze.run(),/^OK:/);
+assert.equal(squeeze.flatCalls.length,4,"different aspects must now match both panel dimensions");
 assert.equal(squeeze.doc.artboards.length,1);
-assert.equal(squeeze.doc.layers.length,1);
-assert.equal(JSON.stringify(squeeze.originals.map(p=>p.geometricBounds)),beforeSqueeze);
+for(const p of squeeze.originals) {
+  const b=p.geometricBounds;
+  near(b[2]-b[0],200*MM); near(b[1]-b[3],140*MM);
+}
 const laterMismatch=fixture(4);
 laterMismatch.originals[3]._points.forEach(p=>{p[1]*=1.1;});
 laterMismatch.originals[3]._updateBounds();
-const laterBefore=JSON.stringify(laterMismatch.originals.map(p=>p.geometricBounds));
-assert.match(laterMismatch.run(),/^ERR:.*không bóp bài/);
-assert.equal(laterMismatch.flatCalls.length,0,"scan every source before consuming the first");
+assert.match(laterMismatch.run(),/^OK:/);
+assert.equal(laterMismatch.flatCalls.length,4);
 assert.equal(laterMismatch.doc.artboards.length,1);
-assert.equal(JSON.stringify(laterMismatch.originals.map(p=>p.geometricBounds)),laterBefore);
-assert.throws(()=>c.dcKeoGayPageScale(0,90,140,200));
-assert.throws(()=>c.dcKeoGayPageScale(60,90,140,200),/không bóp/);
-near(c.dcKeoGayPageScale(70,100,140,200),200);
-near(c.dcKeoGayPageScale(210,297,212,300,true),212/210*100);
-near(c.dcKeoGayPageScale(200,297,212,300,true),300/297*100);
-assert.throws(()=>c.dcKeoGayPageScale(200,297,212,300),/không bóp/);
+for(const p of laterMismatch.originals) {
+  const b=p.geometricBounds;
+  near(b[2]-b[0],200*MM); near(b[1]-b[3],140*MM);
+}
+for(const args of [[0,90,140,200],[60,NaN,140,200],[60,90,Infinity,200],[60,90,140,-1],[1e-310,90,140,200]])
+  assert.throws(()=>c.dcKeoGayPageScales(...args));
+assert.deepEqual(plain(c.dcKeoGayPageScales(70,100,140,200)),{x:200,y:200});
+near(c.dcKeoGayPageScales(210,297,212,300).x,212/210*100);
+near(c.dcKeoGayPageScales(210,297,212,300).y,300/297*100);
+const invalidSource=fixture(4);
+invalidSource.originals[3]._points.forEach(p=>{p[0]=500;});
+invalidSource.originals[3]._updateBounds();
+const invalidBefore=JSON.stringify(invalidSource.originals.map(p=>p.geometricBounds));
+assert.match(invalidSource.run(),/^ERR:.*Không đo được kích thước trang ruột/);
+assert.equal(invalidSource.flatCalls.length,0,"invalid source must fail before any raster/write");
+assert.equal(invalidSource.doc.artboards.length,1);
+assert.equal(JSON.stringify(invalidSource.originals.map(p=>p.geometricBounds)),invalidBefore);
 // A4 max applies only to the large form; small forms use a proportional
-// 20.9 cm limit. Mixed source aspects retain their own ratio and slot centre.
+// 20.9 cm limit. Every mixed source now fills both nominal slot dimensions.
 for (const n of [4,8,12,16,20,32,84]) {
   const f = fixture(n,21.2,30);
-  const before=[];
   f.originals.forEach((p,i)=>{
     const b=p.geometricBounds, heights=[60*297/210,60*297/200,90,75];
     p._points=[[b[0],b[1]],[b[2],b[1]],[b[2],b[1]-heights[i%4]],[b[0],b[1]-heights[i%4]]];
     p._updateBounds();
-    before.push({w:60,h:heights[i%4]});
   });
   const result=f.run();
   assert.match(result,/^OK:/);
@@ -486,12 +493,11 @@ for (const n of [4,8,12,16,20,32,84]) {
     const r=f.doc.artboards[fi].artboardRect;
     const small=face.type==="TT4", W=small?209:212, H=small?300*209/212:300;
     near(r[2]-r[0],(small?648:858)*MM);
-    near(r[1]-r[3],(small?418:638)*MM);
+    near(r[1]-r[3],(small?418:face.type==="AB"?625:638)*MM);
     numbers(face).forEach((pn,slot)=>{
-      const b=f.originals[pn-1].geometricBounds, src=before[pn-1];
-      const scale=Math.min(W*MM/src.w,H*MM/src.h);
-      const expectedW=(small?src.h:src.w)*scale;
-      const expectedH=(small?src.w:src.h)*scale;
+      const b=f.originals[pn-1].geometricBounds;
+      const expectedW=(small?H:W)*MM;
+      const expectedH=(small?W:H)*MM;
       near(b[2]-b[0],expectedW); near(b[1]-b[3],expectedH);
       assert.ok(b[0]>=r[0]-.01 && b[1]<=r[1]+.01 && b[2]<=r[2]+.01 && b[3]>=r[3]-.01);
       const cx=(r[0]+r[2])/2, cy=(r[1]+r[3])/2;
@@ -509,6 +515,38 @@ for (const n of [4,8,12,16,20,32,84]) {
     assert.ok(!f.originals.some(item=>{const b=item.geometricBounds;return x>b[0]+.01&&x<b[2]-.01&&y<b[1]-.01&&y>b[3]+.01;}),"Crop intrudes into fitted artwork");
   }
 }
+// Reported bug: 3722 x 5262 pixels at width 21.2 cm used to become
+// 29.971628 cm high. Exercise actual post-flatten measurement/placement,
+// both the large AB and smaller TT4 frame, including existing rotated art.
+for(const n of [16,20]) {
+  const f=fixture(n,21.2,30);
+  f.originals.forEach((p,i)=>p.rotate([0,90,180,270,17][i%5]));
+  f.context.dcFlattenForImposition=(_,item,frame,ppi)=>{
+    assert.equal(ppi,500);
+    const b=item.geometricBounds, width=3722*.144, height=5262*.144;
+    item._points=[[b[0],b[1]],[b[0]+width,b[1]],
+      [b[0]+width,b[1]-height],[b[0],b[1]-height]];
+    item._updateBounds();
+    return item;
+  };
+  assert.match(f.run(),/^OK:/);
+  const plan=plain(f.c.dcKeoGayPlan(n,false));
+  plan.forEach(face=>numbers(face).forEach(pn=>{
+    const b=f.originals[pn-1].geometricBounds, small=face.type==="TT4";
+    near(b[2]-b[0],(small?300*209/212:212)*MM);
+    near(b[1]-b[3],(small?209:300)*MM);
+  }));
+}
+// Matrix application must use document axes on existing bitmap orientations.
+for(const angle of [0,90,180,270,17]) {
+  const f=fixture(16,21.2,30);
+  f.originals.forEach(p=>p.rotate(angle));
+  assert.match(f.run(),/^OK:/);
+  f.originals.forEach(p=>{
+    const b=p.geometricBounds;
+    near(b[2]-b[0],212*MM); near(b[1]-b[3],300*MM);
+  });
+}
 for (const [w,h] of [[21.21,30],[21.2,30.01],[30,21.2]]) {
   const f=fixture(16,w,h), before=JSON.stringify(f.originals.map(p=>p.geometricBounds));
   assert.match(f.run(),/^ERR:.*Khung A4 tối đa 21,2 × 30/);
@@ -516,5 +554,5 @@ for (const [w,h] of [[21.21,30],[21.2,30.01],[30,21.2]]) {
   assert.equal(JSON.stringify(f.originals.map(p=>p.geometricBounds)),before);
 }
 console.log(
-  "Keo gay: same physical paper/corner PON as staple, A5 TT4 small sheet, 4 new panel cuts, SIG16/duplex/remainders, AI plan and A4 regression passed.",
+  "Keo gay: exact panel width/height, rounded bitmap regression, rotated sources, small-paper allowance, SIG16/duplex/PON/notes and AI plan passed.",
 );

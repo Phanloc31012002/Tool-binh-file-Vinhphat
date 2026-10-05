@@ -1388,7 +1388,7 @@
       var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
       var danBeBridgePath = extensionRoot + "/jsx/dan_be_bridge.jsx";
       return (
-        "if (typeof dcDanToiUu !== 'function' || typeof dcCopyToiUuNoteToAllArtboards !== 'function' || typeof dcCopyToiUuNoteToOddArtboards !== 'function' || typeof dcDanToiUuVersion === 'undefined' || dcDanToiUuVersion < 19) { $.evalFile(" +
+        "if (typeof dcDanToiUu !== 'function' || typeof dcCopyToiUuNoteToAllArtboards !== 'function' || typeof dcCopyToiUuNoteToOddArtboards !== 'function' || typeof dcDanToiUuVersion === 'undefined' || dcDanToiUuVersion < 22) { $.evalFile(" +
         jsStr(jsxPath) +
         "); } " +
         "if (typeof dcDanBePrepare !== 'function' || typeof dcDanBeRender !== 'function' || typeof dcDanBeNestingVersion === 'undefined' || dcDanBeNestingVersion < 8) { $.evalFile(" +
@@ -1450,7 +1450,7 @@
         .replace(/\\/g, "/");
       var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
       return (
-        "if (typeof dcRunSignature8 !== 'function' || typeof dcSignature8AutoPonVersion === 'undefined' || dcSignature8AutoPonVersion < 38) { $.evalFile(" +
+        "if (typeof dcRunSignature8 !== 'function' || typeof dcSignature8AutoPonVersion === 'undefined' || dcSignature8AutoPonVersion < 40) { $.evalFile(" +
         jsStr(jsxPath) +
         "); } "
       );
@@ -1465,7 +1465,7 @@
         .replace(/\\/g, "/");
       var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
       return (
-        "if (typeof dcRunKeoGay !== 'function' || typeof dcKeoGayAutoPonVersion === 'undefined' || dcKeoGayAutoPonVersion < 11) { $.evalFile(" +
+        "if (typeof dcRunKeoGay !== 'function' || typeof dcKeoGayAutoPonVersion === 'undefined' || dcKeoGayAutoPonVersion < 13) { $.evalFile(" +
         jsStr(jsxPath) +
         "); } "
       );

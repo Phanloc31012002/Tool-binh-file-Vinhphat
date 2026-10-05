@@ -87,7 +87,7 @@ function panel(options = {}) {
     dcDanToiUu() {},
     dcCopyToiUuNoteToOddArtboards() {},
     dcCopyToiUuNoteToAllArtboards() {},
-    dcDanToiUuVersion: 19,
+    dcDanToiUuVersion: 22,
     dcDanBeNestingVersion: 8,
     dcDanBePrepare(...args) {
       context.prepareArguments = args;
@@ -537,6 +537,7 @@ for (const scenario of [
   },
   { remove: [], bridgeVersion: 6, expected: ["dan_be_bridge.jsx"] },
   { remove: [], libraryVersion: 15, expected: ["dan_card_lib.jsx"] },
+  { remove: [], libraryVersion: 21, expected: ["dan_card_lib.jsx"] },
 ]) {
   const p = panel();
   const loaded = [];

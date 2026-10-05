@@ -3,7 +3,7 @@
 // only modal answers and icon-file IO are replaced with an isolated vector.
 (function () {
   var root = "C:/Users/ADMIN/Downloads/DanCard_Setup_23";
-  var out = new Folder(root + "/tmp/keo_gay_paper_2.16.2_" + new Date().getTime());
+  var out = new Folder(root + "/tmp/keo_gay_exact_2.16.5_" + new Date().getTime());
   if (!out.exists) out.create();
   function log(phase) {
     var progress = File(out.fsName + "/phase.txt");
@@ -55,6 +55,10 @@
     sourceSizes:[[21,29.7],[20,29.7],[21.2,30],[21,28]] });
   cases.push({ n:4, w:21.2, h:30, name:"A4_max_TT4_only", types:["TT4"],
     sourceSizes:[[21,29.7],[20,29.7],[21.2,30],[21,28]] });
+  cases.push({ n:16, w:21.2, h:30, name:"Existing_rotated_raster_AB", types:["AB","AB"],
+    sourceSizes:[[21.2,21.2*5262/3722]], rasterOnly:true });
+  cases.push({ n:20, w:21.2, h:30, name:"Existing_rotated_raster_AB_TT4", types:["AB","AB","TT4"],
+    sourceSizes:[[21.2,21.2*5262/3722]], rasterOnly:true });
   var spec = cases[ci],
     previous = app.documents.length ? app.activeDocument : null;
   var previousCoordinates = app.coordinateSystem,
@@ -169,6 +173,7 @@
     log("LOAD v" + dcKeoGayAutoPonVersion + " " + spec.name);
     previousFlatten = dcFlattenForImposition;
     dcFlattenForImposition = function (d, item, frame, dpi) {
+      assert(d === doc, "Refusing to rasterize outside owned fixture");
       assert(dpi===500,"All new Keo Gay rasters must use 500ppi");
       var page = parseInt(item.name.replace("SOURCE_PAGE_", ""), 10);
       var flat = previousFlatten(d, item, frame, dpi);
@@ -198,6 +203,7 @@
     doc.artboards[0].name = "KEO_OLD_SOURCE";
     var keep = doc.pathItems.rectangle(200, -200, 20, 20),
       keepBounds = bounds(keep);
+    var sourcePages = [];
     for (var pi = 0; pi < spec.n; pi++) {
       var x = 100 + (pi % 8) * 100,
         y = 600 - Math.floor(pi / 8) * 250;
@@ -218,10 +224,19 @@
       label.contents = String(pi + 1) + " TOP";
       label.textRange.characterAttributes.size = 12;
       label.position = [x + 2, y - 4];
+      if (spec.rasterOnly) {
+        var bitmap = previousFlatten(doc, g, bounds(g), 500);
+        bitmap.name = "SOURCE_PAGE_" + (pi + 1);
+        bitmap.rotate([0,90,180,270,17][pi % 5]);
+        var bitmapBounds = bounds(bitmap);
+        bitmap.translate(x-bitmapBounds[0],y-bitmapBounds[1]);
+        sourcePages.push(bitmap);
+      } else sourcePages.push(g);
     }
     doc.selection = null;
-    for (var gi = 0; gi < doc.groupItems.length; gi++)
-      doc.groupItems[gi].selected = true;
+    for (var gi = 0; gi < sourcePages.length; gi++)
+      sourcePages[gi].selected = true;
+    assert(app.activeDocument === doc, "Active document changed; refusing to run on user content");
     // Exercise coordinate normalisation with a non-document user mode.
     app.coordinateSystem = CoordinateSystem.ARTBOARDCOORDINATESYSTEM;
     var status = dcRunKeoGay(String(spec.w), String(spec.h));
@@ -255,7 +270,7 @@
         faces[bi].smallSelfTurn &&
         Math.min(spec.w, spec.h) * 40 * MM + 4 * MM + 1 <= 648 * MM &&
         Math.max(spec.w, spec.h) * 20 * MM + 1 <= 418 * MM;
-      var paperSize = [858, 638];
+      var paperSize = [858, faces[bi].type === "AB" ? 625 : 638];
       if (faces[bi].type === "TT4") {
         if (small) paperSize = [428, 313];
         else paperSize = [648, 418];
@@ -290,21 +305,16 @@
         assert(!!item, "Missing page " + ns[ni]);
         assert(inside(r, bounds(item)), "Page outside paper " + ns[ni]);
         var pageBounds=bounds(item), sortedSize=[pageBounds[2]-pageBounds[0],pageBounds[1]-pageBounds[3]].sort(function(a,b){return a-b;});
-        // Small synthetic source pages are enlarged after rasterization;
-        // account for a rounded source pixel, not an independent X/Y scale.
-        var pixelTolerance=(spec.exact?0.2:0.15*spec.w*10/(60/MM))*MM;
-        var inputSize=spec.sourceSizes ? spec.sourceSizes[(ns[ni]-1)%spec.sourceSizes.length] : [spec.w,spec.h];
-        var fitScale=Math.min(spec.w/inputSize[0],spec.h/inputSize[1])*frameScale;
-        assert(Math.abs(sortedSize[0]-Math.min(inputSize[0],inputSize[1])*fitScale*10*MM)<pixelTolerance &&
-          Math.abs(sortedSize[1]-Math.max(inputSize[0],inputSize[1])*fitScale*10*MM)<pixelTolerance,"Page dimensions changed or squeezed");
-        var pageMatrix=item.matrix;
-        assert(Math.abs(Math.sqrt(pageMatrix.mValueA*pageMatrix.mValueA+pageMatrix.mValueB*pageMatrix.mValueB)-
-          Math.sqrt(pageMatrix.mValueC*pageMatrix.mValueC+pageMatrix.mValueD*pageMatrix.mValueD))<0.00001,"X/Y page scale differs");
+        // Both measured physical edges must match the panel/form frame, even
+        // when the source aspect or rounded bitmap pixel counts differ.
+        assert(Math.abs(sortedSize[0]-Math.min(spec.w,spec.h)*frameScale*10*MM)<0.03 &&
+          Math.abs(sortedSize[1]-Math.max(spec.w,spec.h)*frameScale*10*MM)<0.03,
+          "Page dimensions differ from panel/form frame: "+sortedSize.join("x"));
         if(spec.exact) {
           var mx=item.matrix;
           var nativePpi=[72/Math.sqrt(mx.mValueA*mx.mValueA+mx.mValueB*mx.mValueB),72/Math.sqrt(mx.mValueC*mx.mValueC+mx.mValueD*mx.mValueD)];
-          assert(Math.abs(nativePpi[0]-nativePpi[1])<0.01,"X/Y raster scale differs");
-          assert(Math.abs(nativePpi[0]-500)<2,"Output raster not 500ppi");
+          assert(Math.abs(nativePpi[0]-500)<2 && Math.abs(nativePpi[1]-500)<2,
+            "Output processing raster not approximately 500ppi after pixel correction");
           report.effectivePpi=nativePpi;
         }
         if (packed) {
@@ -467,6 +477,7 @@
     report = {
       name: spec.name,
       passed: true,
+      exactPanelSize: true,
       status: status,
       types: spec.types,
       artboards: rects,
