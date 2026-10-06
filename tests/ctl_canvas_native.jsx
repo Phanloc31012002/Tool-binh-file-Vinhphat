@@ -1,5 +1,5 @@
-// Opt-in regression on owned copies of the saved AI whose canvas is shifted.
-// Never saves, groups, rasterizes or removes anything in the user's document.
+// Test hồi quy (chỉ chạy khi chủ động bật) trên bản sao riêng của file AI đã lưu có canvas bị lệch.
+// Không bao giờ lưu, group, rasterize hay xoá bất cứ thứ gì trong tài liệu của người dùng.
 (function () {
   var root = "C:/Users/ADMIN/Downloads/DanCard_Setup_23";
   var folder = new Folder(

@@ -28,7 +28,7 @@ function fixture(
   f.doc.selection = f.originals.slice();
   f.sourceLayer.parent = f.doc;
   f.sourceLayer.typename = "Layer";
-  // A selected old PON must be filtered, not deleted on rejected preflight.
+  // PON cũ đang được chọn phải được lọc bỏ chứ không bị xoá khi bước kiểm tra trước từ chối.
   const oldPon = f.doc.layers.add();
   oldPon.name = "Pon cat CTL Offset tu dong";
   oldPon.typename = "Layer";
@@ -43,7 +43,7 @@ function fixture(
     if (++addCount === failArtboard) throw Error("injected artboard failure");
     return originalAdd(rect);
   };
-  // Execute the actual complete preflight; stop before rendering in this test.
+  // Chạy trọn bước kiểm tra trước thật; trong test này thì dừng trước khi dựng.
   f.context.alert = () => {};
   f.context.File = function (path) {
     this.name = path;

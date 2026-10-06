@@ -1,6 +1,6 @@
-// Opt-in Illustrator regression for shortened AB paper. Only owned synthetic
-// documents are edited; the real engine/raster/grid/PON/note code is executed.
-// Modal answers and external icon-file IO use isolated deterministic fixtures.
+// Test hồi quy trong Illustrator cho giấy AB rút ngắn, chỉ chạy khi chủ động bật. Chỉ sửa các
+// tài liệu tự dựng của riêng test; code engine/raster/lưới/PON/ghi chú thật đều được chạy.
+// Câu trả lời hộp thoại modal và việc đọc/ghi file icon ngoài dùng dữ liệu mẫu cô lập, tất định.
 (function () {
   var root = "C:/Users/ADMIN/Downloads/DanCard_Setup_23";
   var ci = typeof taskCtlABCase === "undefined" ? 0 : Number(taskCtlABCase);

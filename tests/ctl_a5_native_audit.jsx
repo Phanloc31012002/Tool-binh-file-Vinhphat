@@ -1,8 +1,8 @@
-// Opt-in native CTL A5 diagnostic. Set dcCtlAuditSourceName to the exact
-// OPEN document name. Only duplicates in a new unsaved document are changed.
-// No production geometry is stubbed. Dialog answers and the isolated icon
-// pathname are substituted; an observer appended to addNoteA5 captures the
-// exact assigned face without changing its placement logic. Alerts are logged.
+// Script chẩn đoán CTL A5 trong Illustrator thật, chỉ chạy khi chủ động bật. Gán dcCtlAuditSourceName
+// bằng đúng tên tài liệu đang MỞ. Chỉ các bản nhân bản trong một tài liệu mới chưa lưu bị thay đổi.
+// Không phần hình học nào của code thật bị thay bằng bản giả. Câu trả lời hộp thoại và đường dẫn
+// icon cô lập được thay thế vào; một đoạn quan sát gắn vào cuối addNoteA5 ghi lại
+// đúng mặt được gán mà không đổi logic đặt vị trí của nó. Các alert đều được ghi log.
 (function () {
   var basePath = "C:/Users/ADMIN/Downloads/DanCard_Setup_23/";
   var libraryPath =
@@ -230,9 +230,9 @@
   }
   function sourceStructure(doc) {
     if (!doc) return null;
-    // Illustrator can expose the active document's artboard collection when
-    // querying a different inactive document. Activate the requested original
-    // for ALL getters, then restore the prior document immediately.
+    // Illustrator có thể trả về tập artboard của tài liệu đang active khi ta
+    // truy vấn một tài liệu khác không active. Kích hoạt tài liệu gốc được yêu cầu
+    // cho MỌI getter, rồi trả lại ngay tài liệu trước đó.
     var previousActive = app.activeDocument;
     doc.activate();
     try {
@@ -282,9 +282,9 @@
   }
   function assertSourceUnchanged() {
     if (!sourceDoc) return;
-    // Illustrator may invalidate document/item collection wrappers when the
-    // copied icon document opens/closes. Resolve the still-open ORIGINAL by
-    // exact name again instead of trusting the earlier wrapper's collections.
+    // Illustrator có thể làm mất hiệu lực các wrapper của tập tài liệu/item khi
+    // tài liệu icon sao chép mở/đóng. Tìm lại bản GỐC vẫn đang mở theo
+    // đúng tên thay vì tin vào các tập của wrapper trước đó.
     var freshSource = sourceByName();
     var previouslyActive = app.activeDocument;
     if (freshSource) freshSource.activate();
@@ -427,10 +427,10 @@
       }
     }
     if (sourceMode === "raster48") {
-      // Geometry-only rerun fixture for an already-imposed document. Read its
-      // 48 images individually (including images inside the pair/panel groups)
-      // and exclude generated PON/text/icon vectors from the COPIED selection.
-      // Snapshot/check every original pageItem, not only these copied images.
+      // Dữ liệu mẫu chạy lại chỉ phần hình học cho một tài liệu đã dàn sẵn. Đọc riêng
+      // từng ảnh trong 48 ảnh của nó (kể cả ảnh nằm trong các group cặp/panel)
+      // và loại các vector PON/chữ/icon tự sinh khỏi selection ĐÃ SAO CHÉP.
+      // Chụp snapshot/kiểm tra mọi pageItem gốc, không chỉ các ảnh được sao chép này.
       if (sourceDoc.rasterItems.length !== 48)
         fail(
           "raster48 diagnostic mode requires exactly 48 source RasterItems.",
@@ -438,8 +438,8 @@
       for (pi = 0; pi < sourceDoc.rasterItems.length; pi++)
         roots.push(sourceDoc.rasterItems[pi]);
     }
-    // Persist the original numeric snapshot BEFORE creating/copying anything.
-    // A diagnostic must not rely only on a later successful assertion.
+    // Lưu snapshot số của bản gốc TRƯỚC KHI tạo/sao chép bất cứ thứ gì.
+    // Một bản chẩn đoán không được chỉ dựa vào một assertion thành công về sau.
     var serializedFrames = [];
     for (pi = 0; pi < sourceSnapshots.length; pi++) {
       var snapshot = sourceSnapshots[pi];
@@ -476,18 +476,18 @@
     var copies = [];
     for (pi = 0; pi < roots.length; pi++)
       copies.push(roots[pi].duplicate(inputLayer, ElementPlacement.PLACEATEND));
-    // Preserve source-relative positions while moving only the isolated
-    // copies to a predictable safe origin within the normal canvas.
+    // Giữ nguyên vị trí tương đối theo nguồn, chỉ dời các bản sao đã cô lập
+    // tới một gốc toạ độ an toàn, đoán trước được, nằm trong canvas thường.
     var copyUnion = null;
     for (pi = 0; pi < copies.length; pi++)
       copyUnion = unionBounds(copyUnion, copies[pi].visibleBounds);
     for (pi = 0; pi < copies.length; pi++)
       copies[pi].translate(-copyUnion[0], -copyUnion[1]);
     testDoc.selection = copies;
-    // Cross-document duplicate/selection calls can reactivate the source in
-    // Illustrator. The production entry point reads app.activeDocument, so
-    // explicitly reactivate the owned document and fail BEFORE calling it if
-    // its identity or the copied selection is not exactly what we expect.
+    // Các lệnh nhân bản/chọn giữa hai tài liệu có thể khiến Illustrator kích hoạt lại
+    // tài liệu nguồn. Điểm vào của code thật đọc app.activeDocument, nên phải
+    // chủ động kích hoạt lại tài liệu của riêng test và báo lỗi TRƯỚC KHI gọi nó nếu
+    // danh tính tài liệu hoặc selection đã sao chép không đúng hệt như mong đợi.
     testDoc.activate();
     assertOwnedActive();
     assertSourceUnchanged();
@@ -500,9 +500,9 @@
       "showNoteDialog",
       "return {bia:'BÌA',tt4:'',tt8:'',ab:'',small4:'',small8:'',small16:'',smallAB:''};",
     );
-    // Preserve the complete original note body. Add an observation only after
-    // it has finished, so its exact face/rect remains identifiable even when
-    // the legacy note is outside the artboard. Never replace note positions.
+    // Giữ nguyên toàn bộ thân hàm ghi chú gốc. Chỉ thêm phần quan sát sau khi
+    // nó chạy xong, để vẫn nhận ra đúng mặt/rect của nó ngay cả khi
+    // ghi chú kiểu cũ nằm ngoài artboard. Không bao giờ thay vị trí ghi chú.
     var noteRange = functionBodyRange(functionSource, "addNoteA5");
     var noteBody = functionSource.substring(
       noteRange.open + 1,
@@ -514,8 +514,8 @@
       noteBody +
         "\nif (typeof tf !== 'undefined' && tf) dcCtlCaptureNativeNote(face,text,pos,tf,icon);\n",
     );
-    // A second assertion at the production document capture prevents its
-    // PON-cleanup or resize logic touching any document except our owned copy.
+    // Assertion thứ hai ngay chỗ code thật lấy tài liệu sẽ ngăn logic dọn PON
+    // hay resize của nó đụng vào bất kỳ tài liệu nào ngoài bản sao của riêng ta.
     var documentCapture = "var doc = app.activeDocument;";
     if (functionSource.indexOf(documentCapture) < 0)
       fail("Production document capture changed; audit needs review.");
@@ -541,7 +541,7 @@
       )
         fail("Refusing flatten on a non-owned diagnostic document.");
       var result = originalFlatten(doc, item, frame, resolution);
-      // Observation only: return exactly the object production flatten made.
+      // Chỉ quan sát: trả về đúng object mà hàm flatten của code thật đã tạo.
       if (doc === testDoc) processed.push(result);
       return result;
     };
@@ -552,9 +552,9 @@
     if (status.indexOf("OK:") !== 0) fail(status);
     if (processed.length !== 48)
       fail("Expected 48 actual processed source frames.");
-    // The icon open/close can change the active document. Artboard getters
-    // are active-document-coupled on this Illustrator build, so reactivate
-    // our owned output explicitly before ANY output artboard measurement.
+    // Việc mở/đóng icon có thể đổi tài liệu đang active. Ở bản Illustrator này,
+    // các getter artboard gắn chặt với tài liệu đang active, nên phải chủ động kích hoạt lại
+    // tài liệu kết quả của riêng ta trước BẤT KỲ phép đo artboard kết quả nào.
     testDoc.activate();
     if (
       String(app.activeDocument.name) !== testDocumentName ||
@@ -697,8 +697,8 @@
             String(pageW).replace(".", "p") +
             "x" +
             String(pageH).replace(".", "p");
-      // Reject path syntax in a filename prefix; the explicit render directory
-      // remains the only destination. No original document is ever captured.
+      // Từ chối cú pháp đường dẫn trong tiền tố tên file; thư mục render chỉ định rõ
+      // vẫn là đích duy nhất. Không bao giờ chụp ảnh bất kỳ tài liệu gốc nào.
       if (/[\\\/\:]/.test(renderPrefix))
         fail("Native image prefix must be a filename only.");
       var capturedTypes = {},
@@ -737,8 +737,8 @@
       " artboards, 48 copied frames, original unchanged."
     );
   } catch (auditError) {
-    // Keep native output evidence even when the preservation check fails.
-    // Root can compare serializable numeric snapshots before retrying.
+    // Giữ lại bằng chứng kết quả từ Illustrator thật kể cả khi kiểm tra bảo toàn bản gốc bị lỗi.
+    // Phía gọi có thể so các snapshot số tuần tự hoá được trước khi thử lại.
     try {
       if (!report)
         report = {
@@ -761,8 +761,8 @@
   } finally {
     alert = previousAlert;
     dcFlattenForImposition = originalFlatten;
-    // The note loader closes its copied icon document normally. If it throws
-    // after opening, close only the fixture path, never an original icon.ai.
+    // Bình thường bộ nạp ghi chú tự đóng tài liệu icon sao chép của nó. Nếu nó ném lỗi
+    // sau khi mở, chỉ đóng file ở đường dẫn dữ liệu mẫu, không bao giờ đóng icon.ai gốc.
     for (
       var closeIndex = app.documents.length - 1;
       closeIndex >= 0;

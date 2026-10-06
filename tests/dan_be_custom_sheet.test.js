@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const vm = require("node:vm");
 const illustrator = require("./illustrator_geometry_mock");
+const { nodes } = require("./dan_be_variable_fixture");
 const bridge = fs.readFileSync(
   require.resolve("../DanCardCEP/jsx/dan_be_bridge.jsx"),
   "utf8",
@@ -55,16 +56,16 @@ function fixture(twoSided = false) {
     front,
     back,
     twoSided,
-    prepare(args = []) {
-      return c.dcDanBePrepare("2", "4", "7.5", twoSided, ...args);
+    prepare(args = [], gapText = "2") {
+      return c.dcDanBePrepare(gapText, "4", "7.5", twoSided, ...args);
     },
     io() {
       return { openCalls, dialogCalls };
     },
   };
 }
-function prepared(f, args) {
-  const result = f.prepare(args);
+function prepared(f, args, gapText = "2") {
+  const result = f.prepare(args, gapText);
   assert.match(result, /^OKJSON:/, result);
   const payload = JSON.parse(result.slice(7)),
     job = f.c.dcDanBeJobs[payload.jobId];
@@ -76,12 +77,95 @@ function prepared(f, args) {
   assert.equal(f.c.app.coordinateSystem, "user-coordinates");
   return { payload, job };
 }
+function pointSegmentDistance(p, a, b) {
+  const dx = b[0] - a[0], dy = b[1] - a[1], length = dx * dx + dy * dy;
+  const t = length ? Math.max(0, Math.min(1,
+    ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / length)) : 0;
+  return Math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy);
+}
+function bezierAt(a, b, c, d, t) {
+  const u = 1 - t;
+  return [0, 1].map((axis) => u * u * u * a[axis] +
+    3 * u * u * t * b[axis] + 3 * u * t * t * c[axis] +
+    t * t * t * d[axis]);
+}
+function assertBezierAccuracy(groups, maximumErrorMm) {
+  // Các điểm lấy mẫu này tính theo handle bậc ba GỐC, không phải theo
+  // cách làm phẳng đường cong của bridge hay một phép xấp xỉ hình tròn/bounding box.
+  const contour = groups[0][0];
+  let maximum = 0;
+  for (let ni = 0; ni < nodes.length; ni++) {
+    const n = nodes[ni], next = nodes[(ni + 1) % nodes.length];
+    for (let sample = 0; sample <= 256; sample++) {
+      const p = bezierAt(n.a, n.r, next.l, next.a, sample / 256);
+      let nearest = Infinity;
+      for (let ei = 0; ei < contour.length; ei++)
+        nearest = Math.min(nearest, pointSegmentDistance(
+          p, contour[ei], contour[(ei + 1) % contour.length]));
+      maximum = Math.max(maximum, nearest);
+    }
+  }
+  assert.ok(maximum <= maximumErrorMm + 1e-8,
+    `true cubic distance ${maximum} mm exceeds flattening bound ${maximumErrorMm} mm`);
+}
 
-// Missing custom parameters mean the documented defaults, not a file prompt.
+// Đường cong khe 0 cần một biên dạng mịn hơn nhiều và một khoản dự trữ sai số tường minh.
+// Bảy điểm/handle gốc và toàn bộ trạng thái object nguồn vẫn nguyên vẹn.
+{
+  const f = fixture(), nodesBefore = JSON.stringify(nodes);
+  const offsetPoint = (p) => [10 + p[0] * MM, 20 + p[1] * MM];
+  f.cut.setEntirePath(nodes.map((n) => offsetPoint(n.a)));
+  f.cut.pathPoints = nodes.map((n) => ({
+    anchor: offsetPoint(n.a),
+    leftDirection: offsetPoint(n.l),
+    rightDirection: offsetPoint(n.r),
+  }));
+  const bounds = f.cut.geometricBounds, right = bounds[2] + 20;
+  f.front.setEntirePath([
+    [right, bounds[1]], [right + 100, bounds[1]],
+    [right + 100, bounds[3]], [right, bounds[3]],
+  ]);
+  const sourceBefore = JSON.stringify(f.originals.map((i) => ({
+    points: i._points, pathPoints: i.pathPoints, bounds: i.geometricBounds,
+  })));
+  const positive = prepared(f, undefined, "1").payload;
+  const zero = prepared(f, undefined, "0").payload;
+  assert.equal(positive.types.length, 1);
+  assert.equal(zero.types.length, 1);
+  assert.equal(positive.gapMm, 1);
+  assert.equal(zero.gapMm, 0);
+  assert.equal(positive.types[0].curveErrorMm, 0,
+    "positive-gap processing retains the existing 0.025 mm silhouette");
+  near(zero.types[0].curveErrorMm, 0.00025);
+  assert.equal(positive.types[0].groups[0][0].length, 99);
+  assert.equal(zero.types[0].groups[0][0].length, 1027);
+  assert.ok(zero.types[0].groups[0][0].length >
+    10 * positive.types[0].groups[0][0].length);
+  assertBezierAccuracy(positive.types[0].groups, 0.025);
+  assertBezierAccuracy(zero.types[0].groups, 0.00025);
+  assert.equal(JSON.stringify(nodes), nodesBefore, "portable Bezier nodes stay unchanged");
+  assert.equal(JSON.stringify(f.originals.map((i) => ({
+    points: i._points, pathPoints: i.pathPoints, bounds: i.geometricBounds,
+  }))), sourceBefore, "Prepare cannot edit the source curves or art");
+}
+{
+  const f = fixture();
+  const before = JSON.stringify(f.cut.pathPoints);
+  const positive = prepared(f).payload;
+  const zero = prepared(f, undefined, "0").payload;
+  assert.equal(positive.types[0].curveErrorMm, 0);
+  assert.equal(zero.types[0].curveErrorMm, 0,
+    "straight zero-gap paths do not reserve a nonexistent Bezier error");
+  assert.deepEqual(zero.types[0].groups, positive.types[0].groups,
+    "straight outlines remain exact at every gap");
+  assert.equal(JSON.stringify(f.cut.pathPoints), before);
+}
+
+// Thiếu tham số tuỳ chỉnh nghĩa là dùng mặc định đã mô tả sẵn, không phải hiện hộp chọn file.
 {
   const f = fixture(),
     { payload, job } = prepared(f);
-  assert.equal(f.c.dcDanBeNestingVersion, 8);
+  assert.equal(f.c.dcDanBeNestingVersion, 10);
   near(payload.sheet.widthMm, 330);
   near(payload.sheet.heightMm, 354);
   const expected = [
@@ -95,7 +179,7 @@ function prepared(f, args) {
   );
   job.pon.rect.forEach((n, i) => near(n, [0, 354 * MM, 330 * MM, 0][i]));
 }
-// Paper is entered in cm; four offsets are mm from paper edge to DOT CENTRE.
+// Khổ giấy nhập theo cm; bốn độ lệch tính bằng mm từ mép giấy tới TÂM CHẤM.
 const customArgs = ["42,3", "29,7", "13,25", "17,5", "21,75", "25,25"];
 {
   const f = fixture(),
@@ -113,7 +197,7 @@ const customArgs = ["42,3", "29,7", "13,25", "17,5", "21,75", "25,25"];
   );
   job.pon.rect.forEach((n, i) => near(n, [0, 297 * MM, 423 * MM, 0][i]));
 }
-// The complete 5 mm dots fit even when exactly tangent to the paper edge.
+// Cả chấm 5 mm vẫn nằm lọt trong giấy ngay cả khi tiếp xúc đúng mép giấy.
 {
   const f = fixture(),
     { payload } = prepared(f, ["3", "4", "2.5", "2.5", "2.5", "2.5"]);
@@ -123,7 +207,7 @@ const customArgs = ["42,3", "29,7", "13,25", "17,5", "21,75", "25,25"];
     assert.ok(d.x + d.r <= 30 && d.y + d.r <= 40);
   }
 }
-// Opposite dots may be tangent, but they cannot overlap.
+// Hai chấm đối diện có thể tiếp xúc nhau, nhưng không được chồng lấn.
 prepared(fixture(), ["3", "4", "10", "10", "12.5", "12.5"]);
 
 const invalid = [
@@ -131,7 +215,7 @@ const invalid = [
   ["-1", "35.4", "10", "10", "10", "10"],
   ["5001", "35.4", "10", "10", "10", "10"],
   ["33", "5001", "10", "10", "10", "10"],
-  ["510", "35.4", "10", "10", "10", "10"], // Normal canvas is too narrow.
+  ["510", "35.4", "10", "10", "10", "10"], // Canvas thường quá hẹp.
   ["33cm", "35.4", "10", "10", "10", "10"],
   ["Infinity", "35.4", "10", "10", "10", "10"],
   ["NaN", "35.4", "10", "10", "10", "10"],
@@ -200,8 +284,8 @@ for (let field = 0; field < 3; field++) {
   assert.deepEqual(f.io(), { openCalls: 0, dialogCalls: 0 });
 }
 
-// Duplex width includes both faces and their 10 mm gap. Reject before nesting;
-// the same large sheet is valid in a scaled Large Canvas document.
+// Bề rộng hai mặt gồm cả hai mặt và khe 10 mm giữa chúng. Từ chối trước khi dàn bế;
+// cùng tờ lớn đó lại hợp lệ trong một tài liệu Large Canvas có áp tỉ lệ.
 {
   const f = fixture(true);
   assert.match(
@@ -214,8 +298,8 @@ for (let field = 0; field < 3; field++) {
   prepared(f, ["260", "35.4", "10", "10", "10", "10"]);
 }
 
-// Render an actual custom Prepare job; every face gets four 5 mm dots and the
-// asymmetric positions mirror horizontally, while image/text are not reflected.
+// Dựng một job Prepare tuỳ chỉnh thật; mỗi mặt có bốn chấm 5 mm và các
+// vị trí bất đối xứng được lật ngang, còn ảnh/chữ thì không bị lật.
 {
   const f = fixture(true),
     { payload } = prepared(f, customArgs);

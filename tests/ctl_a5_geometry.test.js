@@ -1,5 +1,5 @@
-// Execute the production CTL form/grid/placement helpers, not a rewritten
-// geometry formula. The mock implements only affine bounding-box operations.
+// Chạy chính các hàm phụ form/lưới/đặt bài CTL của code thật, không phải một
+// công thức hình học viết lại. Bản giả lập chỉ cài các phép affine trên bounding box.
 const assert = require("assert");
 const fs = require("fs");
 const vm = require("vm");
@@ -245,9 +245,9 @@ function paperPaths(c, rect, kind) {
   return paths.map(path => ({ points: path.points, stroke: path.strokeWidth }));
 }
 
-// A4 cover/self-turn TT4 already centres the two rotated page pairs. Its
-// nominal grid must use that same vertical centre instead of reserving a
-// nonexistent 9 mm top gripper and rejecting a true 209 x 300 mm input.
+// TT4 bìa/tự trở A4 vốn đã canh giữa hai cặp trang xoay. Lưới danh định
+// của nó phải dùng đúng tâm dọc đó thay vì chừa một lề nhíp trên 9 mm
+// không tồn tại rồi từ chối khổ nhập thật 209 x 300 mm.
 for (const widthMm of [200, 209]) for (const heightMm of [270, 300])
 for (const sheetNo of [0, 2]) {
   const { c, processed } = context(widthMm, heightMm, 4);
@@ -454,9 +454,9 @@ for (const [widthMm, heightMm] of [
   );
 }
 
-// Landscape A5 input is normalised before these helpers receive pageW/pageH.
-// Assert the actual production branch still normalises only the A5 family,
-// then execute the same portrait dimensions for the 20 x 14 entry.
+// Khổ A5 nhập nằm ngang được chuẩn hoá trước khi các hàm phụ này nhận pageW/pageH.
+// Kiểm tra rằng nhánh code thật vẫn chỉ chuẩn hoá riêng họ A5,
+// rồi chạy cùng kích thước khổ đứng đó cho trường hợp nhập 20 x 14.
 assert.match(
   signature,
   /var SMALL_SOURCE_IS_LANDSCAPE = IS_SMALL_A5 && PAGE_W > PAGE_H/,
@@ -480,7 +480,7 @@ assert.match(
   );
 }
 
-// Larger A4 form still uses full-height rows from its fixed top gripper.
+// Form A4 lớn hơn vẫn dùng các hàng cao đủ, tính từ lề nhíp trên cố định của nó.
 for (const type of ["TT8", "AB"]) {
   const { c, processed } = context(200, 290);
   const paperH = type === "AB" ? 625 : 638;
@@ -498,8 +498,8 @@ for (const type of ["TT8", "AB"]) {
     "A4 rows stay touching, not overlapping",
   );
 }
-// Only AB changes height. Test both families at their largest supported
-// frames; PON/grid must use the new rect, never a shrunken artwork bound.
+// Chỉ AB đổi chiều cao. Test cả hai họ ở khung lớn nhất được hỗ trợ;
+// PON/lưới phải dùng rect mới, tuyệt đối không dùng bounds bài đã bị thu nhỏ.
 for (const [type,w,h,paperH] of [["AB",212,300,625],["SMALLAB",150,211.5,625],
   ["TT8",212,300,638],["SMALL16",150,211.5,638]]) {
   const {c}=context(w,h);

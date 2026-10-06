@@ -1,7 +1,7 @@
-// Opt-in Illustrator COM diagnostic. Uses only its own synthetic document.
+// Script chẩn đoán Illustrator qua COM, chỉ chạy khi chủ động bật. Chỉ dùng tài liệu tự dựng của riêng nó.
 (function () {
   var root = "C:/Users/ADMIN/Downloads/DanCard_Setup_23";
-  // Set $.global.dcCtlExportAuditFormat = "AI" for the editable AI roundtrip.
+  // Đặt $.global.dcCtlExportAuditFormat = "AI" để chạy vòng lưu/mở lại file AI còn chỉnh sửa được.
   var isAI = $.global.dcCtlExportAuditFormat === "AI";
   var folder = new Folder(
     root +
@@ -158,7 +158,7 @@
         image.name = "RASTER_1";
       }
     }
-    // Hidden content and a locked individual PON must not disturb export.
+    // Nội dung ẩn và một PON riêng lẻ bị khoá không được làm ảnh hưởng tới việc xuất.
     pon.pageItems[0].locked = true;
     pon.locked = true;
     var hidden = owned.layers.add();
@@ -285,7 +285,7 @@
       openedOutput.activate();
       openedOutput.close(SaveOptions.DONOTSAVECHANGES);
     }
-    // Write diagnostics before closing the last fixture (some COM hosts exit then).
+    // Ghi chẩn đoán trước khi đóng dữ liệu mẫu cuối cùng (một số host COM thoát ngay lúc đó).
     var out = new File(folder.fsName + "/result.json");
     out.encoding = "UTF-8";
     out.open("w");

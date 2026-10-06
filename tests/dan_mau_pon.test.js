@@ -37,11 +37,11 @@ for (const throws of [false, true]) {
   assert.deepStrictEqual(calls, [true], "keep multi-source option");
 }
 const core = lib.slice(end, lib.indexOf("//  dcAutoSavePDF", end));
-assert.match(core, /dcDanTheoMauOutputPositions\(ponF\.W, ponF\.H/);
+assert.match(core, /dcDanTheoMauOutputPositions\(\s*ponF\.W,\s*ponF\.H/);
 assert.doesNotMatch(core, /ARTBOARDS_PER_COLUMN|var startCx = ponF\.cx/);
 assert.match(core, /R\.cx = \(pr\[0\] \+ pr\[2\]\) \/ 2;/);
 assert.match(core, /R\.cy = \(pr\[1\] \+ pr\[3\]\) \/ 2;/);
-assert.match(main, /loadDanTheoMauJsx\(\) \+ "dcApMau\("/);
+assert.match(main, /loadDanTheoMauJsx\(\)\s*\+\s*"dcApMau\("/);
 assert.match(main, /dcDanTheoMauVersion < 2/);
 console.log(
   "Dàn theo mẫu: document-coordinate PON offsets and canvas planning, coordinate restore, multi-source forwarding and stale-engine reload passed.",

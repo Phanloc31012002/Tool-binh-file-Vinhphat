@@ -151,9 +151,9 @@ assert.equal(
 );
 assert.match(unfit.error, /loại 2/, "unfit error identifies the cutter");
 
-// Thousands of tiny cutters used to spend 16+ seconds in quadratic final
-// checks, despite a 250 ms search slice. Spatial broad-phase retains every
-// exact near-pair check while keeping this large deterministic fixture bounded.
+// Hàng nghìn khuôn bế tí hon từng mất hơn 16 giây cho các bước kiểm tra cuối có độ phức tạp
+// bậc hai, dù lát tìm kiếm chỉ 250 ms. Bước lọc thô theo không gian vẫn giữ đủ mọi phép kiểm tra
+// chính xác cho các cặp gần nhau mà vẫn giữ dữ liệu mẫu lớn, tất định này chạy trong giới hạn.
 const tinyStarted = Date.now();
 const tiny = nester.nest(f.input(f.circle(1), { budgetMs: 250 }));
 assert.equal(tiny.ok, true, tiny.error);
@@ -169,8 +169,8 @@ console.log(
   "Tiny circles: " + tiny.count + " dies, bounded physical verification",
 );
 
-// Two L-shaped cutters occupy each other's empty quadrants although their
-// bounding rectangles overlap by 18 x 18 mm. A bbox-only packer rejects this.
+// Hai khuôn bế hình chữ L lồng vào góc phần tư trống của nhau dù hai hình chữ nhật
+// bao của chúng chồng lấn 18 x 18 mm. Bộ xếp chỉ dựa vào bbox sẽ loại trường hợp này.
 const elbow = [
   [
     [

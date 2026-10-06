@@ -353,8 +353,8 @@ if (-not $Force -and $state.lastCheckUtc) {
 try {
     $manifestUrl = Test-HttpsUrl -Value $config.manifestUrl -Label 'manifestUrl'
     Write-UpdateLog 'Đang kiểm tra bản cập nhật online…'
-    # GitHub Raw returns latest.json as text/plain.  Parse it explicitly and
-    # remove an optional UTF-8 BOM so Windows PowerShell 5 can read it too.
+    # GitHub Raw trả latest.json về dạng text/plain.  Phân tích tường minh và
+    # bỏ BOM UTF-8 nếu có để Windows PowerShell 5 cũng đọc được.
     $manifestHeaders = @{ 'User-Agent' = 'CongCuBinhUpdater'; 'Accept' = 'application/vnd.github+json' }
     # Khi chưa có bản đang chờ cài, dùng ETag để GitHub trả 304 cho lần kiểm
     # tra không có thay đổi. Nhờ vậy kiểm tra mỗi phút không tải lại nội dung
@@ -381,8 +381,8 @@ try {
     }
     $manifestText = ([string]$manifestResponse.Content).TrimStart([char]0xFEFF)
     $remote = $manifestText | ConvertFrom-Json
-    # GitHub Contents API returns the manifest as base64.  Supporting this
-    # endpoint avoids the five-minute CDN cache used by raw.githubusercontent.
+    # GitHub Contents API trả manifest về dạng base64.  Hỗ trợ endpoint
+    # này giúp tránh cache CDN năm phút mà raw.githubusercontent dùng.
     if (([string]$remote.encoding).ToLowerInvariant() -eq 'base64' -and -not [string]::IsNullOrWhiteSpace([string]$remote.content)) {
         try {
             $base64 = ([string]$remote.content) -replace '\s', ''

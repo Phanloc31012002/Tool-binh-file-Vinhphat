@@ -89,13 +89,13 @@ function auditPlan(specs, w, h, allowUnplaced = false) {
   assert.deepStrictEqual(Array.from(plan.counts), counts);
   noOverlap(Array.from(plan.slots, (s) => [s.x, -s.y, s.x + s.w, -s.y - s.h]));
   auditKnife(plan, w, h);
-  // Independent of the solver's free rectangles: no extra source should fit
-  // at an existing right/bottom edge in either orientation after hole filling.
+  // Độc lập với các hình chữ nhật trống của bộ giải: sau khi lấp lỗ, không nguồn nào
+  // còn đặt thêm được tại một mép phải/dưới sẵn có, dù theo hướng nào.
   const xs = [0, ...Array.from(plan.slots, s => s.x + s.w)];
   const ys = [0, ...Array.from(plan.slots, s => s.y + s.h)];
   for (const [modelIndex, spec] of specs.entries()) for (const rotated of [false, true]) {
-    // A 129-copy candidate is outside the knife validator's cap: null would
-    // not prove saturation. The plan must disclose this bounded-search stop.
+    // Phương án 129 con vượt quá giới hạn của bộ kiểm tra đường dao: null khi đó không
+    // chứng minh được là đã kín chỗ. Kế hoạch phải nói rõ lần dừng do giới hạn tìm kiếm này.
     if (plan.capacityLimited) continue;
     const sw = rotated ? spec.h : spec.w, sh = rotated ? spec.w : spec.h;
     for (const x of xs) for (const y of ys) {
@@ -113,8 +113,8 @@ function auditPlan(specs, w, h, allowUnplaced = false) {
   );
   return plan;
 }
-// A large square and a smaller rectangle fit alongside each other; forcing
-// all models into the largest bounding box loses the smaller positions.
+// Một hình vuông lớn và một hình chữ nhật nhỏ hơn đặt vừa cạnh nhau; nếu ép
+// mọi mẫu vào bounding box lớn nhất thì sẽ mất các vị trí nhỏ hơn.
 const holePlan = auditPlan(
   [
     { w: 60, h: 60 },
@@ -124,16 +124,16 @@ const holePlan = auditPlan(
   120,
 );
 assert.deepStrictEqual(Array.from(holePlan.counts), [2, 2]);
-// User regression: templates are repeatable again. First maximize the
-// large size to eight copies, then fill the remaining region with small ones.
+// Hồi quy do người dùng báo: mẫu lại được phép lặp lại. Trước hết dàn tối đa
+// cỡ lớn lên tám con, sau đó lấp vùng còn lại bằng các con nhỏ.
 const sixLargeOneSmall = Array.from({ length: 6 }, () => ({ w: 152, h: 72 }))
   .concat([{ w: 92, h: 56 }]);
 const userPlan = auditPlan(sixLargeOneSmall, 324, 348);
 assert.deepStrictEqual(Array.from(userPlan.counts), [2, 2, 1, 1, 1, 1, 3]);
 assert.strictEqual(userPlan.count, 11);
 
-// Five distinct 18.4 x 5.6 cm templates must be distributed round-robin
-// across eight large positions, before the 9.2 x 5.6 cm filler is repeated.
+// Năm mẫu 18.4 x 5.6 cm khác nhau phải được chia xoay vòng
+// cho tám vị trí lớn, trước khi lặp lại mẫu lấp chỗ 9.2 x 5.6 cm.
 const fiveLargeOneSmall = Array.from({ length: 5 }, () => ({ w: 184, h: 56 }))
   .concat([{ w: 92, h: 56 }]);
 const latestUserPlan = auditPlan(fiveLargeOneSmall, 324, 348);
@@ -151,15 +151,15 @@ assert.deepStrictEqual(Array.from(repeatPlan.counts), [8, 3],
   "A single large template must repeat to the same maximum as six large templates");
 assert.strictEqual(repeatPlan.count, 11);
 
-// Largest-first is stronger than maximizing total copies or requiring every
-// selected size to appear. Three 60 x 100 copies attain the area upper bound;
-// the residual 20 mm strip cannot accept a medium, but holds five small ones.
+// Ưu tiên cỡ lớn nhất trước mạnh hơn việc tối đa hoá tổng số con hay buộc mọi
+// cỡ đã chọn đều phải xuất hiện. Ba con 60 x 100 đạt cận trên về diện tích;
+// dải 20 mm còn dư không nhận được con cỡ vừa nhưng chứa được năm con nhỏ.
 const threeSizeSpecs = [{ w: 60, h: 100 }, { w: 40, h: 60 }, { w: 20, h: 20 }];
 const threeSizePlan = auditPlan(threeSizeSpecs, 200, 100, true);
 assert.deepStrictEqual(Array.from(threeSizePlan.counts), [3, 0, 5]);
-// Priority continues through intermediate sizes, not just the largest size.
-// One largest leaves 100 x 60: two rotated mediums plus three small squares
-// outrank one medium plus more small squares, despite the latter's higher total.
+// Thứ tự ưu tiên áp dụng tiếp cho các cỡ trung gian, không chỉ riêng cỡ lớn nhất.
+// Một con lớn nhất để lại vùng 100 x 60: hai con cỡ vừa xoay cùng ba ô vuông nhỏ
+// được xếp trên một con cỡ vừa kèm thêm nhiều ô vuông nhỏ, dù phương án sau có tổng số cao hơn.
 const threeTierSpecs = [{ w: 100, h: 80 }, { w: 60, h: 40 }, { w: 20, h: 20 }];
 const threeTierPlan = auditPlan(threeTierSpecs, 100, 140);
 assert.deepStrictEqual(Array.from(threeTierPlan.counts), [1, 2, 3]);
@@ -191,8 +191,8 @@ assert.strictEqual(capacityPlan.count, 128);
 assert.strictEqual(capacityPlan.capacityLimited, true,
   "Search must explicitly disclose remaining holes at its 128-copy cap");
 
-// A portrait source is the same small physical piece, not a new packing
-// constraint: allow its 0/90 rotations without resizing or changing identity.
+// Nguồn khổ dọc vẫn là cùng một con nhỏ ngoài thực tế, không phải một ràng buộc
+// xếp mới: cho phép xoay 0/90 mà không đổi kích thước hay đổi danh tính của nó.
 const userCases = [
   [sixLargeOneSmall, userPlan, 3],
   [fiveLargeOneSmall, latestUserPlan, 3],
@@ -208,9 +208,9 @@ const portraitCases = userCases.map(([specs, , requiredSmall]) => {
   return [portraitSpecs, plan, requiredSmall];
 });
 
-// Cutting-effort regression is independent of the max-count solver. When
-// eight large and three small copies are given, regroup whole bands so all
-// large rows precede the small row, preserving the eight-large-first priority.
+// Test hồi quy về công cắt độc lập với bộ giải tối đa số lượng. Khi
+// cho sẵn tám con lớn và ba con nhỏ, gom lại nguyên từng dải sao cho mọi
+// hàng lớn đứng trước hàng nhỏ, giữ nguyên ưu tiên tám con lớn trước.
 const groupedSlots = Array.from({ length: 8 }, (_, i) => ({
   x: (i % 2) * 152, y: Math.floor(i / 2) * 72,
   w: 152, h: 72, angle: 0, modelIndex: i % 6
@@ -257,7 +257,7 @@ const gridCuts = pure.dcKtsKnifePlan(grid, 100, 100);
 assert.strictEqual(gridCuts.cutCount, 3);
 assert.strictEqual(gridCuts.workCount, 2, "Two identical strips can be stacked for the second cut");
 auditKnife({ ...gridCuts, slots: grid }, 100, 100);
-// A pinwheel fills the paper perfectly but has no straight first cut.
+// Kiểu xếp chong chóng lấp kín giấy hoàn hảo nhưng không có nhát cắt thẳng đầu tiên nào.
 assert.strictEqual(pure.dcKtsKnifePlan([
   { x: 0, y: 0, w: 4, h: 2 }, { x: 4, y: 0, w: 2, h: 4 },
   { x: 2, y: 4, w: 4, h: 2 }, { x: 0, y: 2, w: 2, h: 4 },
@@ -289,7 +289,7 @@ for (const specs of [
 assert.throws(() => pure.dcKtsMixedSizePlan([{ w: 1, h: 1 }], Infinity, 100));
 assert.throws(
   () => pure.dcKtsMixedSizePlan([{ w: 400, h: 400 }], 324, 348),
-  /khong vua/,
+  /không vừa/,
 );
 const sameSizeOverflow = auditPlan([
   { w: 60, h: 60 }, { w: 60, h: 60 }
@@ -298,7 +298,7 @@ assert.strictEqual(sameSizeOverflow.count, 1);
 assert.deepStrictEqual(Array.from(sameSizeOverflow.counts).sort(), [0, 1]);
 assert.throws(
   () => pure.dcKtsMixedSizePlan([{ w: 0.1, h: 0.1 }], 324, 348),
-  /Qua nhieu/,
+  /Quá nhiều/,
 );
 
 function setup(specs, twoSided, backDust = 0, options = {}) {
@@ -322,8 +322,8 @@ function setup(specs, twoSided, backDust = 0, options = {}) {
       );
     top -= Math.max(h, 200) + 100;
   }
-  // Source-only removal instrumentation lives in this fixture, not in the
-  // shared geometric mock. Keep original references to audit omitted items.
+  // Phần theo dõi việc xoá chỉ dành cho nguồn nằm trong dữ liệu mẫu này, không nằm trong
+  // bản giả lập hình học dùng chung. Giữ tham chiếu tới bản gốc để kiểm tra các item bị bỏ ra.
   for (const original of mock.originals) {
     original.removeCalls = 0;
     original.removed = false;
@@ -367,7 +367,7 @@ for (const twoSided of [false, true]) {
   const result = c.dcDanToiUu("33", "35.4", twoSided, true);
   assert.match(result, /^OK:/);
   if (expectedPlan.capacityLimited) assert.match(result,
-    /Da dat gioi han 128 con\/to cua tim kiem ghep; chua lap het phan du\./,
+    /Đã đạt giới hạn 128 con\/tờ của tìm kiếm ghép; chưa lấp hết phần dư\./,
     "Renderer must warn rather than call its 128-copy search cap a fully filled result");
   const fronts = mock.duplicates.filter(i => i.layer.name ===
     (twoSided ? "Dan toi uu - Mat truoc" : "Dan toi uu"));
@@ -416,7 +416,7 @@ for (const twoSided of [false, true])
     const source = mock.originals.map((i) => i.geometricBounds);
     const result = c.dcDanToiUu("33", "35.4", twoSided, true);
     assert.match(result, /^OK:/, result);
-    assert.match(result, /Ghep nhieu kich thuoc; so con tung mau:/);
+    assert.match(result, /Ghép nhiều kích thước; số con từng mẫu:/);
     assert.strictEqual(mock.doc.artboards.length, twoSided ? 2 : 1);
     const fronts = mock.duplicates.filter((i) =>
       twoSided
@@ -479,8 +479,8 @@ for (const twoSided of [false, true])
     assert.deepStrictEqual(counts, Array.from(expected.counts));
     auditSourceCleanup(mock, counts, source);
   }
-// Individually valid sources need not all fit together. Keep the leftover
-// smaller source unchanged after successfully packing the largest template.
+// Các nguồn hợp lệ riêng lẻ không nhất thiết đặt vừa cùng nhau. Giữ nguyên nguồn
+// nhỏ hơn còn thừa sau khi đã dàn thành công mẫu lớn nhất.
 for (const twoSided of [false, true]) {
   const { mock, c } = setup([[240, 240], [250, 250]], twoSided);
   const before = mock.originals.map(i => i.geometricBounds);
@@ -490,8 +490,8 @@ for (const twoSided of [false, true]) {
   assert.strictEqual(fronts[0].identity, "F1");
   auditSourceCleanup(mock, [0, 1], before);
 }
-// A render failure must never consume source material, including a failure
-// after the front side has succeeded but before all backs are duplicated.
+// Lỗi khi render tuyệt đối không được làm mất nguồn, kể cả khi lỗi xảy ra
+// sau khi mặt trước đã xong nhưng trước khi nhân bản hết các mặt sau.
 for (const twoSided of [false, true]) {
   const { mock, c } = setup(sixLargeOneSmall.map(s => [s.w, s.h]), twoSided, 0,
     { failDuplicateAt: twoSided ? userPlan.count + 3 : 3 });

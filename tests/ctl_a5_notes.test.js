@@ -118,7 +118,7 @@ function makeFixture(type, rectMm, artMm) {
     const item = {
       removed: false,
       angle: 0,
-      // Deliberately larger visible bounds than geometry: preserve strokes.
+      // Cố ý để visible bounds lớn hơn bounds hình học: giữ lại nét viền.
       get visibleBounds() {
         return [x, y, x + 8 * MM, y - 8 * MM];
       },
@@ -232,7 +232,7 @@ function verifyLowerLeft(fixture) {
   );
 }
 
-// A full-height maximum A5 SMALL8 has no header, but has a wide side strip.
+// SMALL8 A5 tối đa, cao kín tờ, không có dải đầu tờ nhưng có một dải bên rộng.
 const maximum = makeFixture(
   "SMALL8",
   [1200, 518, 1848, 100],
@@ -268,7 +268,7 @@ assert.throws(
       false,
       blockedLeft.face,
     ),
-  /qua dai/,
+  /quá dài/,
   "SMALL8 cannot fall back to header or right margin when left strip is too narrow",
 );
 
@@ -324,7 +324,7 @@ assert.throws(
       false,
       impossible.face,
     ),
-  /qua dai/,
+  /quá dài/,
 );
 assert.equal(impossible.texts[0].removed, true);
 assert.equal(
@@ -339,7 +339,7 @@ assert.equal(
 );
 assert.equal(impossible.context.noteIconTemplate, null);
 
-// Placement must avoid a mark inside an otherwise usable blank strip.
+// Vị trí đặt phải né dấu nằm bên trong một dải trống lẽ ra vẫn dùng được.
 const ctx = long.context;
 const obstacle = mmRect([1, 312, 32, 301]);
 const placement = ctx.a5NotePlacement(

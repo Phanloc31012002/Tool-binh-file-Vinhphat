@@ -145,7 +145,7 @@ for (const separate of [false, true]) {
       near(fa[1], fc[1]);
       near(ba[0], bc[0]);
       near(ba[1], bc[1]);
-      // Verify every actual polygon vertex, not just identical bounding boxes.
+      // Kiểm tra từng đỉnh đa giác thật, không chỉ các bounding box giống nhau.
       frontCuts[i]._points.forEach((p, j) => {
         near(backCuts[i]._points[j][0] - br[0], f.paperW - (p[0] - fr[0]));
         near(backCuts[i]._points[j][1] - br[3], p[1] - fr[3]);
@@ -167,7 +167,7 @@ for (const separate of [false, true]) {
   );
   assert.strictEqual(f.c.app.coordinateSystem, "user-coordinates");
 }
-// Selection triples remain correct despite order, z-order and tiny Y shifts.
+// Các bộ 3 lấy từ selection vẫn đúng dù thứ tự chọn, z-order có khác và Y lệch rất nhỏ.
 {
   const f = fixture(),
     items = f.models
@@ -191,7 +191,7 @@ for (const separate of [false, true]) {
   items[0].translate(0, -100);
   assert.throws(() => f.c.dcDanBeTripleModels(items, 0.01), /Hàng nguồn/);
 }
-// Exercise actual Prepare with automatic PON and unchanged source roles.
+// Chạy thử bước Prepare thật với PON tự động và vai trò các nguồn giữ nguyên.
 function prepareFixture(layerMode) {
   const f = fixture();
   let ponPrompts = 0,

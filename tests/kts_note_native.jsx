@@ -1,4 +1,4 @@
-// Native note-copy regression: only owned synthetic documents are changed.
+// Test hồi quy sao chép ghi chú trong Illustrator thật: chỉ sửa các tài liệu tự dựng của riêng nó.
 (function () {
   var root = "C:/Users/ADMIN/Downloads/DanCard_Setup_23";
   var folder = new Folder(root + "/tmp/kts_notes_20261003");

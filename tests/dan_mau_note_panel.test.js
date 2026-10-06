@@ -119,7 +119,7 @@ calls.at(-1).callback("ERR: choose a note");
 assert.equal(results.at(-1).output, ids.outCopyDanMauNote);
 assert.equal(ids.btnCopyToiUuNoteOneSide.disabled, false);
 
-// Exercise the actual shared accordion handler, not a new custom toggle.
+// Chạy thử đúng hàm xử lý accordion dùng chung, không phải một toggle tự viết mới.
 let opened = false;
 const arrow = {};
 const head = {

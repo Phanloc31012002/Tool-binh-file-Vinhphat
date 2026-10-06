@@ -1,4 +1,4 @@
-// Opt-in native cleanup regression. Only owned, unsaved fixtures are changed.
+// Test hồi quy dọn dẹp trong Illustrator thật, chỉ chạy khi chủ động bật. Chỉ sửa dữ liệu mẫu riêng, chưa lưu.
 (function () {
   var root = "C:/Users/ADMIN/Downloads/DanCard_Setup_23";
   var folder = new Folder(root + "/tmp/dan_mau_canvas_20261003");
@@ -88,7 +88,7 @@
           expectedCount = 2;
         }
         status = dcDanTuTro("33", "35.4", "4", "0", false, mode);
-        // Offset already consumes placed pairs; cleanup adds no source removal.
+        // Offset vốn đã dùng luôn các cặp đã đặt; bước dọn dẹp không xoá thêm nguồn nào.
         sources = [];
       }
       if (ci === 5 || ci === 6 || ci === 8) {

@@ -32,6 +32,7 @@ nhập dữ liệu biến (variable data).
    ```
 
    (Dán đường dẫn trên vào thanh địa chỉ File Explorer để đi tới đúng chỗ.)
+
 5. Mở Illustrator: **Window > Extensions > Công cụ bình**.
 
 > Nếu Windows cảnh báo khi chạy lệnh `reg add`, đó là do thay đổi cấu hình hệ
@@ -51,17 +52,17 @@ Xem các thay đổi của từng bản tại
 
 Panel gồm 9 tab:
 
-| Tab | Chức năng |
-|---|---|
-| **Dàn file** | **Dàn Card** (6 loại card, hỗ trợ card đôi 18.4×5.6, voucher ghép card). Mục Dàn Decal cũ đã bỏ; dùng **Dàn tối ưu → Dàn bế** để xếp decal theo khuôn. |
-| **Dàn tối ưu** | Dàn KTS/Offset và **Dàn bế** theo biên khuôn thật: xoay bốn hướng, tận dụng chỗ lõm, nhập khổ giấy và tự tạo bốn chấm PON, giữ khuôn/bài ở layer riêng. Dàn bế mặc định mỗi mẫu một tờ; tick **Dàn nhiều mẫu vào một tờ** để gộp. Thêm **Dàn bế 2 mặt (tag)**: chọn Khuôn → trước → sau theo hàng; mỗi tờ tạo cặp artboard đối xứng lật ngang, không lật gương chữ/hình. KTS hai mặt khóa từng cặp trái/trước và phải/sau theo hàng nguồn. |
-| **Dấu cắt** | Tạo dấu cắt theo các thiết lập trên panel. |
-| **Dàn theo mẫu** | **Học mẫu**: học bố cục từ 1 bản đã dàn tay (1 hoặc 2 mặt), gồm vị trí, kích thước và góc xoay của từng ô. **Áp mẫu** có hai chế độ: mặc định mỗi nguồn tạo một artboard và nhân vào các ô; tick chọn nhiều mẫu thì các nguồn lần lượt vào từng ô, thiếu nguồn bù bằng con cuối rồi gần cuối. Dùng được với hình tròn và artwork xoay khác nhau. |
-| **Catalogue** | Dàn trang catalogue đóng gáy giữa, khổ A4 hoặc A5 (hoặc khổ tùy chỉnh nhỏ hơn), tự nhớ pon riêng theo từng khổ. |
-| **CTL Offset** | Dàn bình cho in offset khổ lớn 65×86: **Đóng ghim giữa** (bìa TT4 + ruột AB tự trở) và **Keo gáy** (mỗi tay 16 trang, dàn AB tuần tự). |
-| **Đổi tên** | Đổi tên hàng loạt object: tiền tố, số/chữ thường/HOA, vị trí bắt đầu, đệm số 0, hướng đếm trên/dưới, lặp nhãn. |
-| **Variable** | Mở công cụ Variable Importer — nhập dữ liệu CSV/TXT (giữ dấu tiếng Việt) để tạo nhiều bản từ 1 template. |
-| **Auto Save** | Rà các hàng từ trên xuống: hàng có 2 object là trước/sau và xuất PDF 2 trang; hàng có 1 object là card một mặt, tên file thêm ` - 1 mat` trước `cm/km`. Tool kiểm tra trùng tên file trước khi xuất. Kèm nút **Clip 9.2 × 5.6 (tự xoay)** để cắt khung nhanh. |
+| Tab              | Chức năng                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Dàn file**     | **Dàn Card** (6 loại card, hỗ trợ card đôi 18.4×5.6, voucher ghép card). Mục Dàn Decal cũ đã bỏ; dùng **Dàn tối ưu → Dàn bế** để xếp decal theo khuôn.                                                                                                                                                                                                                                                                                     |
+| **Dàn tối ưu**   | Dàn KTS/Offset và **Dàn bế** theo biên khuôn thật: xoay bốn hướng, tận dụng chỗ lõm, nhập khổ giấy và tự tạo bốn chấm PON, giữ khuôn/bài ở layer riêng. Dàn bế mặc định mỗi mẫu một tờ; tick **Dàn nhiều mẫu vào một tờ** để gộp. Thêm **Dàn bế 2 mặt (tag)**: chọn Khuôn → trước → sau theo hàng; mỗi tờ tạo cặp artboard đối xứng lật ngang, không lật gương chữ/hình. KTS hai mặt khóa từng cặp trái/trước và phải/sau theo hàng nguồn. |
+| **Dấu cắt**      | Tạo dấu cắt theo các thiết lập trên panel.                                                                                                                                                                                                                                                                                                                                                                                                 |
+| **Dàn theo mẫu** | **Học mẫu**: học bố cục từ 1 bản đã dàn tay (1 hoặc 2 mặt), gồm vị trí, kích thước và góc xoay của từng ô. **Áp mẫu** có hai chế độ: mặc định mỗi nguồn tạo một artboard và nhân vào các ô; tick chọn nhiều mẫu thì các nguồn lần lượt vào từng ô, thiếu nguồn bù bằng con cuối rồi gần cuối. Dùng được với hình tròn và artwork xoay khác nhau.                                                                                           |
+| **Catalogue**    | Dàn trang catalogue đóng gáy giữa, khổ A4 hoặc A5 (hoặc khổ tùy chỉnh nhỏ hơn), tự nhớ pon riêng theo từng khổ.                                                                                                                                                                                                                                                                                                                            |
+| **CTL Offset**   | Dàn bình cho in offset khổ lớn 65×86: **Đóng ghim giữa** (bìa TT4 + ruột AB tự trở) và **Keo gáy** (mỗi tay 16 trang, dàn AB tuần tự).                                                                                                                                                                                                                                                                                                     |
+| **Đổi tên**      | Đổi tên hàng loạt object: tiền tố, số/chữ thường/HOA, vị trí bắt đầu, đệm số 0, hướng đếm trên/dưới, lặp nhãn.                                                                                                                                                                                                                                                                                                                             |
+| **Variable**     | Mở công cụ Variable Importer — nhập dữ liệu CSV/TXT (giữ dấu tiếng Việt) để tạo nhiều bản từ 1 template.                                                                                                                                                                                                                                                                                                                                   |
+| **Auto Save**    | Rà các hàng từ trên xuống: hàng có 2 object là trước/sau và xuất PDF 2 trang; hàng có 1 object là card một mặt, tên file thêm ` - 1 mat` trước `cm/km`. Tool kiểm tra trùng tên file trước khi xuất. Kèm nút **Clip 9.2 × 5.6 (tự xoay)** để cắt khung nhanh.                                                                                                                                                                              |
 
 Nút **Raster** trên header: raster nhanh object đang chọn (CMYK, 450 ppi, nền
 trong suốt). Cạnh đó là nút **Clip**: cắt object đang chọn theo khung KT nhập

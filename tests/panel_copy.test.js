@@ -3,9 +3,9 @@ const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 
-// Word baseline is from v2.15.4. Control/navigation snapshots include the
-// requested note relocation (v2.15.17) and CTL filename field/package script (v2.16.1). No dependency on
-// the installed extension or on a Windows user path when run in CI.
+// Mốc số lượng từ lấy theo v2.15.4. Các snapshot control/điều hướng đã gồm
+// việc dời ghi chú theo yêu cầu (v2.15.17) và ô tên file CTL/script đóng gói (v2.16.1). Không phụ thuộc vào
+// extension đã cài hay đường dẫn người dùng Windows khi chạy trong CI.
 const baseline = {
   controlHash:
     "2b9df988d5c48a2a7ff6ac50dc795df1e11622515a444ee05f1718a677e2e338",
@@ -99,7 +99,7 @@ function snapshot(html) {
     const contentEnd = html.indexOf("</" + match[1] + ">", contentStart);
     assert(contentEnd >= contentStart, "Static hint must have a closing tag.");
     const text = plain(html.slice(contentStart, contentEnd));
-    if (!text) continue; // Empty dynamic status placeholders are intentional.
+    if (!text) continue; // Các chỗ giữ chỗ trạng thái động để trống là cố ý.
     staticHints.push({ text, words: text.split(/\s+/).length });
   }
   return {

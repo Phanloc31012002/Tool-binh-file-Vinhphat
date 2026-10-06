@@ -2,6 +2,51 @@
 
 _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
+## v2.16.15 — bản vá sửa báo lỗi, code tiếng việt
+
+- bản vá sửa báo lỗi, code tiếng việt
+
+---
+
+## v2.16.14 — Dàn bế lặp cụm lồng nhau, sửa khe 0 (05/10/2026)
+
+- Thêm tìm kiếm **cụm hai hàng đối hướng lặp lại**. Khoảng lồng giữa hai hàng và bước sang cụm kế tiếp được tính riêng từ biên dạng thật; không ép mọi hàng có cùng bước. Kiểm tra cả A/A, B/B, A/B, B/A, bốn hướng xoay và các pha dịch. Áp dụng chung, không gắn công thức theo tên hình hay số con.
+- Khe **0 mm** không còn giữ phần đệm 0,25/0,5 mm của lưới khi đặt kết quả: co khoảng cách **vị trí**, không co khuôn/bài. Cho phép biên thẳng chạm nhau nhưng không cho chồng diện tích. Với đường cong, đọc chính xác đến **0,00025 mm**, giữ dự phòng sai số khoảng **0,0005 mm** để đường cong gốc không chồng nhau; không dùng xấp xỉ thô để ép chạm. Kiểm tra khoảng cách theo chỉ mục cạnh để tránh so sánh mọi cạnh với nhau.
+- Loại phương án khe 0 bị chồng thật ở phần ô lẻ; giữ phương án an toàn qua bước thêm con, sửa cạnh và canh tâm. Sửa kiểm tra biên trùng/lỗ compound và chồng lấn rất nhỏ, không phụ thuộc điểm bắt đầu hay chiều path. Các hình tròn nhỏ hàng chục nghìn con vẫn được kiểm tra hình học cuối.
+- Rà JSX vừa được định dạng lại: giữ phần định dạng, bỏ code ô PPI CTL cũ xuất hiện lại theo yêu cầu; JPG vẫn cố định 300 ppi. Sửa ba khóa `"in"` bị formatter bỏ ngoặc kép gây lỗi cú pháp ES3; thêm `prettier-ignore` đúng ba dòng để không tái diễn. Kiểm tra biên dịch toàn bộ thư viện và cầu nối bằng engine Illustrator, không thực thi thư viện hay sửa tài liệu người dùng.
+- Kiểm chứng khuôn muỗng gốc **46,0864 × 122 mm**, giấy **33 × 35,4 cm**, lề **4 mm**, tâm chấm PON cách mép **10 mm**, né mép chấm **7,5 mm**: **24 con với khe nhập 1 mm**, và **24 con với khe 0**, cả một/hai mặt. Canh giữa, không đổi kích thước/điểm neo/tay nắm đường cong; mặt sau giữ đăng ký lật ngang. Kiểm tra độc lập đường cong thực của Illustrator trên từng cặp khuôn: khe nhỏ nhất khoảng **1,40779 mm** và **0,00050008 mm**, không chồng khuôn. Các tài liệu người dùng và trạng thái ứng dụng không thay đổi.
+- **35 bộ kiểm thử tự động qua**, gồm nhiều tỷ lệ/hướng, biên dạng lẻ, tròn/lá/muỗng, khe dương, PON, một/hai mặt và nhiều mẫu. Nạp lõi Dàn bế **6**, cầu nối **10**. Chỉ cài local, chưa phát hành GitHub; không đổi CTL/KTS, raster 500 ppi hay JPG 300 ppi. Đây là phương án đã kiểm chứng, không cam kết tối ưu toán học tuyệt đối cho mọi biên dạng.
+
+---
+
+## v2.16.13 — Dàn bế thống nhất làm tròn biên dạng (05/10/2026)
+
+- Sửa lỗi từ chối phương án an toàn ở một số kích thước do sai số đổi tọa độ Illustrator sang mm: cạnh 122 mm có thể thành 122,0000000125 mm. Khung bao đã bỏ sai số cực nhỏ nhưng scanline chưa bỏ, nên phát sinh thêm một ô va chạm 0,25 mm không có thật. Dùng cùng ngưỡng sai số số học cho cả hai; vẫn làm tròn ra ngoài khi cạnh vượt ô thực sự.
+- Áp dụng chung cho biên dạng và kích thước bất kỳ, không nhận diện riêng muỗng hay cố định công thức theo tên hình. Giữ kiểm tra khe/lề/PON bằng cả lưới và hình học liên tục, không thu nhỏ bài hoặc bỏ kiểm tra an toàn. Nạp lõi Dàn bế 5.
+- Sửa bộ đọc JSON trên ExtendScript để giữ đúng `true`/`false`; tránh lỗi engine trả về `NaN` khi dùng chuỗi toán tử điều kiện. Nạp cầu nối 9 và tự nạp lại nếu engine còn bản 8.
+- Kiểm chứng mẫu muỗng thực **46,0864 × 122 mm**, giấy **33 × 35,4 cm**, khe **1 mm**: **20 con** trong Illustrator, một/hai mặt, không đổi kích thước; lề trái/phải khoảng **19,3318 mm**, trên/dưới khoảng **15,9568 mm**. Tài liệu người dùng không thay đổi. Kiểm thử thêm nhiều tỷ lệ, bốn hướng xoay, hai kích thước chung tờ và sai số sát biên ô; các mẫu tròn, lá, khuôn cong và muỗng cũ vẫn qua kiểm tra. Chỉ cài local, chưa phát hành GitHub.
+
+---
+
+## v2.16.12 — Dàn bế canh tâm theo kích thước thật (05/10/2026)
+
+- Sửa lệch tâm khoảng 0,12 mm do canh khung lưới 0,25 mm thay vì biên dạng thực. Sau khi tìm dàn, dịch **toàn bộ khối khuôn/bài** theo kích thước thật và khổ giấy đầy đủ; không làm tròn vị trí cuối về lưới. Không đổi số con, góc xoay, thứ tự mẫu hay khoảng cách giữa các khuôn.
+- Vị trí mới phải giữ lề và khoảng né PON bằng kiểm tra hình học liên tục. Nếu PON bất đối xứng chặn tâm tờ, chọn phép dịch an toàn gần tâm hơn trong phạm vi tìm kiếm; không bỏ/thu nhỏ mẫu để ép vào tâm. Mặt sau vẫn đối xứng lật ngang. Nạp lõi Dàn bế 4.
+- Kiểm chứng trên Illustrator với khuôn cong mẫu, một/hai mặt: giữ **94 con/khe 1 mm**; lề trái/phải khoảng **9,8745 mm**, trên/dưới khoảng **8,369 mm**, sai số tâm dưới **0,001 mm**. Khổ, khuôn, tâm bài và PON đúng; tài liệu người dùng đang mở không thay đổi. Các kiểm thử khe/PON, kích thước giấy lẻ và tâm bị PON chặn giữ nguyên số con. Chỉ cài local, chưa phát hành GitHub.
+
+---
+
+## v2.16.11 — Dàn bế ghép đối đầu trong cùng hàng (05/10/2026)
+
+- Thêm phương án xoay xen kẽ **A → B → A ngay trong cùng hàng**, không chỉ đổi hướng giữa các hàng. Khoảng ghép lấy từ biên dạng đường bế thật và khe nhập, cho phép lồng phần nghiêng/lõm của khung bao. Thử đủ bốn hướng trước khi tìm kiếm bổ sung; không nhận diện riêng tên hình hay gắn công thức chỉ cho mẫu lá.
+- Giữ kiểm tra cuối bằng cả scanline và khoảng cách hình học liên tục: không chồng khuôn, không thu bài, giữ lề và khoảng né mép PON. Các bài cùng khuôn vẫn phân luân phiên; hai mặt giữ đăng ký lật ngang, chữ/hình mặt sau không bị lật gương.
+- Khuôn cong 7 điểm **53 × 26,51 mm** đọc từ file mẫu: trên giấy **33 × 35,4 cm**, lề **4 mm**, chấm PON **5 mm** có tâm cách mép **10 mm**, né PON **7,5 mm** → **94 con/khe 1 mm**, **86 con/khe 2 mm**. Đây là kết quả kiểm chứng theo các khoảng an toàn trên, không cam kết tối ưu toán học tuyệt đối hoặc đồng nhất với bản dàn tay chưa đo khe/PON.
+- Giảm dựng lưới va chạm lặp lại cho các cụm đã chứng minh cách nhau an toàn; các trường hợp lõm/lỗ có thể khóa nhau vẫn kiểm tra lưới như cũ. Ca vuông **2 mm**, giấy 33 × 35,4 cm, khe 1 mm không PON: hơn 10.000 con trong khoảng **0,6 giây** trên máy thử, so với hơn 5 giây ở bản cũ. Nạp lõi Dàn bế 3.
+- Kiểm chứng: 31 bộ kiểm thử tự động; tròn 42 con, muỗng 10 con, lá 50 con giữ nguyên. Đã chạy Illustrator trên tài liệu thử riêng với khuôn cong thật ở chế độ một/hai mặt: 94 con, đúng kích thước/góc xoay/tâm bài/PON/đối xứng đường bế. Các tài liệu người dùng đang mở không thay đổi. Chỉ cài local, chưa phát hành GitHub.
+- Theo yêu cầu bỏ qua ô PPI, không thêm ô này; JPG CTL vẫn **300 ppi**, raster xử lý bài vẫn **500 ppi**.
+
+---
+
 ## v2.16.10 — phát hành sau oke test
 
 - phát hành sau oke test

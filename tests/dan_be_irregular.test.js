@@ -2,8 +2,8 @@
 const assert = require("node:assert/strict");
 const nester = require("../DanCardCEP/js/dan_be_nester");
 
-// Synthetic closed outlines: exercise generic geometry, not product-specific
-// recognisers. Coordinates and all requested clearances are in millimetres.
+// Các đường viền kín tự dựng: để thử phần hình học tổng quát, không phải bộ nhận dạng
+// riêng cho từng sản phẩm. Toạ độ và mọi khoảng hở yêu cầu đều tính bằng milimét.
 const cat = [
   [
     [
@@ -261,7 +261,7 @@ function bboxGridBaseline(groups, input) {
     );
     maximum = Math.max(maximum, columns * rows);
   }
-  // The rectangle baseline ignores PON exclusions, favouring it fairly.
+  // Mốc so sánh hình chữ nhật bỏ qua vùng cấm PON, nên phép so sánh có phần ưu ái cho nó.
   return maximum;
 }
 

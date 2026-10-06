@@ -1,4 +1,4 @@
-// Opt-in native regression: synthetic documents only; never edits user files.
+// Test hồi quy trong Illustrator thật, chỉ chạy khi chủ động bật: chỉ dùng tài liệu tự dựng; không bao giờ sửa file người dùng.
 (function () {
   var root = "C:/Users/ADMIN/Downloads/DanCard_Setup_23";
   var folder = new Folder(

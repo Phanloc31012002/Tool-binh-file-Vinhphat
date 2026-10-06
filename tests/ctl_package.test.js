@@ -131,8 +131,8 @@ for (const options of [
   );
 }
 assert.equal(packager.supported({}), false);
-// Read both central and local ZIP headers, inflate entries and compare bytes.
-// This checks actual archive data, not merely the worker's success message.
+// Đọc cả header trung tâm lẫn header cục bộ của ZIP, giải nén các mục và so từng byte.
+// Cách này kiểm tra dữ liệu thật của file nén, không chỉ thông báo thành công của worker.
 function unzip(file) {
   const b = fs.readFileSync(file);
   let end = -1;

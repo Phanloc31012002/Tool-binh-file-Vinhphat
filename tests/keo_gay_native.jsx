@@ -1,6 +1,6 @@
-// Opt-in native regression. Only creates/changes owned unsaved fixtures.
-// Production plan, rasterization, placement, PON and PDF metadata are real;
-// only modal answers and icon-file IO are replaced with an isolated vector.
+// Test hồi quy trong Illustrator thật, chỉ chạy khi chủ động bật. Chỉ tạo/sửa dữ liệu mẫu chưa lưu của riêng nó.
+// Kế hoạch của code thật, raster hoá, đặt bài, PON và metadata PDF đều là thật;
+// chỉ câu trả lời hộp thoại modal và việc đọc/ghi file icon được thay bằng một vector tách biệt.
 (function () {
   var root = "C:/Users/ADMIN/Downloads/DanCard_Setup_23";
   var out = new Folder(root + "/tmp/keo_gay_exact_2.16.5_" + new Date().getTime());
@@ -237,7 +237,7 @@
     for (var gi = 0; gi < sourcePages.length; gi++)
       sourcePages[gi].selected = true;
     assert(app.activeDocument === doc, "Active document changed; refusing to run on user content");
-    // Exercise coordinate normalisation with a non-document user mode.
+    // Thử việc chuẩn hoá toạ độ khi người dùng đang ở chế độ toạ độ không phải theo tài liệu.
     app.coordinateSystem = CoordinateSystem.ARTBOARDCOORDINATESYSTEM;
     var status = dcRunKeoGay(String(spec.w), String(spec.h));
     log("RENDER " + status);
@@ -305,8 +305,8 @@
         assert(!!item, "Missing page " + ns[ni]);
         assert(inside(r, bounds(item)), "Page outside paper " + ns[ni]);
         var pageBounds=bounds(item), sortedSize=[pageBounds[2]-pageBounds[0],pageBounds[1]-pageBounds[3]].sort(function(a,b){return a-b;});
-        // Both measured physical edges must match the panel/form frame, even
-        // when the source aspect or rounded bitmap pixel counts differ.
+        // Cả hai cạnh vật lý đo được phải khớp với khung của panel/form, kể cả
+        // khi tỉ lệ cạnh của nguồn hay số pixel bitmap đã làm tròn có khác.
         assert(Math.abs(sortedSize[0]-Math.min(spec.w,spec.h)*frameScale*10*MM)<0.03 &&
           Math.abs(sortedSize[1]-Math.max(spec.w,spec.h)*frameScale*10*MM)<0.03,
           "Page dimensions differ from panel/form frame: "+sortedSize.join("x"));
@@ -343,8 +343,8 @@
         captures.push({ page: ns[ni], face: bi, bounds: bounds(item), frameCm:[spec.w*frameScale,spec.h*frameScale] });
       }
     }
-    // Native PON endpoints, including stroke bounds, must remain on paper;
-    // no cut-mark midpoint may be inside the interior of a raster page.
+    // Các đầu mút PON thật trong Illustrator, tính cả bounds của nét, phải nằm trên giấy;
+    // không trung điểm PON cắt nào được nằm bên trong một trang raster.
     var marks = doc.layers.getByName("Pon cat CTL Keo Gay tu dong").pathItems;
     var paperMarks = doc.layers.getByName("Pon CTL Keo Gay tu dong").pathItems;
     assert(paperMarks.length === faces.length * 8, "Paper PON count mismatch");

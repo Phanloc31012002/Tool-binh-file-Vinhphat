@@ -1,4 +1,4 @@
-// Read-only JPEG assertions shared by native export tests; no image rewriting.
+// Các assert JPEG chỉ đọc, dùng chung cho các test xuất file trong Illustrator thật; không ghi lại ảnh.
 const fs = require("node:fs");
 function metadata(path) {
   const b = fs.readFileSync(path),

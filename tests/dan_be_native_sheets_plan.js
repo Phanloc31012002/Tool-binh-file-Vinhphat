@@ -1,5 +1,5 @@
-// Opt-in: consumes the previously captured native 5 cm circle/PON fixture.
-// Generates ignored test data only; not included in any installer.
+// Chỉ chạy khi được bật: dùng dữ liệu mẫu hình tròn 5 cm/PON đã ghi lại từ Illustrator thật.
+// Chỉ sinh dữ liệu test đã được ignore; không đưa vào bất kỳ bộ cài nào.
 const fs = require("fs");
 const path = require("path");
 const engine = require("../DanCardCEP/js/dan_be_nester");

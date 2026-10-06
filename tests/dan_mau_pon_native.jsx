@@ -1,4 +1,4 @@
-// Opt-in native canvas diagnostic: no user's document/template is edited.
+// Chẩn đoán canvas trong Illustrator thật, chỉ chạy khi chủ động bật: không sửa tài liệu/mẫu nào của người dùng.
 (function () {
   var root = "C:/Users/ADMIN/Downloads/DanCard_Setup_23";
   var folder = new Folder(root + "/tmp/dan_mau_canvas_20261003");
@@ -47,8 +47,8 @@
     alert = function (s) {
       messages.push(String(s));
     };
-    // Keep a document open while restoring app state/writing diagnostics.
-    // Some Illustrator builds abort the script when the last document closes.
+    // Giữ một tài liệu mở trong lúc khôi phục trạng thái app/ghi thông tin chẩn đoán.
+    // Một số bản Illustrator sẽ huỷ script khi tài liệu cuối cùng bị đóng.
     if (!original)
       guardDoc = app.documents.add(DocumentColorSpace.CMYK, 100, 100);
     var rect = [1000, 2000, 1600, 1600];
@@ -67,7 +67,7 @@
     ponDoc.saveAs(new File(folder.fsName + "/pon-back.ai"), aiOptions);
     ponDoc.close(SaveOptions.DONOTSAVECHANGES);
     ponDoc = null;
-    // far-away learned absolute references; actual dx/dy are centred slots.
+    // các mốc tham chiếu tuyệt đối đã học nằm rất xa; dx/dy thực tế là các slot canh giữa.
     var template =
       "# dan theo mau v5\nMODE\tone\nSTATE\tready\nBLOCK\tF\nsideHi\t35.2778\nsideLo\t17.6389\nn\t2\nslot\t-70\t0\t1\t0\t100\t50\timage\nslot\t70\t0\t1\t0\t100\t50\timage\nlearnref\t0\t6000\t7000\t100\t50\nlearnref\t1\t6140\t7000\t100\t50\n";
     write("template.txt", template);
@@ -87,7 +87,7 @@
         '"' + folder.fsName.replace(/\\/g, "/") + '/template.txt"',
       )
       .replace('File.openDialog(label, "*.ai")', "selectFixturePon()");
-    // New wrapper helper is loaded separately when present.
+    // Hàm hỗ trợ dạng wrapper mới sẽ được nạp riêng nếu có.
     if (lib.indexOf("function dcApMauCore(") >= 0) {
       var v = lib.indexOf("var dcDanTheoMauVersion");
       code = lib

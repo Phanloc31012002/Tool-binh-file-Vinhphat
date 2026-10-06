@@ -1,7 +1,7 @@
 "use strict";
 
-// The spoon contour was extracted from the PDF-compatible vector data in the
-// user's binh (3).ai. Keep its measured geometry, not a rectangle surrogate.
+// Đường viền cái muỗng được trích từ dữ liệu vector tương thích PDF trong file
+// binh (3).ai của người dùng. Giữ đúng hình đã đo, không thay bằng hình chữ nhật.
 const MM = 2.834645669;
 function spoon() {
   const points = [];

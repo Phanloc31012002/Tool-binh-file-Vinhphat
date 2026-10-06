@@ -112,7 +112,7 @@ function unchanged(before) {
   assert.equal(layer.pathItems.length, 8);
   assert.equal(f.doc.activeLayer, f.sourceLayer);
   assert.equal(f.c.app.coordinateSystem, "user-coordinates");
-  // Reproduce the reported bug: a real filled rectangle pasted into PON layer.
+  // Tái hiện lỗi đã được báo: một hình chữ nhật tô màu thật bị dán vào layer PON.
   f.doc.activeLayer = layer;
   const artwork = layer.pathItems.add();
   artwork.setEntirePath([
@@ -143,7 +143,7 @@ function unchanged(before) {
     17,
     "Repeat does not stack identical marks",
   );
-  // Simulate the old untagged PON style. It must not become selected artwork.
+  // Giả lập kiểu PON cũ chưa gắn thẻ. Nó không được bị coi là bài đang chọn.
   for (const p of layer.pathItems)
     if (p.note === "DANCARD_AUTO_CUT_MARK") p.note = "";
   f.doc.selection = [artwork, ...layer.pathItems];
@@ -198,7 +198,7 @@ function unchanged(before) {
   assert.match(f.run(), /^ERR:/);
   assert.equal(f.doc.layers.length, 1);
 }
-// Actual panel click reloads an old persistent engine, with escaped Windows path.
+// Bấm nút thật trên panel sẽ nạp lại engine persistent cũ, với đường dẫn Windows đã escape.
 const a = main.indexOf("  function jsStr(s)"),
   b = main.indexOf("  function loadDanTheoMauJsx()");
 const start = main.indexOf("  var btnCutMarks ="),

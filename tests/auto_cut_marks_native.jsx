@@ -1,4 +1,4 @@
-// Opt-in integration test. All artwork/marks are in one owned unsaved fixture.
+// Test tích hợp chỉ chạy khi chủ động bật. Mọi bài/PON cắt nằm trong một dữ liệu mẫu riêng, chưa lưu.
 (function () {
   var root = "C:/Users/ADMIN/Downloads/DanCard_Setup_23";
   var folder = Folder(root + "/tmp/auto_cut_marks_20261003");

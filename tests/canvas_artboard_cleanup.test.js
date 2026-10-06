@@ -20,8 +20,8 @@ const helper = lib.slice(
   lib.indexOf("function dcCopyToiUuNoteToOddArtboards("),
 );
 
-// Reverse-order frame deletion: new frames/artwork are never removed. A failed
-// native removal leaves a warning, not a rollback of already-rendered output.
+// Xoá khung theo thứ tự ngược: khung/bài mới không bao giờ bị xoá. Nếu lệnh xoá
+// của Illustrator thất bại thì chỉ để lại cảnh báo, không hoàn tác kết quả đã dựng xong.
 for (const [oldCount, freshCount, failIndex] of [
   [3, 2, -1],
   [3, 0, -1],
@@ -61,8 +61,8 @@ for (const [oldCount, freshCount, failIndex] of [
   assert.equal(c.app.activeDocument, doc);
 }
 
-// Complete KTS rendering cleans up only on success. Failed duplication keeps
-// the original artboard references, irrespective of temporary output state.
+// Lượt dựng KTS hoàn chỉnh chỉ dọn dẹp khi thành công. Nhân bản thất bại thì giữ
+// nguyên các tham chiếu artboard gốc, bất kể trạng thái của kết quả tạm.
 for (const fail of [false, true]) {
   const f = illustrator(),
     c = vm.createContext(f.context);
@@ -99,8 +99,8 @@ assert.equal(
   3,
   "KTS and both Offset flows",
 );
-// Execute both Offset routes too: single-size previously called a PON helper
-// that only existed inside KTS/mixed-size functions and failed after rendering.
+// Chạy luôn cả hai nhánh Offset: trước đây nhánh một cỡ gọi một hàm phụ PON
+// chỉ tồn tại bên trong các hàm KTS/nhiều cỡ nên bị lỗi sau khi dựng xong.
 for (const mode of ["self", "ab", "mixed"]) {
   const f = illustrator(),
     c = vm.createContext(f.context);
@@ -138,7 +138,7 @@ assert.ok(
 );
 assert.match(main, /dcDanToiUuVersion[^\n]*22/);
 assert.match(main, /dcDanTuTroVersion[^\n]*11/);
-assert.match(main, /dcDanBeNestingVersion[^\n]*8/);
+assert.match(main, /dcDanBeNestingVersion[^\n]*10/);
 console.log(
   "Canvas cleanup: result-only frames on success, old frames retained on failure, reverse deletion and partial-removal warning passed.",
 );

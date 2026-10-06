@@ -1,5 +1,5 @@
-// Opt-in Illustrator API integration test. All work is in new unsaved docs.
-// No open user artwork or saved AI fixture is edited or overwritten.
+// Test tích hợp API Illustrator, chỉ chạy khi chủ động bật. Mọi thao tác đều ở tài liệu mới chưa lưu.
+// Không sửa hay ghi đè bài đang mở của người dùng hoặc file AI mẫu đã lưu.
 $.evalFile(
   File(
     "C:/Users/ADMIN/Downloads/DanCard_Setup_23/DanCardCEP/jsx/dan_be_bridge.jsx",

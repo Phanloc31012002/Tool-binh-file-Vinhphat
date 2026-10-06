@@ -168,7 +168,7 @@ assert.match(
   "Roll back artboards on creation failure.",
 );
 assert.doesNotMatch(core, /ARTBOARDS_PER_COLUMN|var startCx = ponF/);
-// Saved-AI canvas reading is bounded/read-only and tracks changed ruler origins.
+// Việc đọc canvas từ file AI đã lưu là có giới hạn/chỉ đọc và bám theo gốc thước đã thay đổi.
 const readFrom = lib.indexOf("function dcDanTheoMauReadCanvasBounds(");
 for (const scale of [1, 0.1]) {
   let header =

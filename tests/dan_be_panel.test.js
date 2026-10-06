@@ -3,8 +3,8 @@ const fs = require("fs");
 const path = require("path");
 const vm = require("vm");
 
-// Exercise the actual production helpers and click handler, without booting
-// unrelated tabs, animations, or Illustrator. No implementation is copied.
+// Chạy thử đúng các hàm hỗ trợ và hàm xử lý click của code thật, không cần khởi động
+// các tab không liên quan, hiệu ứng động hay Illustrator. Không sao chép phần cài đặt nào.
 const main = fs.readFileSync(
   path.join(__dirname, "../DanCardCEP/js/main.js"),
   "utf8",
@@ -82,13 +82,13 @@ function panel(options = {}) {
         timers.push(fn);
       },
     },
-    // Healthy persistent Illustrator engine: evaluating the generated script
-    // must not reload files or call any unrelated native operation.
+    // Engine Illustrator thường trực đang hoạt động bình thường: việc chạy script được sinh ra
+    // không được nạp lại file hay gọi bất kỳ thao tác Illustrator nào không liên quan.
     dcDanToiUu() {},
     dcCopyToiUuNoteToOddArtboards() {},
     dcCopyToiUuNoteToAllArtboards() {},
     dcDanToiUuVersion: 22,
-    dcDanBeNestingVersion: 8,
+    dcDanBeNestingVersion: 10,
     dcDanBePrepare(...args) {
       context.prepareArguments = args;
     },
@@ -270,7 +270,7 @@ const prepared = "OKJSON:" + JSON.stringify(payload);
     right: "9",
   });
   p.click();
-  // Capture all six fields at click time, even if a user edits while preparing.
+  // Chốt giá trị cả sáu ô ngay lúc click, kể cả khi người dùng sửa trong lúc đang chuẩn bị.
   for (const id of [
     "bePaperW",
     "bePaperH",
@@ -524,7 +524,7 @@ for (const options of [
   assert.strictEqual(p.statuses.at(-1), "ERR: Không thể tạo layer đầu ra.");
 }
 
-// Each JSX is loaded independently. No legacy dcDanBe/version is required.
+// Mỗi JSX được nạp độc lập. Không yêu cầu dcDanBe/version kiểu cũ nào.
 for (const scenario of [
   { remove: [], expected: [] },
   { remove: ["dcDanToiUu"], expected: ["dan_card_lib.jsx"] },
@@ -536,6 +536,8 @@ for (const scenario of [
     expected: ["dan_card_lib.jsx", "dan_be_bridge.jsx"],
   },
   { remove: [], bridgeVersion: 6, expected: ["dan_be_bridge.jsx"] },
+  { remove: [], bridgeVersion: 8, expected: ["dan_be_bridge.jsx"] },
+  { remove: [], bridgeVersion: 9, expected: ["dan_be_bridge.jsx"] },
   { remove: [], libraryVersion: 15, expected: ["dan_card_lib.jsx"] },
   { remove: [], libraryVersion: 21, expected: ["dan_card_lib.jsx"] },
 ]) {
@@ -555,8 +557,8 @@ for (const scenario of [
   );
 }
 
-// Default: one sheet per model, even when cut shapes are identical. PON is
-// prepared once; only exact contours may reuse the same local nesting plan.
+// Mặc định: mỗi mẫu một tờ, kể cả khi hình bế giống hệt nhau. PON chỉ được
+// chuẩn bị một lần; chỉ đường viền trùng khớp mới được dùng lại cùng kế hoạch dàn bế cục bộ.
 const multiPayload = clone(payload);
 multiPayload.types.push(clone(payload.types[0]));
 multiPayload.types.push({
@@ -607,7 +609,7 @@ multiPayload.types.push({
 {
   const p = panel({ multi: true });
   p.click();
-  // Capture the checkbox at click time, not after native preparation.
+  // Chốt trạng thái checkbox ngay lúc click, không phải sau bước chuẩn bị bên Illustrator.
   p.nodes.beMultiPerArtboard.checked = false;
   p.prepare("OKJSON:" + JSON.stringify(multiPayload));
   p.tick();

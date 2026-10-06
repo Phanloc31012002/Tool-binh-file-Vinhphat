@@ -1,4 +1,4 @@
-// Consumes contours/PON actually read by Illustrator integration harness.
+// Dùng đường viền/PON do bộ test tích hợp Illustrator thực sự đọc được.
 const fs = require("fs");
 const path = require("path");
 const engine = require("../DanCardCEP/js/dan_be_nester");

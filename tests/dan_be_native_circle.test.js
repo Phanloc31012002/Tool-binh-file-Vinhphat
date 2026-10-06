@@ -2,9 +2,9 @@
 const assert = require("node:assert/strict");
 const engine = require("../DanCardCEP/js/dan_be_nester");
 
-// Retain the four-cubic geometry of Illustrator pathItems.ellipse(), not an
-// ideal sin/cos circle. The actual bridge flattens this 50 mm native ellipse
-// into 128 vertices; its greatest radius is 25.00679985 mm, not 25 mm.
+// Giữ đúng hình học bốn đoạn cubic của pathItems.ellipse() trong Illustrator, không dùng
+// đường tròn sin/cos lý tưởng. Bridge thật làm phẳng ellipse 50 mm gốc của Illustrator
+// thành 128 đỉnh; bán kính lớn nhất của nó là 25.00679985 mm chứ không phải 25 mm.
 function illustratorCircle(diameter) {
   const r = diameter / 2,
     k = 0.5522847498307936,
@@ -131,8 +131,8 @@ verify(sharedResult, shared);
 assert.equal(sharedResult.count, 42);
 assert.deepEqual(sharedResult.counts, [21, 21]);
 
-// Near-round recognition may guide the lattice, but must never claim a near
-// circle is geometrically ideal or return a physically invalid nominal seed.
+// Việc nhận dạng hình gần tròn có thể định hướng cho lưới, nhưng tuyệt đối không được coi hình
+// gần tròn là tròn lý tưởng hay trả về phương án khởi đầu danh định không hợp lệ về vật lý.
 const oval = groups.map((g) =>
   g.map((c) => c.map((p) => [p[0], p[1] * 1.001])),
 );

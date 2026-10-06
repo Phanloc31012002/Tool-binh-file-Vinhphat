@@ -23,7 +23,7 @@ const pairIds = (records) =>
 const source = [];
 for (let row = 0; row < 7; row++) {
   source.push(record("F" + row, 330.48, -1117.558425212 - row * 147.401574788));
-  // Larger than EPS but invisible to the eye: used to invert the old sort.
+  // Lớn hơn EPS nhưng mắt thường không thấy: từng làm đảo ngược kết quả sắp xếp cũ.
   source.push(
     record(
       "B" + row,
@@ -88,8 +88,8 @@ assert.throws(() =>
   ]),
 );
 
-// Exercise the complete production KTS pipeline, including optimization,
-// mixed orientations, slot ordering, duplex mirroring and centering.
+// Chạy thử trọn vẹn quy trình KTS của code thật, gồm cả bước tối ưu,
+// các hướng xoay lẫn lộn, thứ tự slot, lật đối xứng hai mặt và canh giữa.
 for (const mixed of [false, true]) {
   const mock = illustrator();
   const c = vm.createContext(mock.context);

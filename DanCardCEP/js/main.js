@@ -55,7 +55,7 @@
     var rays = [];
     function newRayLen() {
       // đa số DÀI (như hình), một số ngắn để viền lởm chởm.
-      var base = 0.45 + Math.random() * 0.5; // 0.45..0.95 of span
+      var base = 0.45 + Math.random() * 0.5; // 0.45..0.95 lần span
       if (Math.random() < 0.25) base = 0.2 + Math.random() * 0.3; // vài tia ngắn
       return base;
     }
@@ -1366,17 +1366,33 @@
   }
   function loadAutoCutMarksJsx() {
     try {
-      var extensionRoot = cs.getSystemPath(SystemPath.EXTENSION).replace(/\\/g, "/");
+      var extensionRoot = cs
+        .getSystemPath(SystemPath.EXTENSION)
+        .replace(/\\/g, "/");
       var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
-      return "if (typeof dcThemDauCatTuDong !== 'function' || typeof dcAutoCutMarksVersion === 'undefined' || dcAutoCutMarksVersion < 1) { $.evalFile(" + jsStr(jsxPath) + "); } ";
-    } catch (e) { return ""; }
+      return (
+        "if (typeof dcThemDauCatTuDong !== 'function' || typeof dcAutoCutMarksVersion === 'undefined' || dcAutoCutMarksVersion < 1) { $.evalFile(" +
+        jsStr(jsxPath) +
+        "); } "
+      );
+    } catch (e) {
+      return "";
+    }
   }
   function loadDanTheoMauJsx() {
     try {
-      var extensionRoot = cs.getSystemPath(SystemPath.EXTENSION).replace(/\\/g, "/");
+      var extensionRoot = cs
+        .getSystemPath(SystemPath.EXTENSION)
+        .replace(/\\/g, "/");
       var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
-      return "if (typeof dcApMau !== 'function' || typeof dcDanTheoMauVersion === 'undefined' || dcDanTheoMauVersion < 2) { $.evalFile(" + jsStr(jsxPath) + "); } ";
-    } catch (e) { return ""; }
+      return (
+        "if (typeof dcApMau !== 'function' || typeof dcDanTheoMauVersion === 'undefined' || dcDanTheoMauVersion < 2) { $.evalFile(" +
+        jsStr(jsxPath) +
+        "); } "
+      );
+    } catch (e) {
+      return "";
+    }
   }
   function loadDanToiUuJsx() {
     // CEP co the giu ExtendScript engine cu sau khi cai thu panel. Nạp lại khi
@@ -1391,8 +1407,9 @@
         "if (typeof dcDanToiUu !== 'function' || typeof dcCopyToiUuNoteToAllArtboards !== 'function' || typeof dcCopyToiUuNoteToOddArtboards !== 'function' || typeof dcDanToiUuVersion === 'undefined' || dcDanToiUuVersion < 22) { $.evalFile(" +
         jsStr(jsxPath) +
         "); } " +
-        "if (typeof dcDanBePrepare !== 'function' || typeof dcDanBeRender !== 'function' || typeof dcDanBeNestingVersion === 'undefined' || dcDanBeNestingVersion < 8) { $.evalFile(" +
-        jsStr(danBeBridgePath) + "); } "
+        "if (typeof dcDanBePrepare !== 'function' || typeof dcDanBeRender !== 'function' || typeof dcDanBeNestingVersion === 'undefined' || dcDanBeNestingVersion < 10) { $.evalFile(" +
+        jsStr(danBeBridgePath) +
+        "); } "
       );
     } catch (e) {
       return "";
@@ -1562,7 +1579,8 @@
       show(outCutMarks, "Đang tạo dấu cắt…");
       btnCutMarks.disabled = true;
       cs.evalScript(
-        loadAutoCutMarksJsx() + "dcThemDauCatTuDong(" +
+        loadAutoCutMarksJsx() +
+          "dcThemDauCatTuDong(" +
           jsStr(length) +
           ", " +
           jsStr(edge) +
@@ -1659,11 +1677,28 @@
       show(outDanBe, "Đang đo khuôn và tạo PON theo khổ giấy nhập…");
       btnDanBe.disabled = true;
       cs.evalScript(
-        loadDanToiUuJsx() + "dcDanBePrepare(" + jsStr(beGap) + ", " +
-          jsStr(beMargin) + ", " + jsStr(bePon) + ", " + (beTwo ? "true" : "false") + ", " +
-          JSON.stringify(String(bePaperW)) + ", " + JSON.stringify(String(bePaperH)) + ", " +
-          JSON.stringify(String(bePonTop)) + ", " + JSON.stringify(String(bePonBottom)) + ", " +
-          JSON.stringify(String(bePonLeft)) + ", " + JSON.stringify(String(bePonRight)) + ")",
+        loadDanToiUuJsx() +
+          "dcDanBePrepare(" +
+          jsStr(beGap) +
+          ", " +
+          jsStr(beMargin) +
+          ", " +
+          jsStr(bePon) +
+          ", " +
+          (beTwo ? "true" : "false") +
+          ", " +
+          JSON.stringify(String(bePaperW)) +
+          ", " +
+          JSON.stringify(String(bePaperH)) +
+          ", " +
+          JSON.stringify(String(bePonTop)) +
+          ", " +
+          JSON.stringify(String(bePonBottom)) +
+          ", " +
+          JSON.stringify(String(bePonLeft)) +
+          ", " +
+          JSON.stringify(String(bePonRight)) +
+          ")",
         function (prepared) {
           var preparedText = String(prepared || "");
           if (preparedText.indexOf("OKJSON:") !== 0) {
@@ -1677,12 +1712,18 @@
             payload = JSON.parse(preparedText.substring(7));
           } catch (parseError) {
             btnDanBe.disabled = false;
-            show(outDanBe, "ERR: Khong doc duoc du lieu bien dang tu Illustrator.");
+            show(
+              outDanBe,
+              "ERR: Không đọc được dữ liệu biên dạng từ Illustrator.",
+            );
             return;
           }
-          if (!window.DanBeNester || typeof window.DanBeNester.nest !== "function") {
+          if (
+            !window.DanBeNester ||
+            typeof window.DanBeNester.nest !== "function"
+          ) {
             btnDanBe.disabled = false;
-            show(outDanBe, "ERR: Chua nap duoc loi dan be silhouette.");
+            show(outDanBe, "ERR: Chưa nạp được lõi dàn bế silhouette.");
             return;
           }
 
@@ -1693,19 +1734,40 @@
           }
           var separate = !beMulti && payload.types.length > 1;
           var planCount = separate ? payload.types.length : 1;
-          var plans = [], planIndex = 0, totalCount = 0, cachedPlans = {};
+          var plans = [],
+            planIndex = 0,
+            totalCount = 0,
+            cachedPlans = {};
 
           function renderPlans() {
             var layout = separate ? { sheets: plans } : plans[0].slots;
             var report = { detail: plans[0].detail, mode: plans[0].mode };
-            show(outDanBe, separate ?
-              "Đã tính " + planCount + " tờ riêng" + (beTwo ? " hai mặt" : "") + ", tổng " + totalCount + " con; đang vẽ…" :
-              "Đã tìm " + totalCount + " con; đang vẽ " + (beTwo ? "cặp trước/sau, Khuôn và PON…" : "Khuôn, Bài và PON…"));
+            show(
+              outDanBe,
+              separate
+                ? "Đã tính " +
+                    planCount +
+                    " tờ riêng" +
+                    (beTwo ? " hai mặt" : "") +
+                    ", tổng " +
+                    totalCount +
+                    " con; đang vẽ…"
+                : "Đã tìm " +
+                    totalCount +
+                    " con; đang vẽ " +
+                    (beTwo
+                      ? "cặp trước/sau, Khuôn và PON…"
+                      : "Khuôn, Bài và PON…"),
+            );
             cs.evalScript(
               loadDanToiUuJsx() +
-                "dcDanBeRender(" + jsStr(payload.jobId) + ", " +
-                jsStr(JSON.stringify(layout)) + ", " +
-                jsStr(JSON.stringify(report)) + ")",
+                "dcDanBeRender(" +
+                jsStr(payload.jobId) +
+                ", " +
+                jsStr(JSON.stringify(layout)) +
+                ", " +
+                jsStr(JSON.stringify(report)) +
+                ")",
               function (rendered) {
                 btnDanBe.disabled = false;
                 showCountResult(outDanBe, rendered);
@@ -1716,40 +1778,66 @@
           function searchPlan() {
             var result;
             try {
-              var input = payload, cacheKey = null;
+              var input = payload,
+                cacheKey = null;
               if (separate) {
                 input = {};
                 for (var key in payload) {
-                  if (Object.prototype.hasOwnProperty.call(payload, key)) input[key] = payload[key];
+                  if (Object.prototype.hasOwnProperty.call(payload, key))
+                    input[key] = payload[key];
                 }
                 input.types = [payload.types[planIndex]];
-                // Reuse only exactly identical cut contours on the same sheet.
-                // Clone before remapping mi; never mutate a cached local plan.
+                // Chỉ dùng lại khi đường bao khuôn giống hệt nhau trên cùng khổ tờ.
+                // Sao chép trước khi gán lại mi; không bao giờ sửa phương án dàn cục bộ đã cache.
                 cacheKey = JSON.stringify(input.types[0].groups);
               }
-              result = cacheKey && cachedPlans[cacheKey] ? cachedPlans[cacheKey] :
-                window.DanBeNester.nest(input);
-              if (cacheKey && result && result.ok) cachedPlans[cacheKey] = result;
+              result =
+                cacheKey && cachedPlans[cacheKey]
+                  ? cachedPlans[cacheKey]
+                  : window.DanBeNester.nest(input);
+              if (cacheKey && result && result.ok)
+                cachedPlans[cacheKey] = result;
             } catch (nestError) {
               btnDanBe.disabled = false;
-              show(outDanBe, "ERR: " + (nestError && nestError.message ? nestError.message : nestError));
+              show(
+                outDanBe,
+                "ERR: " +
+                  (nestError && nestError.message
+                    ? nestError.message
+                    : nestError),
+              );
               return;
             }
             if (!result || !result.ok) {
               btnDanBe.disabled = false;
-              show(outDanBe, "ERR: " + (result && result.error ? result.error : "Khong tim duoc cach dan hop le."));
+              show(
+                outDanBe,
+                "ERR: " +
+                  (result && result.error
+                    ? result.error
+                    : "Không tìm được cách dàn hợp lệ."),
+              );
               return;
             }
             if (!result.slots || !result.slots.length) {
               btnDanBe.disabled = false;
-              show(outDanBe, "ERR: Mẫu " + (planIndex + 1) + " không có vị trí dàn hợp lệ.");
+              show(
+                outDanBe,
+                "ERR: Mẫu " + (planIndex + 1) + " không có vị trí dàn hợp lệ.",
+              );
               return;
             }
             var slots = JSON.parse(JSON.stringify(result.slots));
             if (separate) {
-              for (var slotIndex = 0; slotIndex < slots.length; slotIndex++) slots[slotIndex].mi = planIndex;
+              for (var slotIndex = 0; slotIndex < slots.length; slotIndex++)
+                slots[slotIndex].mi = planIndex;
             }
-            plans.push({ modelIndex: planIndex, slots: slots, detail: result.detail, mode: result.mode });
+            plans.push({
+              modelIndex: planIndex,
+              slots: slots,
+              detail: result.detail,
+              mode: result.mode,
+            });
             totalCount += slots.length;
             planIndex++;
             if (planIndex < planCount) queuePlan();
@@ -1757,11 +1845,18 @@
           }
 
           function queuePlan() {
-            show(outDanBe, separate ?
-              "Đang dàn mẫu " + (planIndex + 1) + "/" + planCount + " trên tờ riêng…" :
-              "Đang tìm cách lồng khuôn theo đường bao thật…");
-            // Let Chromium repaint between models. No Illustrator objects are
-            // created until every plan has succeeded.
+            show(
+              outDanBe,
+              separate
+                ? "Đang dàn mẫu " +
+                    (planIndex + 1) +
+                    "/" +
+                    planCount +
+                    " trên tờ riêng…"
+                : "Đang tìm cách lồng khuôn theo đường bao thật…",
+            );
+            // Nhường cho Chromium vẽ lại giữa các mẫu. Chưa tạo object Illustrator nào
+            // cho tới khi mọi phương án dàn đều thành công.
             window.setTimeout(searchPlan, 20);
           }
           queuePlan();
@@ -1771,19 +1866,28 @@
   }
 
   var btnCopyToiUuNote = document.getElementById("btnCopyToiUuNote");
-  var btnCopyToiUuNoteOneSide = document.getElementById("btnCopyToiUuNoteOneSide");
+  var btnCopyToiUuNoteOneSide = document.getElementById(
+    "btnCopyToiUuNoteOneSide",
+  );
   var outCopyDanMauNote = document.getElementById("outCopyDanMauNote");
   function wireToiUuNoteButton(button, twoSided) {
     if (!button || !outCopyDanMauNote) return;
     button.addEventListener("click", function () {
       var notePrefixInput = document.getElementById("autoSheetNotePrefixes");
       var notePrefixes = notePrefixInput ? notePrefixInput.value || "" : "";
-      show(outCopyDanMauNote, twoSided ? "Đang điền ghi chú bài 2 mặt (1, 3, 5…)…" : "Đang điền ghi chú bài 1 mặt (1, 2, 3…)…");
+      show(
+        outCopyDanMauNote,
+        twoSided
+          ? "Đang điền ghi chú bài 2 mặt (1, 3, 5…)…"
+          : "Đang điền ghi chú bài 1 mặt (1, 2, 3…)…",
+      );
       if (btnCopyToiUuNote) btnCopyToiUuNote.disabled = true;
       if (btnCopyToiUuNoteOneSide) btnCopyToiUuNoteOneSide.disabled = true;
       cs.evalScript(
         loadDanToiUuJsx() +
-          (twoSided ? "dcCopyToiUuNoteToOddArtboards(" : "dcCopyToiUuNoteToAllArtboards(") +
+          (twoSided
+            ? "dcCopyToiUuNoteToOddArtboards("
+            : "dcCopyToiUuNoteToAllArtboards(") +
           jsStr(notePrefixes) +
           ")",
         function (res) {
@@ -1909,7 +2013,7 @@
           signals = [],
           index = 0;
         if (!(imageW > 0) || !(imageH > 0))
-          throw new Error("preview tong co kich thuoc khong hop le.");
+          throw new Error("preview tổng có kích thước không hợp lệ.");
         function readNextBatch() {
           try {
             var end = Math.min(regions.length, index + 24);
@@ -1917,7 +2021,7 @@
               var region = regions[index];
               if (!region || region.length !== 4)
                 throw new Error(
-                  "khung preview " + (index + 1) + " khong hop le.",
+                  "khung preview " + (index + 1) + " không hợp lệ.",
                 );
               var rx = Number(region[0]),
                 ry = Number(region[1]),
@@ -1925,7 +2029,7 @@
                 rh = Number(region[3]);
               if (!isFinite(rx) || !isFinite(ry) || !(rw > 0) || !(rh > 0))
                 throw new Error(
-                  "khung preview " + (index + 1) + " khong hop le.",
+                  "khung preview " + (index + 1) + " không hợp lệ.",
                 );
               var sx = Math.max(0, Math.floor(rx * imageW)),
                 sy = Math.max(0, Math.floor(ry * imageH)),
@@ -1933,23 +2037,23 @@
                 ey = Math.min(imageH, Math.ceil((ry + rh) * imageH));
               if (!(ex > sx) || !(ey > sy))
                 throw new Error(
-                  "khung preview " + (index + 1) + " nam ngoai anh tong.",
+                  "khung preview " + (index + 1) + " nằm ngoài ảnh tổng.",
                 );
               signals.push(sheetSignal(image, sx, sy, ex - sx, ey - sy));
             }
             if (index < regions.length) setTimeout(readNextBatch, 0);
             else done(signals);
           } catch (err) {
-            fail("Khong doc duoc preview tong: " + err);
+            fail("Không đọc được preview tổng: " + err);
           }
         }
         readNextBatch();
       } catch (err) {
-        fail("Khong doc duoc preview tong: " + err);
+        fail("Không đọc được preview tổng: " + err);
       }
     };
     image.onerror = function () {
-      fail("Khong mo duoc preview tong: " + path);
+      fail("Không mở được preview tổng: " + path);
     };
     image.src = localFileUrl(path);
   }
@@ -2032,7 +2136,7 @@
           }
           rotations.push(best);
         }
-        // The user-selected reference slot is the only 0-degree baseline.
+        // Slot tham chiếu do người dùng chọn là mốc 0 độ duy nhất.
         var angles = [];
         for (i = 0; i < rotations.length; i++) {
           var visualTurns = rotations[i];
@@ -2061,7 +2165,7 @@
       regions,
       function (signals) {
         if (!signals.length) {
-          fail("Khong co preview tong de hoc huong artwork.");
+          fail("Không có preview tổng để học hướng artwork.");
           return;
         }
         if (
@@ -2069,7 +2173,7 @@
           referenceIndex < 0 ||
           referenceIndex >= signals.length
         ) {
-          fail("Con mau chuan khong khop du lieu preview tong.");
+          fail("Con mẫu chuẩn không khớp dữ liệu preview tổng.");
           return;
         }
         var base = signals[referenceIndex],
@@ -2285,7 +2389,10 @@
         multiSourcePerArtboard && multiSourcePerArtboard.checked
       );
       cs.evalScript(
-        loadDanTheoMauJsx() + "dcApMau(" + (useMultiSource ? "true" : "false") + ")",
+        loadDanTheoMauJsx() +
+          "dcApMau(" +
+          (useMultiSource ? "true" : "false") +
+          ")",
         function (res) {
           btnApMau.disabled = false;
           handleRes(outApMau, res);
@@ -2317,16 +2424,16 @@
   }
 
   // ---- Raster object đang chọn ----
-  // Raster exactly one output per selected object. Do not infer an artboard,
-  // nested mask, or parent group: those guesses can merge separate pages.
+  // Raster mỗi object đang chọn thành đúng một kết quả. Không tự suy ra artboard,
+  // mask lồng bên trong hay group cha: đoán như vậy có thể gộp nhầm các trang riêng.
   function rasterizeSelectionInHost() {
     function rasterizeExactSelection(doc, liveSelection) {
       var options = new RasterizeOptions();
       options.resolution = 500;
       options.transparency = true;
       options.antiAliasingMethod = AntiAliasingMethod.ARTOPTIMIZED;
-      // clipBounds already crops the pixels. Asking Illustrator to create one
-      // more clipping mask leaves unnecessary vector-mask remnants behind.
+      // clipBounds đã cắt sẵn phần điểm ảnh. Nếu bảo Illustrator tạo thêm một
+      // clipping mask nữa thì sẽ để lại phần mask vector thừa không cần thiết.
       options.clippingMask = false;
       options.padding = 0;
       options.convertSpotColors = false;
@@ -2370,8 +2477,8 @@
         return false;
       }
 
-      // A clipping path is authoritative only when it belongs directly to the
-      // selected group. Never promote a descendant's frame to its parent.
+      // Clipping path chỉ có giá trị quyết định khi nó thuộc trực tiếp về
+      // group đang chọn. Không bao giờ lấy khung của object con cháu gán cho cha nó.
       function directClipFrame(item) {
         try {
           if (item.typename !== "GroupItem" || item.clipped !== true)
@@ -2419,8 +2526,8 @@
           Math.min(frame[1], itemBounds[1]) - Math.max(frame[3], itemBounds[3]),
         );
 
-        // A page clip can include bleed, but it must still cover almost all of
-        // the selected group's visual envelope. A photo clip will not pass.
+        // Clip của trang có thể gồm cả tràn lề, nhưng vẫn phải phủ gần hết
+        // vùng bao nhìn thấy của group đang chọn. Clip của ảnh sẽ không đạt.
         return (
           overlapWidth >= itemWidth * 0.9 &&
           overlapHeight >= itemHeight * 0.9 &&
@@ -2428,9 +2535,9 @@
         );
       }
 
-      // Some imported pages have one normal outer group and their actual page
-      // clipping group one level below it. Collect only the outermost clipped
-      // children so photo masks inside a page do not become raster boundaries.
+      // Một số trang nhập vào có một group thường bọc ngoài, còn group clip
+      // thật của trang nằm thấp hơn một cấp. Chỉ gom các object con có clip ngoài cùng
+      // để mask ảnh bên trong trang không bị lấy làm ranh giới raster.
       function collectNestedPageFrames(group, frames) {
         var children = directChildren(group);
         for (var i = 0; i < children.length; i++) {
@@ -2460,9 +2567,9 @@
           return frameCoversItem(frames[0], item) ? frames[0] : null;
         if (frames.length < 2) return null;
 
-        // A page frame must be clearly larger than photo/detail masks. Two
-        // similarly large frames mean the selection contains more than one page,
-        // so retaining the whole selected object is safer than guessing.
+        // Khung trang phải lớn hơn hẳn các mask ảnh/chi tiết. Hai khung
+        // lớn xấp xỉ nhau nghĩa là selection chứa nhiều hơn một trang,
+        // nên giữ nguyên cả object đang chọn sẽ an toàn hơn là đoán.
         frames.sort(function (a, b) {
           return frameArea(b) - frameArea(a);
         });
@@ -2523,20 +2630,20 @@
         return false;
       }
 
-      // The source remains untouched until the clipped duplicate has become a
-      // RasterItem. This avoids losing a page if Illustrator rejects one item.
+      // Object nguồn được giữ nguyên cho tới khi bản nhân bản đã clip trở thành
+      // RasterItem. Nhờ vậy không mất trang nếu Illustrator từ chối một object.
       function rasterOne(source, frame) {
         var duplicate = null;
         var raster = null;
         try {
           duplicate = source.duplicate(source, ElementPlacement.PLACEAFTER);
-          // Document.rasterize disposes of the copied source and clips pixels
-          // to frame. A prepared Clip group already contains its background.
+          // Document.rasterize tự huỷ bản sao của nguồn và clip điểm ảnh
+          // theo frame. Clip group đã chuẩn bị sẵn thì đã chứa nền của nó.
           raster = doc.rasterize(duplicate, frame, options);
-          if (!raster) throw new Error("Illustrator khong tra ve RasterItem.");
-          // Most Illustrator versions consume duplicate. Some complex clipped
-          // groups leave that duplicate alive, so remove only a surviving
-          // non-raster copy before deleting the original source.
+          if (!raster) throw new Error("Illustrator không trả về RasterItem.");
+          // Đa số phiên bản Illustrator dùng xong là mất luôn duplicate. Một số group clip
+          // phức tạp lại để duplicate đó còn sống, nên chỉ xoá bản sao còn sót
+          // không phải raster trước khi xoá object nguồn ban đầu.
           try {
             if (duplicate !== raster && duplicate.typename !== "RasterItem")
               duplicate.remove();
@@ -2550,7 +2657,7 @@
             try {
               raster.remove();
             } catch (removeRasterError) {}
-            throw new Error("Khong the thay object goc: " + removeSourceError);
+            throw new Error("Không thể thay object gốc: " + removeSourceError);
           }
           return raster;
         } catch (rasterError) {
@@ -2564,8 +2671,8 @@
         }
       }
 
-      // Snapshot before the first mutation. A live Illustrator selection can
-      // otherwise skip items or change to a parent as earlier items are removed.
+      // Chụp lại danh sách trước lần thay đổi đầu tiên. Nếu không, selection sống của
+      // Illustrator có thể bỏ sót object hoặc nhảy sang object cha khi các object trước bị xoá.
       var snapshot = [];
       for (var s = 0; s < liveSelection.length; s++)
         snapshot.push(liveSelection[s]);
@@ -2582,8 +2689,8 @@
         if (!seen) unique.push(snapshot[u]);
       }
 
-      // When a selected parent also contains a selected child, raster the
-      // explicit parent once. Separate sibling selections remain independent.
+      // Khi object cha đang chọn lại chứa một object con cũng đang chọn, chỉ raster
+      // object cha được chọn tường minh đó một lần. Các object ngang hàng chọn riêng vẫn độc lập.
       var targets = [];
       for (var i = 0; i < unique.length; i++) {
         var nested = false;
@@ -2601,9 +2708,9 @@
       for (var t = 0; t < targets.length; t++) {
         try {
           if (!isEditable(targets[t]))
-            throw new Error("object hoac layer dang khoa/an.");
+            throw new Error("object hoặc layer đang khóa/ẩn.");
           var frame = rasterFrame(targets[t]);
-          if (!frame) throw new Error("khong do duoc khung object.");
+          if (!frame) throw new Error("không đo được khung object.");
           rasters.push(rasterOne(targets[t], frame));
         } catch (itemError) {
           errors.push("Object " + (t + 1) + ": " + itemError);
@@ -2618,17 +2725,17 @@
       app.redraw();
       if (errors.length > 0)
         return (
-          "OK: Da raster " +
+          "OK: Đã raster " +
           rasters.length +
           "/" +
           targets.length +
-          " object doc lap. Canh bao: " +
+          " object độc lập. Cảnh báo: " +
           errors.join(" | ")
         );
       return (
-        "OK: Da raster " +
+        "OK: Đã raster " +
         rasters.length +
-        " object doc lap - CMYK, 500 ppi, nen trong suot."
+        " object độc lập - CMYK, 500 ppi, nền trong suốt."
       );
     }
 
@@ -3470,10 +3577,9 @@
       });
   }
 
-
   // ---- Dàn Catalogue ----
   var outCatalogue = document.getElementById("outCatalogue");
-  // Retain these handlers only if an older CEP-cached HTML file is open.
+  // Chỉ giữ các handler này khi đang mở file HTML cũ còn nằm trong cache của CEP.
   if (document.getElementById("selCatA4")) {
     // dropdown chọn khổ -> ẩn/hiện ô nhập kích thước
     var selCatA4 = document.getElementById("selCatA4");
@@ -3564,10 +3670,10 @@
       var pw = parseFloat(String(w).replace(",", "."));
       var ph = parseFloat(String(h).replace(",", "."));
       if (isNaN(pw) || isNaN(ph) || pw <= 0 || ph <= 0) {
-        show(outCatalogue, "Kich thuoc khong hop le (rong x cao, cm).", "warn");
+        show(outCatalogue, "Kích thước không hợp lệ (rộng x cao, cm).", "warn");
         return;
       }
-      show(outCatalogue, "Dang tinh 1 hay 2 cuon tren to...");
+      show(outCatalogue, "Đang tính 1 hay 2 cuốn trên tờ...");
       btnCatalogueAuto.disabled = true;
       cs.evalScript(
         loadCatalogueJsx() +
@@ -3615,14 +3721,18 @@
     offsetPdfButtons.innerHTML = "";
   }
   function saveOffsetPdf(total, jobsText, label) {
-    if(!window.DanCardCtlPackage || !window.DanCardCtlPackage.supported()) {
-      show(outOffsetPdf,"Không có bộ nén ZIP; chưa xuất file. Hãy mở lại panel.","warn");
+    if (!window.DanCardCtlPackage || !window.DanCardCtlPackage.supported()) {
+      show(
+        outOffsetPdf,
+        "Không có bộ nén ZIP; chưa xuất file. Hãy mở lại panel.",
+        "warn",
+      );
       return;
     }
     var buttons = offsetPdfButtons.querySelectorAll("button");
     function setDisabled(disabled) {
       for (var i = 0; i < buttons.length; i++) buttons[i].disabled = disabled;
-      if(offsetFileSuffix) offsetFileSuffix.disabled = disabled;
+      if (offsetFileSuffix) offsetFileSuffix.disabled = disabled;
     }
     setDisabled(true);
     show(outOffsetPdf, "Chọn nơi lưu AI + JPG + ZIP " + label + "…");
@@ -3632,25 +3742,56 @@
         jsStr(total) +
         ", " +
         jsStr(jobsText) +
-        ", " + jsStr(offsetFileSuffix ? offsetFileSuffix.value : "") +
+        ", " +
+        jsStr(offsetFileSuffix ? offsetFileSuffix.value : "") +
         ")",
       function (res) {
-        var at=typeof res==="string" ? res.indexOf("||CTLPACK:") : -1;
-        if(at<0) {setDisabled(false);handleRes(outOffsetPdf,res);return;}
-        var text=res.substring(0,at),plan;
-        try {plan=JSON.parse(res.substring(at+10));}
-        catch(e) {setDisabled(false);show(outOffsetPdf,text+" Không đọc được danh sách ZIP; AI/JPG đã giữ nguyên.","warn");return;}
-        window.DanCardCtlPackage.pack(plan,function(status){show(outOffsetPdf,status);},function(error,result) {
+        var at = typeof res === "string" ? res.indexOf("||CTLPACK:") : -1;
+        if (at < 0) {
           setDisabled(false);
-          if(error) {show(outOffsetPdf,text+" Nén ZIP lỗi: "+error.message,"warn");return;}
-          var files=result.files||[],errors=result.errors||[];
-          var message=text+" Đã nén "+files.length+" ZIP.";
-          if(errors.length) {
-            message+=" AI/JPG được giữ lại. Lỗi: ";
-            for(var i=0;i<errors.length;i++) message+=(i?" | ":"")+errors[i].name+": "+errors[i].error;
-            show(outOffsetPdf,message,"warn");
-          }else handleRes(outOffsetPdf,message);
-        });
+          handleRes(outOffsetPdf, res);
+          return;
+        }
+        var text = res.substring(0, at),
+          plan;
+        try {
+          plan = JSON.parse(res.substring(at + 10));
+        } catch (e) {
+          setDisabled(false);
+          show(
+            outOffsetPdf,
+            text + " Không đọc được danh sách ZIP; AI/JPG đã giữ nguyên.",
+            "warn",
+          );
+          return;
+        }
+        window.DanCardCtlPackage.pack(
+          plan,
+          function (status) {
+            show(outOffsetPdf, status);
+          },
+          function (error, result) {
+            setDisabled(false);
+            if (error) {
+              show(
+                outOffsetPdf,
+                text + " Nén ZIP lỗi: " + error.message,
+                "warn",
+              );
+              return;
+            }
+            var files = result.files || [],
+              errors = result.errors || [];
+            var message = text + " Đã nén " + files.length + " ZIP.";
+            if (errors.length) {
+              message += " AI/JPG được giữ lại. Lỗi: ";
+              for (var i = 0; i < errors.length; i++)
+                message +=
+                  (i ? " | " : "") + errors[i].name + ": " + errors[i].error;
+              show(outOffsetPdf, message, "warn");
+            } else handleRes(outOffsetPdf, message);
+          },
+        );
       },
     );
   }
@@ -3677,7 +3818,7 @@
         })
         .join("|");
       var btn = document.createElement("button");
-      btn.type = "button";
+      btn.type = "buttton";
       btn.className = "btn";
       btn.textContent = text;
       btn.addEventListener("click", function () {

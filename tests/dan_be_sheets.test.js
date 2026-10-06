@@ -153,8 +153,8 @@ function audit(f, expectedSheets) {
 {
   const canvasLeft = -7200 + 10 * MM,
     canvasTop = 7200 - 10 * MM;
-  // The KTS-style allocator now starts at the canvas upper-left, not beside
-  // source artwork. A full-width printed strip blocks the first canvas row.
+  // Bộ cấp phát vị trí kiểu KTS giờ bắt đầu từ góc trên trái canvas, không còn nằm cạnh
+  // bài nguồn. Một dải bài in rộng hết chiều ngang chắn mất hàng đầu tiên của canvas.
   const f = fixture({
     rect: [canvasLeft, canvasTop, 7200 - 10 * MM, canvasTop - 354 * MM],
   });

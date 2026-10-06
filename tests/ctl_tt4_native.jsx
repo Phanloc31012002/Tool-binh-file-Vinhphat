@@ -1,8 +1,8 @@
-// Opt-in native Illustrator regression for the centred A4 TT4 cover grid.
-// Only the owned synthetic document is edited or closed. Existing documents
-// are read for structure/selection snapshots, then their active state returns.
-// taskCtlTT4Case: 0=20.9x30 cover, 1=20x29.7 cover, 2=21x30 reject,
-//                3=21.2x30, 16 pages, no cover (maximum existing AB input).
+// Test hồi quy trong Illustrator thật (chỉ chạy khi chủ động bật) cho lưới bìa TT4 A4 canh giữa.
+// Chỉ tài liệu tự dựng của riêng test bị sửa hoặc đóng. Các tài liệu sẵn có
+// chỉ được đọc để chụp snapshot cấu trúc/selection, rồi được trả lại trạng thái active.
+// taskCtlTT4Case: 0=bìa 20.9x30, 1=bìa 20x29.7, 2=21x30 bị từ chối,
+//                3=21.2x30, 16 trang, không bìa (khổ nhập AB lớn nhất hiện có).
 (function () {
   var root = "C:/Users/ADMIN/Downloads/DanCard_Setup_23";
   var ci = typeof taskCtlTT4Case === "undefined" ? 0 : Number(taskCtlTT4Case);
@@ -286,8 +286,8 @@
     keep.filled = true;
     var keepBefore = json(itemState(keep));
 
-    // A tiny 72ppi fixture image is made once. Actual production flatten is
-    // still called with 500, and its existing-image branch returns this image.
+    // Một ảnh mẫu 72ppi tí hon chỉ được tạo một lần. Hàm flatten của code thật
+    // vẫn được gọi với 500, và nhánh ảnh-có-sẵn của nó trả về đúng ảnh này.
     var seed = artwork.groupItems.add(),
       seedH = (48 * spec.h) / spec.w;
     var base = seed.pathItems.rectangle(100, 0, 48, seedH);
@@ -331,7 +331,7 @@
       );
       sourcePages.push(page);
     }
-    // Rejection must leave existing generated layers untouched as well.
+    // Khi bị từ chối, các layer tự sinh sẵn có cũng phải được giữ nguyên.
     var oldPaper = doc.layers.add();
     oldPaper.name = "Pon CTL Offset tu dong";
     var oldPaperMark = oldPaper.pathItems.rectangle(100, -100, 4, 4);

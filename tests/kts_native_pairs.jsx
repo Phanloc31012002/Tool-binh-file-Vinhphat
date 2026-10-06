@@ -1,5 +1,5 @@
-// Opt-in Illustrator test: set dcKtsTestSourceName to the exact open source
-// document name. Only duplicates in a new unsaved document are modified.
+// Test Illustrator chỉ chạy khi chủ động bật: gán dcKtsTestSourceName đúng bằng tên tài liệu
+// nguồn đang mở. Chỉ các bản nhân bản trong một tài liệu mới chưa lưu mới bị sửa.
 $.evalFile(
   File(
     "C:/Users/ADMIN/Downloads/DanCard_Setup_23/DanCardCEP/jsx/dan_card_lib.jsx",
@@ -65,9 +65,9 @@ $.evalFile(
         selected: it.selected,
       });
     }
-    // The open work file can contain additional examples. Copy only seven
-    // complete rows of the known 9.2 x 5.2 cm frame, ignoring unmatched rows.
-    // This is fixture selection, not a fallback in the production pairer.
+    // File làm việc đang mở có thể chứa thêm các ví dụ khác. Chỉ sao chép bảy
+    // hàng đầy đủ của khung 9.2 x 5.2 cm đã biết, bỏ qua các hàng không khớp cặp.
+    // Đây là việc chọn dữ liệu mẫu, không phải phương án dự phòng trong bộ ghép cặp của code thật.
     var candidates = [],
       testRecords = [],
       MM = 2.834645669;
@@ -125,7 +125,7 @@ $.evalFile(
         back.note = "KTS_BACK_" + i;
         back.translate(0, i % 2 ? -0.02 : 0.02);
         selected.push(back);
-        selected.push(front); // intentionally reverse selection order
+        selected.push(front); // cố ý đảo thứ tự selection
       }
       testDoc.selection = selected;
       var result = dcDanToiUu("33", "35.4", true, mode === 1);

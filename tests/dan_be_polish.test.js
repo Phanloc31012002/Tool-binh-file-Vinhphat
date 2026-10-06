@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const nester = require("../DanCardCEP/js/dan_be_nester");
 const fixtures = require("./dan_be_fixtures");
 
-// Same measured spoon cutter, oriented as the actual Illustrator payload.
+// Vẫn khuôn bế hình muỗng đã đo, xoay theo đúng hướng của payload Illustrator thật.
 const step = 0.25,
   margin = 4,
   rw = 1288,

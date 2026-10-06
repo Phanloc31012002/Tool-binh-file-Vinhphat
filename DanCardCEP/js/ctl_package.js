@@ -1,5 +1,5 @@
-/* CTL AI/JPG -> one flat ZIP per sheet. Uses Adobe CEP's native process API;
- * no Node permission flag, shell interpolation, source edit or network IO.
+/* CTL AI/JPG -> mỗi tờ một file ZIP phẳng. Dùng API tiến trình gốc của Adobe CEP;
+ * không cần cờ cấp quyền Node, không nội suy vào shell, không sửa file nguồn, không IO mạng.
  * CEP API: github.com/Adobe-CEP/CEP-Resources/CEP_12.x/CEPEngine_extensions.js
  */
 (function (root, factory) {
@@ -56,8 +56,8 @@
   }
   function command(plan, statusPath, btoa) {
     validate(plan);
-    // Read the batch as JSON data, not shell arguments. The command remains
-    // short even with many sheets and long Vietnamese filenames.
+    // Đọc cả lô dưới dạng dữ liệu JSON, không qua tham số shell. Câu lệnh vẫn
+    // ngắn dù có nhiều tờ và tên file tiếng Việt dài.
     var payload = btoa(unescape(encodeURIComponent(absolute(statusPath))));
     return [
       "$ErrorActionPreference='Stop'",
@@ -185,7 +185,7 @@
             return;
           }
           if (Date.now() - started > 1800000) {
-            // The worker could still be writing; leave its state on timeout.
+            // Worker có thể vẫn đang ghi; khi timeout thì để nguyên trạng thái của nó.
             ownsStatus = false;
             finish(Error("Nén ZIP quá lâu; AI/JPG đã giữ nguyên."));
             return;

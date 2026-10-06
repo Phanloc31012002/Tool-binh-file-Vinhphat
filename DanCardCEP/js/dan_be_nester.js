@@ -16,7 +16,7 @@
 })(typeof window !== "undefined" ? window : this, function () {
   "use strict";
 
-  var VERSION = 2;
+  var VERSION = 6;
 
   function now() { return new Date().getTime(); }
   function abs(v) { return v < 0 ? -v : v; }
@@ -94,11 +94,11 @@
     return out;
   }
 
-  // Different artwork designs often share the same cutter. Search that
-  // silhouette once, then distribute the resulting slots cyclically; treating
-  // identical cutters as unrelated types used to disable the dense motifs.
-  // Coordinates are already normalized. Path starting point, winding and
-  // group/compound ordering do not change a cutter's physical geometry.
+  // Nhiều mẫu bài khác nhau thường dùng chung một khuôn bế. Chỉ tìm cho
+  // silhouette đó một lần rồi chia xoay vòng các slot tìm được; trước đây việc coi
+  // các khuôn bế giống hệt nhau là những loại riêng rẽ đã làm tắt các mô-típ xếp dày.
+  // Toạ độ đã được chuẩn hoá sẵn. Điểm bắt đầu của path, chiều quay và
+  // thứ tự group/compound không làm đổi hình học vật lý của khuôn bế.
   function sameContour(a, b) {
     if (a.length !== b.length) return false;
     var tolerance = 0.000001, start, direction, i, j, equal;
@@ -178,14 +178,14 @@
     return out;
   }
 
-  // Even/odd in a CompoundPath; separate groups are unioned afterwards.
+  // Luật even/odd trong một CompoundPath; các group riêng thì được hợp lại sau.
   function intervalsForGroup(group, y) {
     var xs = [], ci, c, i, p, q, x;
     for (ci = 0; ci < group.length; ci++) {
       c = group[ci];
       for (i = 0; i < c.length; i++) {
         p = c[i]; q = c[(i + 1) % c.length];
-        // Half-open rule prevents counting a vertex twice.
+        // Quy tắc nửa mở giúp không đếm một đỉnh hai lần.
         if ((p[1] <= y && q[1] > y) || (q[1] <= y && p[1] > y)) {
           x = p[0] + (y - p[1]) * (q[0] - p[0]) / (q[1] - p[1]);
           xs.push(x);
@@ -212,8 +212,13 @@
   function toCellSpans(spans, step) {
     var out = [], i, a, b;
     for (i = 0; i < spans.length; i++) {
-      a = Math.floor(spans[i][0] / step);
-      b = Math.ceil(spans[i][1] / step);
+      // Dùng cùng dung sai biên ô như trong buildVariant. Phép đổi từ point của
+      // Illustrator có thể biến một cạnh tròn số thành 122.0000000125 mm: ceil thô
+      // khi đó thêm một ô ma nằm ngoài bbox đã khai báo của khuôn bế. Việc này chỉ
+      // bỏ sai số vụn nhỏ hơn một ô; phần nhô ra thật vẫn được làm tròn ra ngoài
+      // và chốt chặn hình học liên tục độc lập vẫn là bắt buộc.
+      a = Math.floor(spans[i][0] / step + 1e-7);
+      b = Math.ceil(spans[i][1] / step - 1e-7);
       if (b > a) out.push([a, b]);
     }
     return mergeSpans(out);
@@ -222,9 +227,9 @@
   function buildVariant(groups, mi, vi, angle, gap, step) {
     var rotated = rotateGroups(groups, angle), b = boundsOfGroups(rotated);
     if (!b) return null;
-    // Illustrator's point-to-mm conversion can leave an exact 50 mm cutter
-    // at 50.000000002 mm. Do not inflate it by an entire raster cell because
-    // of that numerical dust (the continuous physical guard still judges it).
+    // Phép đổi point sang mm của Illustrator có thể để một khuôn bế đúng 50 mm
+    // thành 50.000000002 mm. Đừng phồng nó thêm cả một ô raster chỉ vì
+    // sai số vụn đó (chốt chặn vật lý liên tục vẫn xét nó).
     var wCells = Math.ceil(b.w / step - 1e-7), hCells = Math.ceil(b.h / step - 1e-7);
     var rawRows = [], r, y;
     for (r = 0; r < hCells; r++) {
@@ -232,9 +237,9 @@
       rawRows.push(toCellSpans(intervalsForGroups(rotated, y), step));
     }
 
-    // A sampled scanline represents a vertical slab, not an infinitely thin
-    // line. Include its half-cell height when dilating; otherwise two curved
-    // contours can pass the row test with less than the entered physical gap.
+    // Một scanline lấy mẫu đại diện cho cả một lát theo chiều dọc, không phải một
+    // đường mảnh vô hạn. Khi nở phải tính thêm nửa chiều cao ô; nếu không, hai
+    // đường bao cong có thể qua được phép thử theo hàng dù khe vật lý nhỏ hơn số đã nhập.
     var radius = gap / 2 + step / 2;
     var padCells = Math.ceil(radius / step);
     var clearRows = [], cr, rr, delta, ext, raw, j, expanded;
@@ -274,11 +279,11 @@
     for (r = 1; r < n; r++) {
       prev = spanSignature(v.rawRows[r - 1]); cur = spanSignature(v.rawRows[r]);
       change = prev !== cur;
-      // Curves may change each row; only retain periodic strong landmarks.
+      // Đường cong có thể đổi ở mỗi hàng; chỉ giữ các mốc nổi bật theo chu kỳ.
       if (change && (r % Math.max(1, Math.round(n / 18)) === 0)) keep[r] = true;
       if (v.rawRows[r].length !== v.rawRows[r - 1].length) { keep[r] = true; strong[r] = true; }
-      // Preserve sudden neck/head/shoulder transitions even when the general
-      // curve has hundreds of gradually changing scanlines.
+      // Giữ lại các chỗ chuyển đột ngột ở cổ/đầu/vai ngay cả khi đường cong
+      // chung có hàng trăm scanline thay đổi từ từ.
       var a0 = v.rawRows[r - 1][0], a1 = v.rawRows[r][0];
       var z0 = v.rawRows[r - 1][v.rawRows[r - 1].length - 1];
       var z1 = v.rawRows[r][v.rawRows[r].length - 1];
@@ -391,8 +396,8 @@
 
   function planScore(plan, variants) {
     var b = planBounds(plan, variants);
-    // Count is handled separately. A compact block has more chance to accept a
-    // rotated piece than a shallow, wide block with the same number of decals.
+    // Số con được xét riêng. Một khối gọn có nhiều cơ hội nhận thêm một con
+    // xoay hơn là một khối thấp và rộng có cùng số decal.
     return b.area * 10000 + (b.y1 - b.y0) * 8 + (b.x1 - b.x0);
   }
 
@@ -419,8 +424,8 @@
     return out;
   }
 
-  // A mixed source promises equal alternation. Greedy placement preserves this
-  // invariant, but prebuilt seeds and repair removals must obey it as well.
+  // Nguồn trộn nhiều loại cam kết luân phiên đều nhau. Xếp tham lam giữ được
+  // bất biến này, nhưng seed dựng sẵn và các lượt gỡ con khi sửa cũng phải tuân theo.
   function balancedPlan(plan, typeCount) {
     if (typeCount <= 1) return true;
     var counts = countTypes(plan, typeCount), lo = counts[0], hi = counts[0], i;
@@ -446,10 +451,10 @@
     seen[k] = true; list.push({ x: x, y: y });
   }
 
-  // Raster no-fit boundary: at EVERY relative scanline displacement, find
-  // the forbidden horizontal intervals between two real silhouettes. Their
-  // endpoints are tangent positions, including pockets inside concave dies.
-  // Cache per orientation pair; copies of the same die reuse the catalogue.
+  // Biên no-fit dạng raster: ở MỌI độ lệch scanline tương đối, tìm
+  // các khoảng ngang bị cấm giữa hai silhouette thật. Hai đầu mút của
+  // chúng là các vị trí tiếp xúc, kể cả các hốc bên trong khuôn bế lõm.
+  // Cache theo từng cặp hướng xoay; các con cùng một khuôn dùng lại danh mục này.
   function contactOffsets(a, b) {
     if (b.contacts[a.id]) return b.contacts[a.id];
     var out = [], dy, ib, ia, ra, rb, i, j, blocks, merged, f;
@@ -493,8 +498,8 @@
       var contacts = contactOffsets(a, v), co;
       for (co = 0; co < contacts.length; co++)
         candidateAdd(list, seen, s.x + contacts[co].dx, s.y + contacts[co].dy, v, rw, rh);
-      // Bbox contacts and center alignments are indispensable for simple
-      // rectangles, while the feature contacts below handle concave shapes.
+      // Tiếp xúc theo bbox và canh tâm là không thể thiếu với các hình chữ nhật
+      // đơn giản, còn tiếp xúc theo hàng đặc trưng bên dưới lo các hình lõm.
       candidateAdd(list, seen, s.x - v.wCells, s.y, v, rw, rh);
       candidateAdd(list, seen, s.x + a.wCells, s.y, v, rw, rh);
       candidateAdd(list, seen, s.x, s.y - v.hCells, v, rw, rh);
@@ -503,10 +508,10 @@
       candidateAdd(list, seen, s.x, s.y + Math.round((a.hCells - v.hCells) / 2), v, rw, rh);
       candidateAdd(list, seen, s.x + a.wCells - v.wCells, s.y + a.hCells - v.hCells, v, rw, rh);
 
-      // True contour contacts: align a feature row of the new silhouette with
-      // one of the placed silhouette, then touch right-to-left / left-to-right.
-      // The collision test uses the dilated profile, so candidates with less
-      // than the requested gap are rejected automatically.
+      // Tiếp xúc đường bao thật: canh một hàng đặc trưng của silhouette mới với
+      // một hàng của silhouette đã đặt, rồi cho chạm phải-sang-trái / trái-sang-phải.
+      // Phép thử va chạm dùng biên dạng đã nở, nên các phương án có khe nhỏ
+      // hơn khe yêu cầu sẽ tự động bị loại.
       for (ia = 0; ia < fa.length; ia++) {
         rowA = a.clearRows[fa[ia] + a.padCells] || [];
         if (!rowA.length) continue;
@@ -567,19 +572,19 @@
         v = variants[vi];
         if (!allowedType(v.mi, counts, typeCount)) continue;
         cs = candidatesFor(plan, v, variants, rw, rh);
-        // Try low/left candidates first, but retain enough contacts for a
-        // horizontal or reverse-orientation lock to be chosen.
+        // Thử các phương án thấp/trái trước, nhưng giữ đủ tiếp xúc để vẫn
+        // chọn được thế lồng nằm ngang hoặc ngược hướng.
         cs.sort(function (u, w) { return u.y - w.y || u.x - w.x; });
-        // One wide/long orientation used to consume the complete shared cap,
-        // so 90°/270° was literally never evaluated. Each rotation gets the
-        // same bounded allowance.
+        // Trước đây một hướng xoay rộng/dài ăn hết toàn bộ hạn mức dùng chung,
+        // nên 90°/270° thật sự chưa bao giờ được xét. Mỗi góc xoay được cấp
+        // cùng một hạn mức có giới hạn.
         checked = 0;
         var edgeCount = Math.min(280, Math.floor(cs.length / 2));
         var middleStride = Math.max(1, Math.floor(Math.max(1, cs.length - 2 * edgeCount) / 180));
         for (ci = 0; ci < cs.length && checked < maxCandidatesPerVariant; ci++) {
-          // Keep both ends of the y-sorted list. The useful free strip for a
-          // sideways die is often at the top, which the old "first N only"
-          // policy never reached.
+          // Giữ cả hai đầu của danh sách đã sắp theo y. Dải trống hữu ích cho
+          // khuôn nằm ngang thường ở trên cùng, nơi cách cũ "chỉ lấy N cái đầu"
+          // không bao giờ với tới.
           if (ci >= edgeCount && ci < cs.length - edgeCount &&
               ((ci - edgeCount) % middleStride) !== 0) continue;
           checked++;
@@ -588,8 +593,8 @@
           var trial = { mi: v.mi, v: vi, x: p.x, y: p.y };
           var metricPlan = plan.concat([trial]);
           var score = planScore(metricPlan, variants);
-          // A small bottom-left preference keeps open regions contiguous, but
-          // count remains the only global primary objective.
+          // Ưu tiên nhẹ cho góc dưới-trái giúp các vùng trống liền nhau, nhưng
+          // số con vẫn là mục tiêu chính duy nhất trên toàn cục.
           score += p.y * 4 + p.x * 0.05;
           if (!best || score < best.score) {
             best = { mi: v.mi, v: vi, x: p.x, y: p.y, score: score };
@@ -603,9 +608,9 @@
     return plan;
   }
 
-  // A pair is evaluated as a single move. Greedy one-at-a-time placement can
-  // consume the first slot of a useful pair and then make its partner fail.
-  // This is how a free horizontal pair is kept available above a compact block.
+  // Một cặp được xét như một nước đi duy nhất. Xếp tham lam từng con một có thể
+  // chiếm mất slot đầu của một cặp hữu ích rồi khiến con còn lại không đặt được.
+  // Nhờ vậy mới giữ được chỗ cho một cặp nằm ngang tự do phía trên một khối gọn.
   function augmentWithPair(plan, variants, typeCount, rw, rh, dots, deadline) {
     if (!plan || !plan.length) return plan;
     var counts = countTypes(plan, typeCount), va, vb, a, b, ca, cb, pairCap = 24;
@@ -631,8 +636,8 @@
     for (va = 0; va < variants.length && now() < deadline; va++) {
       var av = variantOrder[va]; a = variants[av];
       if (!allowedType(a.mi, counts, typeCount)) continue;
-      // Filter against the complete layout BEFORE sampling. Sampling the raw
-      // catalogue dropped virtually every valid head-to-neck pocket.
+      // Lọc theo toàn bộ bố cục TRƯỚC KHI lấy mẫu. Lấy mẫu trên danh mục thô
+      // từng làm mất gần như mọi hốc đầu-kề-cổ hợp lệ.
       ca = validCandidates(plan, a, baseOcc);
       for (var ai = 0; ai < ca.length && now() < deadline; ai++) {
         var occA = buildOccupancyFor(plan, variants, rh), pa = ca[ai];
@@ -649,8 +654,8 @@
             if (!insideAndClear(b, pb.x, pb.y, rw, rh, occA, dots)) continue;
             var joined = clonePlan(once);
             joined.push({ mi: b.mi, v: bv, x: pb.x, y: pb.y });
-            // Count is the objective. Keep the first verified two-piece gain
-            // and give the remaining budget to other layout seeds.
+            // Số con là mục tiêu. Giữ lần tăng hai con đầu tiên đã kiểm chứng
+            // và dành quỹ thời gian còn lại cho các seed bố cục khác.
             return joined;
           }
         }
@@ -670,9 +675,9 @@
       seen[sig] = true; seeds.push(plan);
     }
 
-    // A compact strip is a generic nesting motif, not a shape-specific rule.
-    // Long dies frequently need a complete row before the inverse/sideways
-    // pieces can lock into its recesses (the yellow spoon is one example).
+    // Một dải gọn là mô-típ lồng tổng quát, không phải luật riêng cho hình nào.
+    // Khuôn dài thường cần một hàng hoàn chỉnh trước rồi các con ngược/nằm ngang
+    // mới lồng được vào chỗ lõm của nó (cái muỗng vàng là một ví dụ).
     function pushStrip(vi, y) {
       if (typeCount !== 1) return;
       var vv = variants[vi], pitch = vv.wCells + Math.max(1, 2 * vv.padCells);
@@ -704,10 +709,10 @@
       return plan;
     }
 
-    // Two opposing strips are a generic "interlock motif": it is created
-    // only from real contour contact candidates, then validated row by row.
-    // Unlike a rectangle grid, this leaves a continuous pocket for a rotated
-    // pair above/below the two strips.
+    // Hai dải đối hướng là một "mô-típ lồng" tổng quát: nó chỉ
+    // được tạo từ các phương án tiếp xúc đường bao thật, rồi kiểm chứng từng hàng một.
+    // Khác với lưới chữ nhật, cách này chừa một hốc liền mạch cho một cặp
+    // xoay ở trên/dưới hai dải.
     function pushTwinStrips() {
       if (typeCount !== 1) return;
       var twins = [], a, b, vv, oo, n, baseYs, baseXs, bx, by, base, cs, ci, c, second, joined;
@@ -734,17 +739,17 @@
         baseYs = [rh - vv.hCells, 0];
         var stripWidth = vv.wCells + (n - 1) * (vv.wCells + Math.max(1, 2 * vv.padCells));
         var spareX = rw - stripWidth;
-        // A half-pitch opposing strip needs room on one side of its base.
-        // Quarter phases leave that room while still shifting corner circles
-        // away from PON; centring the base row alone can make its partner spill.
+        // Dải đối hướng lệch nửa bước lưới cần chỗ ở một bên của dải gốc.
+        // Các pha một phần tư chừa được chỗ đó mà vẫn dời các hình tròn ở góc
+        // ra xa PON; chỉ canh giữa riêng hàng gốc có thể làm dải đi kèm tràn ra ngoài.
         baseXs = [Math.floor(spareX / 4), Math.floor(3 * spareX / 4), Math.floor(spareX / 2), 0, spareX];
         for (bx = 0; bx < baseXs.length && now() < deadline; bx++)
         for (by = 0; by < baseYs.length && now() < deadline; by++) {
           base = makeStrip(a, baseXs[bx], baseYs[by], n, null);
           if (!base) continue;
           cs = candidatesFor(base, oo, variants, rw, rh);
-          // Rank the whole opposite-strip block by compactness rather than
-          // throwing away most contact offsets before checking them.
+          // Xếp hạng cả khối dải đối hướng theo độ gọn thay vì
+          // vứt phần lớn các độ lệch tiếp xúc trước khi kiểm tra chúng.
           var baseBounds = planBounds(base, variants);
           cs.sort(function (u, w) {
             function area(p) {
@@ -760,9 +765,9 @@
             var secondPitch = oo.wCells + Math.max(1, 2 * oo.padCells);
             for (var sk = 0; sk < n; sk++) {
               var sx = c.x + sk * secondPitch;
-              // Same-orientation copies have disjoint expanded bboxes at this
-              // pitch. Reuse the base occupancy instead of rebuilding it for
-              // every possible concave contact.
+              // Các con cùng hướng xoay có bbox mở rộng rời nhau ở bước lưới
+              // này. Dùng lại bảng chiếm chỗ của dải gốc thay vì dựng lại cho
+              // từng tiếp xúc lõm có thể có.
               if (!insideAndClear(oo, sx, c.y, rw, rh, baseOcc, dots)) { second = null; break; }
               second.push({mi:oo.mi,v:b,x:sx,y:c.y});
             }
@@ -770,8 +775,8 @@
             joined = clonePlan(base);
             for (var sj = 0; sj < second.length; sj++) joined.push(second[sj]);
             retain(joined);
-            // The sorted catalogue's first feasible lock is the smallest
-            // block at this anchor. Different anchors/rotations get time too.
+            // Thế lồng khả thi đầu tiên trong danh mục đã sắp là khối nhỏ nhất
+            // tại điểm neo này. Các điểm neo/góc xoay khác cũng cần được chia thời gian.
             break;
           }
         }
@@ -789,8 +794,8 @@
 
     for (vi = 0; vi < variants.length; vi++) {
       v = variants[vi];
-      // Corner PON can block all four corner anchors while the same die fits
-      // in the middle. Retain that cheap deterministic seed for every heading.
+      // PON góc có thể chặn cả bốn điểm neo ở góc trong khi chính khuôn đó vẫn vừa
+      // ở giữa. Giữ lại seed tất định, ít tốn kém đó cho mọi hướng.
       anchors = [[0, 0], [rw - v.wCells, 0], [0, rh - v.hCells], [rw - v.wCells, rh - v.hCells],
                  [Math.floor((rw - v.wCells) / 2), Math.floor((rh - v.hCells) / 2)]];
       for (ai = 0; ai < anchors.length; ai++) {
@@ -800,18 +805,18 @@
       }
     }
 
-    // Generic pair locks: no rule mentions spoon. Every orientation pair gets
-    // a chance to form the smallest valid contact cluster before greedy growth.
+    // Thế lồng cặp tổng quát: không luật nào nhắc tới muỗng. Mỗi cặp hướng xoay đều
+    // có cơ hội tạo cụm tiếp xúc hợp lệ nhỏ nhất trước bước mở rộng tham lam.
     var a, b, base, candidates, ci, candidate, pairOcc, candidateSeed, totalPairs = 0;
     var emptyPairOcc = buildOccupancyFor([], variants, rh);
     for (a = 0; a < variants.length && now() < deadline && totalPairs < 32; a++) {
       for (b = 0; b < variants.length && now() < deadline && totalPairs < 32; b++) {
         if (typeCount > 1 && variants[a].mi === variants[b].mi) continue;
         base = { mi: variants[a].mi, v: a, x: 0, y: 0 };
-        // The first die of a contact pair is a real placement, not a free
-        // coordinate anchor. It must avoid sheet/PON constraints before its
-        // mate is tested; otherwise an unsafe corner die poisons the winning
-        // seed and makes the final contour guard reject an otherwise viable job.
+        // Khuôn đầu tiên của một cặp tiếp xúc là một vị trí đặt thật, không phải
+        // điểm neo toạ độ tự do. Nó phải thoả các ràng buộc tờ/PON trước khi thử
+        // con ghép cặp; nếu không, một khuôn ở góc không an toàn sẽ làm hỏng seed
+        // thắng cuộc và khiến chốt chặn đường bao cuối từ chối một lượt dàn lẽ ra vẫn khả thi.
         if (!insideAndClear(variants[a], base.x, base.y, rw, rh, emptyPairOcc, dots)) continue;
         pairOcc = buildOccupancyFor([base], variants, rh);
         candidates = candidatesFor([base], variants[b], variants, rw, rh);
@@ -839,11 +844,193 @@
     return true;
   }
 
-  // A repeated motif is measured against the actual profiles. The stagger
-  // and row pitch are derived from contour clearance, rather than from bbox
-  // height. This gives a fast dense starting layout for leaves, diamonds and
-  // other repeating dies before the free-placement search fills remaining
-  // pockets with any allowed rotation.
+  // Tiếp xúc từ phía ngoài cho con kề bên phải, ở một độ lệch dọc cố định.
+  // Khoảng cách do các đoạn scanline đã nở thật quyết định, không phải bề rộng bbox.
+  // Biên ngoài thì an toàn với mọi đường bao (kể cả lỗ của compound).
+  function rightProfileContact(a, b, dy) {
+    var right = 0, ib, ia, ra, rb;
+    for (ib = Math.max(0, b.padCells - a.padCells - dy); ib < b.clearRows.length; ib++) {
+      ia = ib + dy + a.padCells - b.padCells;
+      if (ia >= a.clearRows.length) break;
+      ra = a.clearRows[ia]; rb = b.clearRows[ib];
+      if (ra.length && rb.length)
+        right = Math.max(right, ra[ra.length - 1][1] - rb[0][0]);
+    }
+    return Math.max(1, Math.ceil(right));
+  }
+
+  // Lặp A -> B -> A trong một hàng. Hai hướng đối nhau có thể dùng chung cạnh
+  // xiên/chỗ lõm trong khung bao chữ nhật của chúng; mỗi cặp là một đơn vị tuần hoàn.
+  // Bố cục nền cố định cho cả bốn hướng chạy trước các bước tinh chỉnh bị giới hạn thời gian,
+  // nên máy đang bận cũng không thể bỏ sót cặp 90/270 hữu ích.
+  function alternatingRowPlans(variants, typeCount, rw, rh, dots, deadline) {
+    if (typeCount !== 1) return [];
+    var out = [], ai, bi;
+    function retain(plan) {
+      if (!plan.length) return;
+      out.push(plan);
+      out.sort(function(u,w) { return -comparePlans(u,w,variants); });
+      if (out.length > 8) out.pop();
+    }
+    function motif(first, second, dy, extraPhases) {
+      var a = variants[first], b = variants[second];
+      var ay = Math.max(0,-dy), by = Math.max(0,dy);
+      var ab = rightProfileContact(a,b,dy), ba = rightProfileContact(b,a,-dy);
+      var cycle = Math.max(ab+ba,rightProfileContact(a,a,0),rightProfileContact(b,b,0));
+      var height = Math.max(ay+a.hCells,by+b.hCells);
+      var rowPitch = height+Math.max(1,2*Math.max(a.padCells,b.padCells));
+      if (height > rh || Math.min(a.wCells,b.wCells) > rw) return;
+      var rows = Math.floor((rh-height)/rowPitch)+1;
+      var spareY = rh-height-(rows-1)*rowPitch;
+      function modulo(x) { return ((x % cycle)+cycle) % cycle; }
+      var phasesX = [0,modulo(rw-a.wCells),modulo(rw-b.wCells-ab)];
+      if (extraPhases) phasesX.push(Math.round(cycle/4),Math.round(cycle/2),Math.round(3*cycle/4));
+      var phasesY = [0,Math.floor(spareY/2),spareY], xi, yi;
+      for (xi=0;xi<phasesX.length;xi++) for (yi=0;yi<phasesY.length;yi++) {
+        if (extraPhases && now() >= deadline) return;
+        var plan=[],row,col,parts,part,x,y,v,visits=0;
+        for (row=0;row<rows && visits<20000;row++) {
+          for (col=-1;col<=Math.ceil(rw/cycle) && visits<20000;col++) {
+            parts=[{v:first,x:phasesX[xi]+col*cycle,y:phasesY[yi]+row*rowPitch+ay},
+                   {v:second,x:phasesX[xi]+col*cycle+ab,y:phasesY[yi]+row*rowPitch+by}];
+            for(part=0;part<parts.length;part++) {
+              visits++; v=variants[parts[part].v]; x=parts[part].x; y=parts[part].y;
+              // Tiếp xúc AB/BA và chu kỳ cùng hướng đã tách sẵn
+              // mọi cặp trong mô-típ tuần hoàn này; rowPitch tách các hàng.
+              // Tránh dựng lại hàng nghìn đoạn chiếm chỗ cho mỗi pha với
+              // khuôn bế rất nhỏ. Chốt chặn raster VÀ vật lý cuối cùng vẫn chạy.
+              if(x<0 || y<0 || x+v.wCells>rw || y+v.hCells>rh || rawHitsPon(v,x,y,dots)) continue;
+              plan.push({mi:v.mi,v:parts[part].v,x:x,y:y});
+            }
+          }
+        }
+        retain(plan);
+      }
+    }
+    // Phần việc được bảo đảm chạy là hữu hạn: bốn cặp hướng xoay, mỗi cặp chín pha.
+    // Không dựng toàn bộ danh mục no-fit, cũng không quét tuyến tính các bước hàng.
+    for(ai=0;ai<variants.length;ai++) {
+      bi=-1;
+      for(var oi=0;oi<variants.length;oi++)
+        if(variants[oi].mi===variants[ai].mi && variants[oi].angle===(variants[ai].angle+180)%360) { bi=oi; break; }
+      if(bi>=0) motif(ai,bi,0,false);
+    }
+    for(ai=0;ai<variants.length && now()<deadline;ai++) {
+      for(bi=0;bi<variants.length && now()<deadline;bi++) {
+        if(ai===bi) continue;
+        // Độ lệch một phần tư chiều cao tìm ra các hốc bất đối xứng mà không gắn cứng
+        // công thức cho tam giác, muỗng hay silhouette của sản phẩm có tên nào.
+        var quarter=Math.round(Math.min(variants[ai].hCells,variants[bi].hCells)/4);
+        motif(ai,bi,0,true);
+        if(quarter) { motif(ai,bi,quarter,true); motif(ai,bi,-quarter,true); }
+      }
+    }
+    return out;
+  }
+
+  // Hai hàng đối hướng tạo thành một băng lặp lại được. Độ lệch A->B và
+  // bước quay về băng kế tiếp không cần bằng nhau: đường bao thật có thể lồng
+  // sâu vào nhau theo một chiều nhưng cần bước quay về dài hơn theo chiều kia.
+  function bandPlans(variants, typeCount, rw, rh, dots, gap, step, deadline) {
+    if (typeCount !== 1) return [];
+    var pending = [], out = [], ai, bi, si;
+    function retain(plan) {
+      if (!plan.length) return;
+      pending.push(plan);
+      pending.sort(function(u,w) { return -comparePlans(u,w,variants); });
+      if (pending.length > 8) pending.pop();
+    }
+    function motif(first, second, shift, timed) {
+      var a = variants[first], b = variants[second];
+      var pad = 2 * Math.max(a.padCells,b.padCells);
+      var pitch = Math.max(a.wCells,b.wCells) + pad;
+      var limit = Math.max(a.hCells,b.hCells) + pad, dy, period;
+      // Chỉ hai cột kề nhau mới có thể va chạm; các cột xa hơn có
+      // khung bao mở rộng rời nhau ở bước lưới ngang này.
+      for (dy = 0; dy <= limit; dy++) {
+        if (timed && now() >= deadline) return;
+        if (pairProfilesClear(a,b,shift,dy) &&
+            pairProfilesClear(a,b,shift-pitch,dy)) break;
+      }
+      if (dy > limit) return;
+      var height = Math.max(a.hCells,dy+b.hCells);
+      if (height > rh || Math.min(a.wCells,b.wCells) > rw) return;
+      // Các băng cách nhau hai bước phải có khung bao mở rộng rời nhau. Với các băng
+      // kề nhau, thử mọi quan hệ đường bao A/A, B/B, A/B và B/A thay vì
+      // áp một bước quay về bằng chiều cao bbox gây phí chỗ hay một khoảng cách hàng đồng đều.
+      for (period = Math.ceil((height+pad)/2); period <= height+pad; period++) {
+        if (timed && now() >= deadline) return;
+        if (pairProfilesClear(a,a,0,period) && pairProfilesClear(b,b,0,period) &&
+            pairProfilesClear(a,b,shift,period+dy) &&
+            pairProfilesClear(a,b,shift-pitch,period+dy) &&
+            pairProfilesClear(b,a,-shift,period-dy) &&
+            pairProfilesClear(b,a,pitch-shift,period-dy)) break;
+      }
+      if (period > height+pad) return;
+      var unitWidth = Math.max(a.wCells,shift+b.wCells);
+      var columns = Math.max(1,Math.floor((rw-unitWidth)/pitch)+1);
+      var rows = Math.floor((rh-height)/period)+1;
+      var spareX = rw-unitWidth-(columns-1)*pitch;
+      var spareY = rh-height-(rows-1)*period;
+      var phasesX = [0,Math.floor(spareX/2),spareX];
+      var phasesY = [0,Math.floor(spareY/2),spareY], xi, yi;
+      for (xi=0;xi<phasesX.length;xi++) for (yi=0;yi<phasesY.length;yi++) {
+        if (timed && now() >= deadline) return;
+        var plan=[], row, col, part, parts, vv, x, y, visits=0;
+        for (row=0;row<rows && visits<20000;row++) {
+          for (col=-1;col<=Math.ceil(rw/pitch) && visits<20000;col++) {
+            parts=[{v:first,x:phasesX[xi]+col*pitch,y:phasesY[yi]+row*period},
+                   {v:second,x:phasesX[xi]+col*pitch+shift,y:phasesY[yi]+row*period+dy}];
+            for (part=0;part<parts.length;part++) {
+              visits++; vv=variants[parts[part].v]; x=parts[part].x; y=parts[part].y;
+              if (x<0 || y<0 || x+vv.wCells>rw || y+vv.hCells>rh || rawHitsPon(vv,x,y,dots)) continue;
+              plan.push({mi:vv.mi,v:parts[part].v,x:x,y:y});
+            }
+          }
+        }
+        retain(plan);
+      }
+    }
+    // Bảo đảm có cặp đối hướng lệch nửa cột hữu ích cho mọi hướng trước
+    // các bước tinh chỉnh pha có giới hạn. Không dùng tên hình, kích thước hay số con mong muốn.
+    for (ai=0;ai<variants.length;ai++) {
+      bi=-1;
+      for (var oi=0;oi<variants.length;oi++)
+        if (variants[oi].mi===variants[ai].mi &&
+            variants[oi].angle===(variants[ai].angle+180)%360) { bi=oi; break; }
+      if (bi<0 || sameGroups(variants[ai].groups,variants[bi].groups)) continue;
+      var pitch=Math.max(variants[ai].wCells,variants[bi].wCells) +
+        2*Math.max(variants[ai].padCells,variants[bi].padCells);
+      motif(ai,bi,Math.round(pitch/2),false);
+    }
+    for (ai=0;ai<variants.length && now()<deadline;ai++) {
+      bi=-1;
+      for (var j=0;j<variants.length;j++)
+        if (variants[j].mi===variants[ai].mi &&
+            variants[j].angle===(variants[ai].angle+180)%360) { bi=j; break; }
+      if (bi<0 || sameGroups(variants[ai].groups,variants[bi].groups)) continue;
+      var extraPitch=Math.max(variants[ai].wCells,variants[bi].wCells) +
+        2*Math.max(variants[ai].padCells,variants[bi].padCells);
+      var shifts=[0,Math.round(extraPitch/4),Math.round(3*extraPitch/4)];
+      for (si=0;si<shifts.length && now()<deadline;si++) motif(ai,bi,shifts[si],true);
+    }
+    // Kiểm chứng độc lập các phương án tốt nhất trước khi đưa ra bất kỳ seed nào.
+    // Một bố cục nền đã kiểm chứng vẫn được giữ dù hết quỹ thời gian; phần kiểm chứng thêm
+    // bị giới hạn trong phần thời gian còn lại, giữ tối đa hai băng.
+    for (si=0;si<pending.length && (!out.length || now()<deadline);si++) {
+      if (!verifyPlan(pending[si],variants,rw,rh,dots) ||
+          !verifyGeometry(pending[si],variants,rw,rh,dots,gap,step)) continue;
+      out.push(pending[si]);
+      if (out.length>=2) break;
+    }
+    return out;
+  }
+
+  // Mô-típ lặp được đo trên chính các biên dạng thật. Độ so le
+  // và bước hàng suy ra từ khoảng hở giữa các đường bao, không phải từ chiều cao
+  // bbox. Nhờ đó có nhanh một bố cục khởi đầu dày cho hình lá, hình thoi và
+  // các khuôn lặp khác trước khi bước tìm đặt tự do lấp các hốc còn lại
+  // bằng bất kỳ góc xoay nào được phép.
   function latticePlans(variants, typeCount, rw, rh, dots, deadline) {
     if (typeCount !== 1) return [];
     var out = [], ai, bi, pitchX, shifts, si;
@@ -862,29 +1049,46 @@
       var rows = Math.floor((rh - Math.max(a.hCells, b.hCells)) / py) + 1;
       var spareY = rh - (Math.max(a.hCells, b.hCells) + Math.max(0, rows - 1) * py);
       var phasesX = [0, Math.floor(spareX / 2), spareX], phasesY = [0, Math.floor(spareY / 2), spareY], xi, yi;
+      // Ở trên đã kiểm các hàng kề nhau tại cả hai cột lân cận có thể có.
+      // Nếu các hàng cách nhau hai bước có bbox mở rộng rời nhau thì mọi hàng/cột
+      // xa hơn cũng tách nhau ngay từ cách dựng. Các mô-típ lõm/có lỗ
+      // có bước hai hàng ngắn hơn thì vẫn cần kiểm tra chiếm chỗ.
+      var provenLattice = shift >= 0 && shift <= pitch &&
+        2 * py >= Math.max(a.hCells, b.hCells) + 2 * Math.max(a.padCells, b.padCells);
       for (xi = 0; xi < phasesX.length; xi++) for (yi = 0; yi < phasesY.length; yi++) {
-        var plan = [], occ = buildOccupancyFor([], variants, rh), row, col, vx, yy, xx, vv;
+        var plan = [], occ = provenLattice ? null : buildOccupancyFor([], variants, rh), row, col, vx, yy, xx, vv;
         for (row = 0; row < rows; row++) {
           vx = row % 2 ? second : first; vv = variants[vx];
           yy = phasesY[yi] + row * py;
-          // Extend both directions so a phase shift cannot lose an edge slot.
+          // Mở rộng về cả hai phía để dịch pha không làm mất slot ở mép.
           for (col = -1; col <= columns; col++) {
             xx = phasesX[xi] + (row % 2 ? shift : 0) + col * pitch;
-            if (!insideAndClear(vv, xx, yy, rw, rh, occ, dots)) continue;
-            occAdd(occ, vv, xx, yy);
+            if (provenLattice) {
+              if (xx < 0 || yy < 0 || xx + vv.wCells > rw || yy + vv.hCells > rh || rawHitsPon(vv, xx, yy, dots)) continue;
+            } else {
+              if (!insideAndClear(vv, xx, yy, rw, rh, occ, dots)) continue;
+              occAdd(occ, vv, xx, yy);
+            }
             plan.push({mi:vv.mi,v:vx,x:xx,y:yy});
           }
         }
         if (plan.length) out.push(plan);
       }
     }
-    // Complete one staggered baseline for EVERY permitted rotation before
-    // time-sliced extras. Previously rotation 0 spent the entire slice on many
-    // motifs, so a busy machine never reached the denser 90-degree leaf rows.
-    // This is a fixed four-motif baseline, not an unbounded search.
+    // Hoàn tất một bố cục nền so le cho MỌI góc xoay được phép trước
+    // các phần bổ sung chia theo thời gian. Trước đây góc xoay 0 tiêu hết phần thời gian cho nhiều
+    // mô-típ, nên máy đang bận không bao giờ tới được các hàng hình lá 90 độ dày hơn.
+    // Đây là bố cục nền cố định gồm bốn mô-típ, không phải phép tìm không giới hạn.
     for (ai = 0; ai < variants.length; ai++) {
       pitchX = variants[ai].wCells + Math.max(1, 2 * variants[ai].padCells);
       motif(ai, ai, Math.round(pitchX / 2));
+    }
+    // Cũng bảo đảm có các hướng đối nhau mà không phải chờ hết các phần bổ sung
+    // phía trước. Đây là bản theo chiều dọc tương ứng với alternatingRowPlans.
+    for (ai = 0; ai < variants.length; ai++) {
+      for (bi = 0; bi < variants.length; bi++)
+        if (variants[bi].angle === (variants[ai].angle + 180) % 360)
+          motif(ai, bi, 0);
     }
     for (ai = 0; ai < variants.length && now() < deadline; ai++) {
       for (bi = 0; bi < variants.length && now() < deadline; bi++) {
@@ -901,10 +1105,10 @@
     return out.slice(0, 8);
   }
 
-  // Distinct cutters cannot reuse the single-cutter lattice. A bounded shelf
-  // baseline gives the free silhouette search a balanced starting block instead
-  // of waiting for expensive contacts before it has placed a useful first row.
-  // This is only a seed; concave contacts remain the actual refinement search.
+  // Các khuôn bế khác nhau không dùng lại được lưới một khuôn. Một bố cục nền kiểu xếp kệ
+  // có giới hạn đem lại cho bước tìm silhouette tự do một khối khởi đầu cân bằng, thay vì
+  // phải chờ các tiếp xúc tốn kém trước khi đặt được một hàng đầu hữu ích.
+  // Đây chỉ là seed; tiếp xúc lõm vẫn là phép tìm tinh chỉnh thực sự.
   function mixedRowPlans(variants, typeCount, rw, rh, dots, deadline) {
     if (typeCount <= 1) return [];
     var lookup = [], spacing = 1, vi, mi, phase, alternate, start, out = [];
@@ -934,7 +1138,7 @@
         }
         rowHeight = Math.max(rowHeight, v.hCells);
         if (!insideAndClear(v, x, y, rw, rh, occ, dots)) {
-          // Move a bounded step past a corner PON, not one complete cutter.
+          // Nhích qua PON góc một bước có giới hạn, không nhảy cả một khuôn bế.
           x += spacing;
           continue;
         }
@@ -978,10 +1182,118 @@
     return Math.min(b.x0, b.y0, rw - b.x1, rh - b.y1);
   }
 
-  // Count-preserving polish for a parallel pair close to a sheet edge. Try
-  // each original heading and its real 180-degree rotation, never reflection.
-  // This can interlock the pair more deeply into the remaining block and make
-  // room to centre the complete layout farther from both opposing edges.
+  function physicalPlanBounds(plan, variants, step) {
+    var b = {x0:Infinity,y0:Infinity,x1:-Infinity,y1:-Infinity}, i, s, v;
+    for (i = 0; i < plan.length; i++) {
+      s = plan[i]; v = variants[s.v];
+      b.x0 = Math.min(b.x0, s.x); b.y0 = Math.min(b.y0, s.y);
+      b.x1 = Math.max(b.x1, s.x + v.w / step);
+      b.y1 = Math.max(b.y1, s.y + v.h / step);
+    }
+    return b;
+  }
+
+  // Phép tịnh tiến cuối cùng, chỉ áp vào đầu ra. Tìm kiếm/chiếm chỗ phải giữ ô nguyên,
+  // nhưng canh giữa dùng đường bao vật lý và khổ giấy đầy đủ (chưa làm tròn).
+  // Dời cả khối thì giữ nguyên mọi khoảng cách giữa các khuôn bế. Chỉ
+  // khoảng hở với tờ/PON có thể đổi; chốt chặn vật lý đầy đủ vẫn chạy sau đó.
+  function centrePhysicalPlan(plan, variants, rw, rh, dots, gap, step) {
+    if (!plan.length) return plan;
+    var b = physicalPlanBounds(plan, variants, step);
+    var wantX = (rw - b.x0 - b.x1) / 2, wantY = (rh - b.y0 - b.y1) / 2;
+    function safeMove(tx, ty) {
+      var i, s, v, x, y, di, dot, p, r, dx, dy, gi, ci, pi, contour;
+      if (b.x0 + tx < -1e-8 || b.y0 + ty < -1e-8 ||
+          b.x1 + tx > rw + 1e-8 || b.y1 + ty > rh + 1e-8) return false;
+      for (i = 0; i < plan.length; i++) {
+        s = plan[i]; v = variants[s.v]; x = (s.x + tx) * step; y = (s.y + ty) * step;
+        for (di = 0; di < dots.length; di++) {
+          dot = dots[di]; p = [dot.x * step - x, dot.y * step - y];
+          r = Math.max(0, dot.radius * step + (v.curveErrorMm || 0) - 0.001);
+          dx = Math.max(-p[0], p[0] - v.w, 0);
+          dy = Math.max(-p[1], p[1] - v.h, 0);
+          if (dx * dx + dy * dy >= r * r) continue;
+          if (insideGroups(p, v.groups)) return false;
+          for (gi = 0; gi < v.groups.length; gi++) for (ci = 0; ci < v.groups[gi].length; ci++) {
+            contour = v.groups[gi][ci];
+            for (pi = 0; pi < contour.length; pi++)
+              if (pointSegmentDistanceSq(p, contour[pi], contour[(pi + 1) % contour.length]) < r * r) return false;
+          }
+        }
+      }
+      return true;
+    }
+    function moved(tx, ty) {
+      var out = clonePlan(plan), i;
+      for (i = 0; i < out.length; i++) { out[i].x += tx; out[i].y += ty; }
+      return out;
+    }
+    if (safeMove(wantX, wantY)) return moved(wantX, wantY);
+    // Người dùng có thể đặt PON không đối xứng. Đừng bỏ bớt/co giãn khuôn bế chỉ để
+    // ép canh giữa: thay vào đó giữ phép tịnh tiến nguyên khối an toàn gần nhất tìm được.
+    var tries = [[0,0],[wantX,0],[0,wantY]], r, ti, tx, ty, score;
+    for (r = 1; r <= 14; r++)
+      tries.push([wantX-r,wantY],[wantX+r,wantY],[wantX,wantY-r],[wantX,wantY+r],
+        [wantX-r,wantY-r],[wantX+r,wantY-r],[wantX-r,wantY+r],[wantX+r,wantY+r]);
+    var bestX = 0, bestY = 0, found = safeMove(0,0);
+    var bestScore = found ? sq(wantX) + sq(wantY) : Infinity;
+    for (ti = 0; ti < tries.length; ti++) {
+      tx = tries[ti][0]; ty = tries[ti][1]; score = sq(tx-wantX) + sq(ty-wantY);
+      if (score >= bestScore - 1e-10 || !safeMove(tx,ty)) continue;
+      bestX = tx; bestY = ty; bestScore = score; found = true;
+    }
+    if (!found) return plan; // Chốt chặn vật lý cuối sẽ loại phương án dự phòng không an toàn.
+    // Tiến dần tới vị trí lý tưởng đang bị chặn từ phương án đã kiểm chứng, không bao giờ
+    // nhận một vị trí trung gian không an toàn. Không xếp lại theo từng cặp.
+    var low = 0, high = 1, mid, baseX = bestX, baseY = bestY;
+    for (ti = 0; ti < 20; ti++) {
+      mid = (low + high) / 2;
+      tx = baseX + (wantX - baseX) * mid; ty = baseY + (wantY - baseY) * mid;
+      if (safeMove(tx,ty)) { low = mid; bestX = tx; bestY = ty; } else high = mid;
+    }
+    return moved(bestX,bestY);
+  }
+
+  // Phép tìm vẫn chạy trên các lát ô nguyên thận trọng. Khi yêu cầu khe bằng 0,
+  // khử khoảng cách số học của chúng ở đầu ra bằng cách co VỊ TRÍ lại,
+  // không bao giờ co hình học của khuôn bế/bài. Mỗi lần thử được nhận đều được
+  // kiểm tra liên tục một cách độc lập; cho phép chạm biên, không cho chồng lấn vùng tô.
+  // Co chung theo một trục sẽ khép các tiếp xúc lặp lại cùng một lúc thay vì
+  // phải dời đi dời lại hàng nghìn object riêng lẻ trong Illustrator.
+  function closeZeroGapPlan(plan, variants, rw, rh, dots, step, deadline) {
+    if (plan.length < 2) return plan;
+    var best = clonePlan(plan), pass, axis, i, low, high, mid, trial;
+    function contracted(base, coordinate, factor) {
+      var lo = Infinity, hi = -Infinity, out = clonePlan(base), k;
+      for (k = 0; k < base.length; k++) {
+        lo = Math.min(lo,base[k][coordinate]); hi = Math.max(hi,base[k][coordinate]);
+      }
+      var centre = (lo+hi)/2;
+      for (k = 0; k < out.length; k++)
+        out[k][coordinate] = centre+(base[k][coordinate]-centre)*factor;
+      return out;
+    }
+    if (!verifyGeometry(best,variants,rw,rh,dots,0,step)) return plan;
+    for (pass = 0; pass < 2; pass++) for (axis = 0; axis < 2; axis++) {
+      if (now() >= deadline) return best;
+      var base = best, coordinate = axis ? "y" : "x";
+      trial = contracted(base,coordinate,0);
+      if (verifyGeometry(trial,variants,rw,rh,dots,0,step)) { best = trial; continue; }
+      low = 0; high = 1;
+      for (i = 0; i < 28 && now() < deadline; i++) {
+        mid = (low+high)/2; trial = contracted(base,coordinate,mid);
+        if (verifyGeometry(trial,variants,rw,rh,dots,0,step)) {
+          high = mid; best = trial;
+        } else low = mid;
+      }
+    }
+    return best;
+  }
+
+  // Tinh chỉnh giữ nguyên số con cho một cặp song song nằm sát mép tờ. Thử
+  // từng hướng gốc và phép xoay 180 độ thật của nó, không bao giờ lật đối xứng.
+  // Việc này có thể lồng cặp đó sâu hơn vào khối còn lại và tạo
+  // chỗ để canh giữa cả bố cục, cách xa hơn cả hai mép đối diện.
   function polishEdges(plan, variants, rw, rh, dots, gap, step, deadline) {
     if (plan.length < 2 || plan.length > 80) return plan;
     var picked = -1, mate = -1, shortDistance = Infinity, useY = true, towardLow = true;
@@ -1058,8 +1370,8 @@
     var current = best, passes = 0, i, seed, trial;
     while (current && passes++ < 12 && now() < deadline) {
       var improved = false;
-      // Remove one piece near the outer outline, then let all orientations
-      // refill that region. It is deliberately bounded: no explosive beam tree.
+      // Gỡ một con gần đường viền ngoài, rồi để mọi hướng xoay
+      // lấp lại vùng đó. Cố ý có giới hạn: không để cây beam search bùng nổ.
       var start = Math.max(0, current.length - 12);
       for (i = start; i < current.length && now() < deadline; i++) {
         seed = clonePlan(current); seed.splice(i, 1);
@@ -1079,45 +1391,45 @@
     for (i = 0; i < c.length; i++) {
       d = Math.sqrt(sq(c[i][0] - cx) + sq(c[i][1] - cy));
       if (d < lo) lo = d; if (d > hi) hi = d;
-      // Equal-radius vertices alone would incorrectly recognise squares and
-      // diamonds as circles. Their edges must also follow a circular contour.
+      // Nếu chỉ xét các đỉnh cách đều tâm thì sẽ nhận nhầm hình vuông và
+      // hình thoi là hình tròn. Các cạnh của chúng cũng phải bám theo đường bao tròn.
       var next = c[(i + 1) % c.length];
       d = Math.sqrt(sq((c[i][0] + next[0]) / 2 - cx) + sq((c[i][1] + next[1]) / 2 - cy));
       if (d < lo) lo = d; if (d > hi) hi = d;
     }
     r = (lo + hi) / 2;
     if (!r || hi - lo > Math.max(0.12, r * 0.025)) return null;
-    // Illustrator's four-cubic ellipse is slightly outside an ideal circle
-    // between cardinal anchors. Use the enclosing radius of the actual
-    // flattened contour, not width / 2, for safe analytic lattice spacing.
+    // Ellipse bốn đoạn cubic của Illustrator hơi phình ra ngoài đường tròn lý tưởng
+    // ở giữa các điểm neo bốn hướng chính. Dùng bán kính bao của chính
+    // đường bao đã flatten, không dùng width / 2, để có khoảng cách lưới giải tích an toàn.
     return { diameter: b.w, radius: hi, cx: cx, cy: cy };
   }
 
   function circlePlan(v, rw, rh, dots, gap, deadline) {
-    // Dynamic hex lattice. It tests phase against today's gap, margin and PON;
-    // it is not a borrowed static DECAL_SETS coordinate table.
+    // Lưới lục giác động. Nó thử pha theo khe, lề và PON hiện tại;
+    // không phải bảng toạ độ tĩnh mượn từ DECAL_SETS.
     var dia = Math.max(v.wCells, v.hCells), profile = circleLike(v.groups);
-    var radius = profile ? profile.radius / v.step : dia / 2;
+    var radius = (profile ? profile.radius / v.step : dia / 2) + (v.curveErrorMm || 0) / v.step;
     var centreX = profile ? profile.cx / v.step : dia / 2;
     var centreY = profile ? profile.cy / v.step : v.hCells / 2;
-    // Round separation outward, never inward. Fractional user gaps such as
-    // 1.1 mm otherwise generated an unsafe lattice which final checks refused.
-    var pitchX = Math.max(dia + 1, Math.ceil(2 * radius + gap / v.step - 1e-7));
+    // Làm tròn khoảng cách ra ngoài, không bao giờ vào trong. Nếu không, khe lẻ như
+    // 1.1 mm do người dùng nhập từng sinh ra lưới không an toàn, bị bước kiểm tra cuối từ chối.
+    var pitchX = Math.max(gap === 0 ? dia : dia + 1, Math.ceil(2 * radius + gap / v.step - 1e-7));
     var cols = Math.floor((rw - dia) / pitchX) + 1;
     var spareX = rw - (dia + (cols - 1) * pitchX);
     var maxShift = Math.max(0, Math.min(Math.floor(pitchX / 2), spareX));
     var best = null, shiftStep = Math.max(1, Math.floor(Math.max(1, maxShift) / 12));
     var shift, pitchY, rows, spareY, xPhases, yPhases, xi, yi, px, py, row, col, x, y, plan;
-    // A coarse sweep must still include its final half-pitch phase: omitting
-    // that endpoint can lose one entire staggered column on a tight sheet.
+    // Lượt quét thô vẫn phải gồm pha nửa bước lưới cuối cùng: bỏ
+    // điểm cuối đó có thể làm mất cả một cột so le trên tờ chật.
     for (shift = 0; shift <= maxShift && now() < deadline;
          shift = shift < maxShift ? Math.min(maxShift, shift + shiftStep) : maxShift + 1) {
       pitchY = Math.max(1, Math.ceil(Math.sqrt(Math.max(1, pitchX * pitchX - shift * shift))));
       rows = Math.floor((rh - dia) / pitchY) + 1;
       spareY = rh - (dia + (rows - 1) * pitchY);
-      // Both parities must remain inside the printable rectangle. We examine
-      // three deterministic phases rather than every grid cell: all useful
-      // circle phases are bounded by the remaining strip after a full row.
+      // Cả hàng chẵn lẫn hàng lẻ đều phải nằm trong hình chữ nhật in được. Ta xét
+      // ba pha tất định thay vì mọi ô lưới: mọi pha hữu ích của
+      // hình tròn đều bị giới hạn bởi dải còn dư sau một hàng đầy.
       xPhases = [0, Math.floor((spareX - shift) / 2), spareX - shift];
       yPhases = [0, Math.floor(spareY / 2), spareY];
       for (xi = 0; xi < xPhases.length && now() < deadline; xi++) {
@@ -1131,9 +1443,9 @@
             for (col = 0; col < cols; col++) {
               x = px + rowShift + col * pitchX;
               if (x < 0 || x + dia > rw || y < 0 || y + dia > rh) continue;
-              // Distances are guaranteed analytically by the lattice. Test PON
-              // as two circles here instead of the conservative raster cells,
-              // otherwise a valid 1 mm gap can be rounded up and lost.
+              // Khoảng cách đã được lưới bảo đảm bằng giải tích. Ở đây thử với PON
+              // theo kiểu hai hình tròn thay vì dùng các ô raster thận trọng,
+              // nếu không một khe 1 mm hợp lệ có thể bị làm tròn lên rồi mất.
               var safe = true, di, ddx, ddy, minD;
               for (di = 0; di < dots.length; di++) {
                 ddx = x + centreX - dots[di].x;
@@ -1176,13 +1488,13 @@
         minD = radius + dots[di].radius;
         if (dx * dx + dy * dy < minD * minD - 1e-6) return false;
       }
-      // Only centres inside the required separation can collide. Keep the
-      // exact distance check, but avoid O(n^2) work on thousands of small dies.
+      // Chỉ những tâm nằm trong khoảng cách yêu cầu mới có thể va chạm. Giữ phép
+      // kiểm tra khoảng cách chính xác, nhưng tránh khối lượng O(n^2) trên hàng nghìn khuôn nhỏ.
       var near = spatialNear(index, {x0:a.x-spacing,x1:a.x+spacing,y0:a.y-spacing,y1:a.y+spacing});
       for (j = 0; j < near.length; j++) {
         b = plan[near[j]]; dx = a.x - b.x; dy = a.y - b.y;
-        // Match the sub-cell conversion dust ignored by outward lattice
-        // rounding. The independent millimetre contour guard remains final.
+        // Khớp với sai số vụn do quy đổi (nhỏ hơn một ô) mà phép làm tròn lưới ra ngoài
+        // đã bỏ qua. Chốt chặn đường bao độc lập theo milimet vẫn là quyết định cuối.
         minD = Math.max(0, spacing - 1e-7);
         if (dx * dx + dy * dy < minD * minD - 1e-6) return false;
       }
@@ -1221,11 +1533,86 @@
     return false;
   }
 
-  // Independent continuous check of the flattened cutter paths. Raster rows
-  // choose placements, but cannot be the only judge of a physical 1 mm gap.
+  // Chạm biên không phải là chồng lấn vùng tô. Phân loại từng compound theo
+  // luật tô even/odd rồi hợp các compound lại: việc nằm trên biên của một group
+  // không được che mất việc điểm đó nằm hẳn bên trong một group khác.
+  function strictInsideGroups(p, groups) {
+    var gi, ci, pi, contour, a, b, inside, boundary;
+    for (gi = 0; gi < groups.length; gi++) {
+      inside = false; boundary = false;
+      for (ci = 0; ci < groups[gi].length; ci++) {
+        contour = groups[gi][ci];
+        for (pi = 0; pi < contour.length; pi++) {
+          a = contour[pi]; b = contour[(pi + 1) % contour.length];
+          if (pointSegmentDistanceSq(p, a, b) <= 1e-18) boundary = true;
+          if ((a[1] > p[1]) !== (b[1] > p[1]) &&
+              p[0] < a[0] + (p[1] - a[1]) * (b[0] - a[0]) / (b[1] - a[1])) inside = !inside;
+        }
+      }
+      if (inside && !boundary) return true;
+    }
+    return false;
+  }
+
+  // Giao cắt thật sự được kiểm riêng. Các điểm chứng này bao quát biên lọt trong nhau
+  // và biên trùng nhau mà không coi cạnh/góc dùng chung là chồng lấn.
+  // Phải xác nhận điểm thuộc CẢ HAI hợp vùng tô, kể cả lỗ của compound; một
+  // đường bao rỗng/bị triệt tiêu không bao giờ là bằng chứng đủ cho chồng lấn.
+  function filledShapesOverlap(a, b) {
+    var overlapScale = Math.min(Math.min(a.bounds.x1,b.bounds.x1)-Math.max(a.bounds.x0,b.bounds.x0),
+      Math.min(a.bounds.y1,b.bounds.y1)-Math.max(a.bounds.y0,b.bounds.y0));
+    function strictIn(p, shape) {
+      var bb = shape.bounds;
+      if (p[0] <= bb.x0 || p[0] >= bb.x1 || p[1] <= bb.y0 || p[1] >= bb.y1) return false;
+      return strictInsideGroups(p, shape.groups);
+    }
+    function sharedInterior(p) { return strictIn(p, a) && strictIn(p, b); }
+    function probe(shape, other) {
+      var i, edge, dx, dy, length, epsilon, p, q, side, k;
+      var bb = shape.bounds, scale = Math.min(bb.w, bb.h);
+      var directions = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]];
+      for (i = 0; i < shape.edges.length; i++) {
+        edge = shape.edges[i]; dx = edge.b[0] - edge.a[0]; dy = edge.b[1] - edge.a[1];
+        length = Math.sqrt(dx * dx + dy * dy);
+        if (length <= 1e-12) continue;
+        epsilon = Math.min(1e-6, length * 1e-4, scale * 1e-4, overlapScale/4);
+        // Một đỉnh hay trung điểm nằm hẳn bên trong cũng phải có vùng tô
+        // kề bên. Kiểm tra điều đó thay vì tin vào các đường bao bị triệt tiêu/bị che.
+        var points = [edge.a, [(edge.a[0]+edge.b[0])/2,(edge.a[1]+edge.b[1])/2]];
+        for (var pi = 0; pi < points.length; pi++) {
+          p = points[pi];
+          if (!strictIn(p, other)) continue;
+          if (strictIn(p, shape)) return true;
+          for (k = 0; k < directions.length; k++) {
+            q = [p[0] + directions[k][0] * epsilon, p[1] + directions[k][1] * epsilon];
+            if (sharedInterior(q)) return true;
+          }
+        }
+        // Các đường bao giống hệt nhau không có đỉnh biên nào nằm hẳn bên trong.
+        // Cạnh chung có hai hình ở hai phía thì không có điểm nào nằm trong cả hai vùng tô.
+        p = points[1];
+        for (side = -1; side <= 1; side += 2) {
+          q = [p[0] - side * dy / length * epsilon, p[1] + side * dx / length * epsilon];
+          if (sharedInterior(q)) return true;
+        }
+      }
+      return false;
+    }
+    return probe(a, b) || probe(b, a);
+  }
+
+  // Kiểm tra liên tục, độc lập trên các path khuôn bế đã flatten. Các hàng raster
+  // chọn vị trí đặt, nhưng không thể là trọng tài duy nhất cho một khe vật lý 1 mm.
   function verifyGeometry(plan, variants, rw, rh, dots, gap, step) {
     var mapped = [], i, j, s, v, groups, edges, gi, ci, pi, p, q;
-    var tolerance = 0.001, gapSq = sq(Math.max(0, gap - tolerance));
+    var tolerance = 0.001, curveError = 0;
+    for (i = 0; i < variants.length; i++)
+      curveError = Math.max(curveError,variants[i].curveErrorMm || 0);
+    // Đường cubic đã flatten lệch khỏi khuôn bế thật không quá sai số đã khai báo.
+    // Chừa cả hai sai số trước khi khép một tiếp xúc khe 0; bù thêm
+    // dung sai khoảng cách số học để nó không ăn vào giới hạn hình học đó.
+    if (curveError) gap += 2 * curveError + tolerance;
+    var gapSq = sq(Math.max(0, gap - tolerance));
     var index = spatialIndex(Math.max(8, gap * 2));
     for (i = 0; i < plan.length; i++) {
       s = plan[i]; v = variants[s.v]; groups = copyGroups(v.groups); edges = [];
@@ -1242,7 +1629,7 @@
       }
       var shape = {groups:groups, edges:edges, bounds:boundsOfGroups(groups)};
       for (var di = 0; di < dots.length; di++) {
-        var centre = [dots[di].x * step, dots[di].y * step], radiusSq = sq(Math.max(0, dots[di].radius * step - tolerance));
+        var centre = [dots[di].x * step, dots[di].y * step], radiusSq = sq(Math.max(0, dots[di].radius * step + curveError - tolerance));
         if (insideGroups(centre, groups)) return false;
         for (var ei = 0; ei < edges.length; ei++)
           if (pointSegmentDistanceSq(centre, edges[ei].a, edges[ei].b) < radiusSq) return false;
@@ -1252,17 +1639,34 @@
       for (j = 0; j < near.length; j++) {
         var other = mapped[near[j]], ob = other.bounds;
         if (bb.x0 >= ob.x1 + gap || ob.x0 >= bb.x1 + gap || bb.y0 >= ob.y1 + gap || ob.y0 >= bb.y1 + gap) continue;
-        for (var ea = 0; ea < edges.length; ea++) for (var eb = 0; eb < other.edges.length; eb++) {
-          var e = edges[ea], f = other.edges[eb];
+        // Cubic chia mịn ở khe 0 có thể có hàng nghìn cạnh. Lập chỉ mục mỗi đường bao
+        // lân cận một lần thay vì so từng cạnh với mọi cạnh khác.
+        if (!other.edgeIndex && other.edges.length > 160) {
+          other.edgeIndex = spatialIndex(Math.max(1,gap*2));
+          for (var oi = 0; oi < other.edges.length; oi++)
+            spatialAdd(other.edgeIndex,oi,other.edges[oi]);
+        }
+        for (var ea = 0; ea < edges.length; ea++) {
+          var e = edges[ea];
+          var edgeNear = other.edgeIndex ? spatialNear(other.edgeIndex,
+            {x0:e.x0-gap,x1:e.x1+gap,y0:e.y0-gap,y1:e.y1+gap}) : null;
+          for (var eb = 0; eb < (edgeNear ? edgeNear.length : other.edges.length); eb++) {
+          var f = other.edges[edgeNear ? edgeNear[eb] : eb];
           if (e.x0 >= f.x1 + gap || f.x0 >= e.x1 + gap || e.y0 >= f.y1 + gap || f.y0 >= e.y1 + gap) continue;
           if (segmentsCross(e.a, e.b, f.a, f.b) ||
               pointSegmentDistanceSq(e.a, f.a, f.b) < gapSq || pointSegmentDistanceSq(e.b, f.a, f.b) < gapSq ||
               pointSegmentDistanceSq(f.a, e.a, e.b) < gapSq || pointSegmentDistanceSq(f.b, e.a, e.b) < gapSq) return false;
+          }
         }
-        for (gi = 0; gi < groups.length; gi++) for (ci = 0; ci < groups[gi].length; ci++)
-          if (insideGroups(groups[gi][ci][0], other.groups)) return false;
-        for (gi = 0; gi < other.groups.length; gi++) for (ci = 0; ci < other.groups[gi].length; ci++)
-          if (insideGroups(other.groups[gi][ci][0], groups)) return false;
+        if (gap > tolerance) {
+          // Khe vật lý dương đã loại sẵn mọi biên dùng chung/trùng nhau
+          // ở lượt đo khoảng cách đoạn thẳng. Giữ phép kiểm tra bao chứa
+          // ít tốn kém của nó cho hàng nghìn khuôn bế rất nhỏ.
+          for (gi = 0; gi < groups.length; gi++) for (ci = 0; ci < groups[gi].length; ci++)
+            if (insideGroups(groups[gi][ci][0], other.groups)) return false;
+          for (gi = 0; gi < other.groups.length; gi++) for (ci = 0; ci < other.groups[gi].length; ci++)
+            if (insideGroups(other.groups[gi][ci][0], groups)) return false;
+        } else if (filledShapesOverlap(shape, other)) return false;
       }
       mapped.push(shape);
       spatialAdd(index, i, shape.bounds);
@@ -1288,9 +1692,13 @@
         if (!g) throw new Error("Không đọc được đường bế kín của loại " + (ti + 1) + ".");
         groupsByType.push(g);
         var fitsSheet = false;
+        var curveError = Number(input.types[ti].curveErrorMm);
+        if (!isFinite(curveError) || !(curveError >= 0)) curveError = 0;
+        curveError = Math.min(0.025,curveError);
         for (ri = 0; ri < rots.length; ri++) {
           v = buildVariant(g, ti, ri, rots[ri], gap, step);
           if (v) {
+            v.curveErrorMm = curveError;
             variants.push(v);
             if (v.wCells <= rw && v.hCells <= rh) fitsSheet = true;
           }
@@ -1319,17 +1727,47 @@
       budget = clamp(budget, 250, 4000);
       var deadline = began + budget;
       var best = null, mode = "silhouette nhiều khoảng + tiếp xúc thật";
+      // Khi không có khoảng hở, lát cuối lấy mẫu thấy trống vẫn có thể che một chồng lấn
+      // thật cỡ phần lẻ ô. Chỉ đưa lên những bố cục tìm kiếm an toàn theo kiểm tra liên tục;
+      // cache tham chiếu tới các plan tìm kiếm bất biến để kiểm tra phương án dự phòng vẫn rẻ.
+      var checkedZeroPlans = [], checkedZeroValues = [];
+      function safeSearchPlan(plan) {
+        if (gap !== 0) return true;
+        for (var checkIndex=0;checkIndex<checkedZeroPlans.length;checkIndex++)
+          if (checkedZeroPlans[checkIndex]===plan) return checkedZeroValues[checkIndex];
+        var safe = verifyGeometry(plan,planningVariants,rw,rh,dots,0,step);
+        checkedZeroPlans.push(plan); checkedZeroValues.push(safe);
+        return safe;
+      }
+      function safeGrowth(trial, seed) {
+        if (gap !== 0 || safeSearchPlan(trial)) return trial;
+        // Bước thêm cặp và mở rộng tham lam nối thêm vào seed đã kiểm chứng này.
+        // Giữ riêng từng con thêm vào mà an toàn, thay vì bỏ cả seed hoặc
+        // chấp nhận một va chạm do lấy mẫu. Mọi kiểu xáo thứ tự khác thì giữ phương án dự phòng.
+        var recovered = clonePlan(seed), addIndex, before, after;
+        for (addIndex=0;addIndex<seed.length;addIndex++) {
+          before=seed[addIndex]; after=trial[addIndex];
+          if (!after || before.mi!==after.mi || before.v!==after.v ||
+              before.x!==after.x || before.y!==after.y) return seed;
+        }
+        for (addIndex=seed.length;addIndex<trial.length && now()<deadline;addIndex++) {
+          if (!allowedType(trial[addIndex].mi,countTypes(recovered,planningTypeCount),planningTypeCount)) continue;
+          var appended = recovered.concat([trial[addIndex]]);
+          if (safeSearchPlan(appended)) recovered = appended;
+        }
+        return recovered;
+      }
 
-      // Circle gets a geometry-derived hex attempt first; generic planner still
-      // runs if it has time and may beat it around unusual PON locations.
+      // Hình tròn được thử lưới lục giác suy từ hình học trước; bộ lập bố cục tổng quát vẫn
+      // chạy nếu còn thời gian và có thể thắng nó quanh các vị trí PON bất thường.
       var isRound = planningTypeCount === 1 && circleLike(groupsByType[0]);
       if (isRound) {
         var circle = circlePlan(variants[0], rw, rh, dots, gap, deadline);
         if (circle.length) best = circle;
-        // A rectangular sheet can fit more circles in staggered columns than
-        // in staggered rows, especially around actual corner-PON keepouts.
-        // Search both directions under the same budget; swapping coordinates
-        // does not alter a circular cutter or relax any clearance rule.
+        // Một tờ chữ nhật có thể chứa nhiều hình tròn hơn khi so le theo cột so với
+        // so le theo hàng, nhất là quanh các vùng né PON góc thực tế.
+        // Tìm cả hai chiều trong cùng một quỹ thời gian; đổi chỗ toạ độ
+        // không làm đổi khuôn bế tròn, cũng không nới lỏng luật khoảng hở nào.
         var turnedDots = [], turnedCircle, ci;
         for (di = 0; di < dots.length; di++)
           turnedDots.push({x:dots[di].y,y:dots[di].x,radius:dots[di].radius});
@@ -1345,28 +1783,41 @@
       var seeds = [], si, candidate;
       if (!isRound) {
         var mixedRows = mixedRowPlans(planningVariants, planningTypeCount, rw, rh, dots, Math.min(deadline, now() + budget * 0.08));
+        var alternating = alternatingRowPlans(planningVariants, planningTypeCount, rw, rh, dots, Math.min(deadline, now() + budget * 0.12));
+        var bands = bandPlans(planningVariants, planningTypeCount, rw, rh, dots, gap, step, Math.min(deadline, now() + budget * 0.15));
         var lattice = latticePlans(planningVariants, planningTypeCount, rw, rh, dots, Math.min(deadline, now() + budget * 0.2));
-        seeds = seedPlans(planningVariants, planningTypeCount, rw, rh, dots, Math.min(deadline, now() + budget * 0.35)).concat(lattice, mixedRows);
+        seeds = seedPlans(planningVariants, planningTypeCount, rw, rh, dots, Math.min(deadline, now() + budget * 0.35)).concat(lattice, alternating, bands, mixedRows);
         seeds.sort(function (u, w) { return -comparePlans(u, w, variants); });
       }
-      // Keep all verified seeds as a fallback even when preprocessing reaches
-      // the time limit. A time slice must never turn a valid layout into zero.
+      // Giữ mọi seed đã kiểm chứng làm phương án dự phòng ngay cả khi bước tiền xử lý chạm
+      // giới hạn thời gian. Việc chia phần thời gian không bao giờ được biến một bố cục hợp lệ thành số 0.
       for (si = 0; si < seeds.length; si++)
-        if (balancedPlan(seeds[si], planningTypeCount) && comparePlans(seeds[si], best, variants) > 0) best = seeds[si];
+        if (balancedPlan(seeds[si], planningTypeCount) && comparePlans(seeds[si], best, variants) > 0 &&
+            safeSearchPlan(seeds[si])) best = seeds[si];
       for (si = 0; si < seeds.length && now() < deadline; si++) {
         candidate = seeds[si];
-        // Check a mutually dependent pair BEFORE greedy growth. A greedy first
-        // horizontal piece can otherwise destroy the space needed by its mate.
+        if (!safeSearchPlan(candidate)) continue;
+        var verifiedSeed = candidate;
+        // Kiểm tra cặp phụ thuộc lẫn nhau TRƯỚC KHI mở rộng tham lam. Nếu không, con nằm ngang
+        // đầu tiên xếp tham lam có thể phá mất chỗ mà con ghép cặp của nó cần.
         var sliceDeadline = Math.min(deadline, now() + Math.max(650, budget * 0.25));
         if (candidate.length >= 6 && now() < sliceDeadline)
           candidate = augmentWithPair(candidate, planningVariants, planningTypeCount, rw, rh, dots, sliceDeadline);
         candidate = growPlan(candidate, planningVariants, planningTypeCount, rw, rh, dots, sliceDeadline);
+        candidate = safeGrowth(candidate,verifiedSeed);
         if (balancedPlan(candidate, planningTypeCount) && comparePlans(candidate, best, variants) > 0) best = candidate;
       }
       if (!best) best = [];
-      if (!isRound && now() < deadline && best.length) best = repairPlans(best, planningVariants, planningTypeCount, rw, rh, dots, deadline);
-      best = centrePlan(best, variants, rw, rh, dots);
-      if (!isRound) best = polishEdges(best, planningVariants, rw, rh, dots, gap, step, now() + Math.min(550, budget * 0.2));
+      if (!isRound && now() < deadline && best.length) {
+        candidate = repairPlans(best, planningVariants, planningTypeCount, rw, rh, dots, deadline);
+        if (balancedPlan(candidate,planningTypeCount) && safeSearchPlan(candidate)) best = candidate;
+      }
+      candidate = centrePlan(best, variants, rw, rh, dots);
+      if (safeSearchPlan(candidate)) best = candidate;
+      if (!isRound) {
+        candidate = polishEdges(best, planningVariants, rw, rh, dots, gap, step, now() + Math.min(550, budget * 0.2));
+        if (safeSearchPlan(candidate)) best = candidate;
+      }
       if (equivalentTypes) {
         for (var slotIndex = 0; slotIndex < best.length; slotIndex++) {
           var originalVariant = variants[best[slotIndex].v];
@@ -1378,8 +1829,20 @@
       var valid = isRound && best.length ?
         verifyCirclePlan(best, variants[0], rw, rh, dots, gap / step) :
         verifyPlan(best, variants, rw, rh, dots);
-      valid = valid && balancedPlan(best, input.types.length) && verifyGeometry(best, variants, rw, rh, dots, gap, step);
+      valid = valid && balancedPlan(best, input.types.length);
       if (!valid) throw new Error("Bộ kiểm tra an toàn từ chối phương án dàn.");
+
+      var physicalRw = (Number(input.sheet.widthMm) - 2 * margin) / step;
+      var physicalRh = (Number(input.sheet.heightMm) - 2 * margin) / step;
+      if (gap === 0) best = closeZeroGapPlan(best,variants,physicalRw,physicalRh,dots,step,
+        now()+Math.min(1600,Math.max(450,budget*0.4)));
+      best = centrePhysicalPlan(best, variants, physicalRw, physicalRh, dots, gap, step);
+      if (!verifyGeometry(best, variants, physicalRw, physicalRh, dots, gap, step))
+        throw new Error("Bộ kiểm tra an toàn từ chối phương án canh tâm.");
+      var physicalBounds = physicalPlanBounds(best, variants, step);
+      var centreOffsetX = best.length ? (physicalBounds.x0 + physicalBounds.x1 - physicalRw) * step / 2 : 0;
+      var centreOffsetY = best.length ? (physicalBounds.y0 + physicalBounds.y1 - physicalRh) * step / 2 : 0;
+      var centredExactly = abs(centreOffsetX) <= 0.001 && abs(centreOffsetY) <= 0.001;
 
       var slots = [], i, s, vv;
       for (i = 0; i < best.length; i++) {
@@ -1391,9 +1854,11 @@
       total = now() - began;
       return {
         ok: true, slots: slots, mode: mode, count: slots.length, counts: counts,
+        centering: {exact:centredExactly,offsetXmm:centreOffsetX,offsetYmm:centreOffsetY},
         detail: "Dàn silhouette thật: " + slots.length + " con (" + countText.join(", ") + "). " +
           "Lưới kiểm tra " + step.toFixed(2) + " mm, khe " + gap.toFixed(2) + " mm; " +
-          "đã thử xoay/lồng biên dạng trong " + total + " ms."
+          "đã thử xoay/lồng biên dạng trong " + total + " ms." +
+          (centredExactly ? "" : " Canh tâm bị giới hạn bởi vùng né PON.")
       };
     } catch (err) {
       return { ok: false, error: err && err.message ? err.message : String(err) };
@@ -1403,13 +1868,16 @@
   return {
     version: VERSION,
     nest: nest,
-    // Exposed only for the Node regression fixtures; the panel uses nest().
+    // Chỉ mở ra cho dữ liệu mẫu test hồi quy chạy bằng Node; panel thì dùng nest().
     _test: {
       buildVariant: buildVariant, circleLike: circleLike, verifyPlan: verifyPlan,
       buildOccupancyFor: buildOccupancyFor, insideAndClear: insideAndClear,
       candidatesFor: candidatesFor, growPlan: growPlan, centrePlan: centrePlan, occAdd: occAdd,
       planBounds: planBounds, augmentWithPair: augmentWithPair, seedPlans: seedPlans,
       contactOffsets: contactOffsets, verifyGeometry: verifyGeometry, latticePlans:latticePlans,
+      alternatingRowPlans:alternatingRowPlans,rightProfileContact:rightProfileContact,
+      bandPlans:bandPlans,
+      centrePhysicalPlan:centrePhysicalPlan,physicalPlanBounds:physicalPlanBounds,
       balancedPlan: balancedPlan, mixedRowPlans: mixedRowPlans, polishEdges: polishEdges, edgeMargin:edgeMargin
     }
   };

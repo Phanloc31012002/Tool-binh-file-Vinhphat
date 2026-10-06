@@ -1,4 +1,4 @@
-// Opt-in native check: only owned, tiny CMYK test documents are changed.
+// Kiểm tra trong Illustrator thật, chỉ chạy khi chủ động bật: chỉ sửa các tài liệu test CMYK tí hon của riêng nó.
 (function () {
   var root = "C:/Users/ADMIN/Downloads/DanCard_Setup_23";
   var folder = new Folder(root + "/tmp/raster_500_" + new Date().getTime());

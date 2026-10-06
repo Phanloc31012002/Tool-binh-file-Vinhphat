@@ -1,4 +1,4 @@
-// Opt-in Illustrator COM audit. Creates/closes only its own small fixtures.
+// Kiểm tra Illustrator qua COM, chỉ chạy khi chủ động bật. Chỉ tạo/đóng các dữ liệu mẫu nhỏ của riêng nó.
 (function () {
   var root = "C:/Users/ADMIN/Downloads/DanCard_Setup_23";
   var folder = new Folder(root + "/tmp/ctl_package_" + new Date().getTime());
@@ -114,8 +114,8 @@
       t.position = [left + 20, top - 8];
       t.textRange.characterAttributes.size = 7;
       t.name = "NOTE_" + n;
-      // One mark crosses the artboard edge. Export without artboard clipping
-      // must retain it; no artwork outside this sheet may be included.
+      // Một dấu PON vắt qua mép artboard. Lệnh xuất không clip theo artboard
+      // phải giữ được nó; không được lẫn bài nào nằm ngoài tờ này.
       var mark = pon.pathItems.add();
       mark.setEntirePath([
         [left - 2, top - 4],

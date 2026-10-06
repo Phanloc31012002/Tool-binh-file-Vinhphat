@@ -1,5 +1,5 @@
-// Opt-in native renderer test. Creates/then closes unsaved test documents.
-// No user document or saved test AI file is changed.
+// Test render trong Illustrator thật, chỉ chạy khi chủ động bật. Tạo rồi đóng tài liệu test chưa lưu.
+// Không đụng tới tài liệu của người dùng hay file AI test đã lưu.
 $.evalFile(
   File(
     "C:/Users/ADMIN/Downloads/DanCard_Setup_23/DanCardCEP/jsx/dan_be_bridge.jsx",

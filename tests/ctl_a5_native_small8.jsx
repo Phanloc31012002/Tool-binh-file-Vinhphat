@@ -1,6 +1,6 @@
-// Opt-in SYNTHETIC Illustrator SMALL8 edge-case regression. Creates eight
-// small vector rectangles in an owned unsaved document, then runs real CTL
-// flatten/resize/grid/creep/PON/notes. Never copies or edits original artwork.
+// Test hồi quy ca biên SMALL8 TỰ DỰNG trong Illustrator, chỉ chạy khi chủ động bật. Tạo tám
+// hình chữ nhật vector nhỏ trong một tài liệu riêng chưa lưu, rồi chạy CTL thật:
+// flatten/resize/lưới/bóp/PON/ghi chú. Không bao giờ sao chép hay sửa bài gốc.
 (function () {
   var base = "C:/Users/ADMIN/Downloads/DanCard_Setup_23/";
   var libPath =
@@ -298,7 +298,7 @@
     assertOwned();
     var status = run(w, h, false);
     if (status.indexOf("OK:") !== 0) fail(status);
-    assertOwned(); // Artboard collections on this build are active-coupled.
+    assertOwned(); // Ở bản này, tập artboard gắn với tài liệu đang active.
     if (testDoc.artboards.length !== 1 || processed.length !== 8)
       fail("Expected one SMALL8 output with eight rasters.");
     var rect = copy(testDoc.artboards[0].artboardRect),

@@ -1,4 +1,4 @@
-// Isolated native integration fixture. Never changes any user's source document.
+// Dữ liệu mẫu tích hợp tách biệt cho Illustrator thật. Không bao giờ sửa tài liệu nguồn của người dùng.
 $.evalFile(
   File(
     "C:/Users/ADMIN/AppData/Roaming/Adobe/CEP/extensions/DanCardCEP/jsx/dan_be_bridge.jsx",
@@ -16,7 +16,7 @@ $.evalFile(
     file.close();
   }
   if (dcNativeCirclePhase === "prepare") {
-    // Refuse an existing fixture rather than overwrite it.
+    // Nếu dữ liệu mẫu đã tồn tại thì từ chối chạy chứ không ghi đè.
     if (File(root + "dan_be_test_circle.ai").exists)
       throw new Error("Circle fixture already exists.");
     var doc = app.documents.add(DocumentColorSpace.CMYK, 160 * MM, 100 * MM);

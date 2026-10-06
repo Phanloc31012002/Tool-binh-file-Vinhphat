@@ -103,7 +103,7 @@ function overlaps(a, b) {
     before,
     "A whole-canvas work artboard is ignored, not moved/deleted.",
   );
-  // The 92% exception requires both dimensions; a wide printed strip blocks.
+  // Ngoại lệ 92% đòi hỏi cả hai chiều; một dải tờ in rộng thì vẫn chắn chỗ.
   const strip = [safe[0], safe[1], safe[2], safe[1] - 354 * MM];
   const [wrapped] = positions({ boards: [strip] });
   near(wrapped[0], safe[0]);
@@ -156,7 +156,7 @@ for (const scale of [1, 0.1]) {
     "Plan the entire batch before creating any output.",
   );
 }
-// Actual renderer must consume the helper without transforming source objects.
+// Bộ dựng thật phải dùng hàm phụ này mà không biến đổi các object nguồn.
 function renderFixture(options = {}) {
   const mock = illustrator(options),
     context = vm.createContext(mock.context);
@@ -224,10 +224,10 @@ for (const scaleFactor of [1, 0.1]) {
   assert.strictEqual(f.context.app.coordinateSystem, "user-coordinates");
 }
 {
-  // The first sheet could fit but the second cannot; no partial output survives.
+  // Tờ đầu có thể vừa nhưng tờ thứ hai thì không; không được sót lại kết quả dở dang nào.
   const safe = bounds(),
     f = renderFixture({ paperW: 6000, paperH: safe[1] - safe[3] });
-  // A narrow blocker leaves room for exactly one huge first-row sheet.
+  // Một vật chắn hẹp chỉ chừa chỗ cho đúng một tờ khổng lồ ở hàng đầu.
   f.doc.artboards[0].artboardRect = [-1000, safe[1], safe[2], safe[3]];
   const before = f.originals.map((it) => it._points.map((p) => p.slice()));
   assert.match(f.render(), /^ERR:.*canvas/i);

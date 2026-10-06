@@ -61,7 +61,8 @@ const html = fs.readFileSync(
   "utf8",
 );
 assert.match(html, /Raster CMYK · 500 ppi/);
-assert.match(lib, /300\*65536/, "CTL JPG intentionally remains 300ppi");
+assert.match(lib, /300\s*\*\s*65536/, "CTL JPG intentionally remains 300ppi");
+assert.doesNotMatch(lib, /dcCtlJpegPpi|ppiText/, "cancelled CTL JPG PPI option must stay removed");
 console.log(
   "Raster: all panel/JSX options and imposition call sites at 500ppi, legacy caller protection, existing bitmap preservation and JPG 300ppi isolation passed.",
 );

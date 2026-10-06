@@ -175,8 +175,8 @@ function fixture(failName) {
         const copy = {
           name,
           locked: it.locked,
-          // A cross-document duplicate applies one coordinate-frame offset,
-          // not an independent origin for each item.
+          // Lệnh nhân bản giữa hai tài liệu áp một độ lệch hệ toạ độ chung,
+          // không phải mỗi item một gốc toạ độ riêng.
           geometricBounds: bounds.map((v, i) => v + (i % 2 ? -950 : 2000)),
           translate() {
             throw Error("per-object snapping is forbidden");
@@ -190,7 +190,7 @@ function fixture(failName) {
           parent.pageItems.push(copy);
         };
         target.pageItems.push(copy);
-        // Model a host changing the active document during duplicate.
+        // Mô phỏng trường hợp host đổi tài liệu đang active trong lúc nhân bản.
         app.activeDocument = target.doc;
         return copy;
       },
@@ -206,11 +206,11 @@ function fixture(failName) {
   for (let n = 0; n < 3; n++) {
     const x = -1000 + n * 400;
     item(body, "body" + n, [x + 10, 990, x + 110, 890]);
-    item(pon, "pon" + n, [x + 2, 998, x + 7, 998]); // zero-height stroked crop mark
+    item(pon, "pon" + n, [x + 2, 998, x + 7, 998]); // PON cắt có nét viền, chiều cao bằng 0
     item(hidden, "hidden" + n, [x, 1000, x + 300, 800]);
   }
   item(nested, "nestedChild", [-990, 980, -980, 970]);
-  // A child already included in a group must not be copied a second time.
+  // Phần tử con đã nằm trong một group thì không được sao chép lần thứ hai.
   body.pageItems.push({
     name: "groupChild",
     parent: { typename: "GroupItem" },
@@ -364,7 +364,7 @@ for (const save of ai.saves) {
   assert.strictEqual(save.options.artboardRange, undefined);
   assert.strictEqual(save.options.saveMultipleArtboards, undefined);
 }
-// A/B are two native artboards in ONE modern AI, not legacy extracted assets.
+// A/B là hai artboard thật trong MỘT file AI đời mới, không phải tài nguyên tách rời kiểu cũ.
 assert.strictEqual(ai.saves[0].doc.name, "TEMP");
 ai.saves[1].doc.activate();
 assert.deepStrictEqual(

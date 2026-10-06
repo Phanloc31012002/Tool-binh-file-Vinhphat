@@ -1,5 +1,5 @@
-// Small geometric Illustrator double. Production JSX is executed unchanged;
-// this supplies only the collections/transforms used by the renderer.
+// Bản giả lập Illustrator nhỏ về mặt hình học. JSX của code thật được chạy nguyên trạng;
+// file này chỉ cung cấp các collection/phép biến đổi mà phần render dùng tới.
 function illustrator(options = {}) {
   const doc = {
     selection: [],
@@ -161,7 +161,7 @@ function illustrator(options = {}) {
     ElementPlacement: { PLACEATEND: 1 },
     ZOrderMethod: { SENDTOBACK: 0, BRINGTOFRONT: 1 },
     Transformation: { CENTER: "center" },
-    // Accept the existing KTS uneven-count prompt in geometry-only tests.
+    // Chấp nhận hộp thoại số mẫu không đều sẵn có của KTS trong các test chỉ xét hình học.
     Window: function () {
       const buttons = [];
       function control(kind) {

@@ -3,7 +3,7 @@ import { latestJson } from "../generated/latest.js";
 const headers = {
   "Content-Type": "application/json; charset=utf-8",
   "Cache-Control": "no-store, max-age=0",
-  "Access-Control-Allow-Origin": "*"
+  "Access-Control-Allow-Origin": "*",
 };
 
 export default {
@@ -19,5 +19,5 @@ export default {
       return new Response("Not found", { status: 404 });
     }
     return new Response(latestJson, { headers });
-  }
+  },
 };

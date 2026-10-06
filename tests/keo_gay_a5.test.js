@@ -102,7 +102,7 @@ function fixture(n, w = 14, h = 20, left = 100, sourceHeight = 60 * h / w) {
       return g;
     },
   };
-  f.doc.selection = f.originals.slice().reverse(); // host selection order is not page order
+  f.doc.selection = f.originals.slice().reverse(); // thứ tự selection của host không phải thứ tự trang
   f.context.dcFlattenForImposition = (_, item, frame, ppi) => {
     assert.equal(ppi,500);
     flatCalls.push(item.identity);
@@ -137,7 +137,7 @@ function fixture(n, w = 14, h = 20, left = 100, sourceHeight = 60 * h / w) {
   };
 }
 
-// Execute production planner for every supported remainder, both families.
+// Chạy bộ lập kế hoạch của code thật cho mọi số dư được hỗ trợ, ở cả hai họ.
 const c = fixture(32).c;
 for (const small of [false, true])
   for (let n = 4; n <= 256; n += 4) {
@@ -189,8 +189,8 @@ assert.deepEqual(
   [23, 26, 27, 22],
 );
 
-// Independent duplex registration check: physically opposite pages must be
-// 1/2, 3/4, ... and remain upright together after a horizontal sheet turn.
+// Kiểm tra độc lập độ khớp hai mặt: các trang nằm đối lưng nhau trên tờ phải là
+// 1/2, 3/4, ... và vẫn cùng xuôi chiều sau khi trở tờ theo chiều ngang.
 const rect = [0, 2000, 2436.1, 2000 - 1775.62];
 const faces = plain(c.dcKeoGayPlan(64, true));
 for (let i = 0; i < faces.length; i += 2) {
@@ -212,8 +212,8 @@ for (let i = 0; i < faces.length; i += 2) {
   }
 }
 
-// Entire production renderer, including all remainder paths, crop marks,
-// source sorting, frame cleanup, coordinate restoration and PDF plan.
+// Toàn bộ phần render của code thật, gồm mọi nhánh xử lý số dư, PON cắt,
+// sắp xếp nguồn, dọn khung, khôi phục toạ độ và kế hoạch PDF.
 for (const [w, h] of [
   [14, 20],
   [14.5, 20.7],
@@ -409,7 +409,7 @@ for (const page of tooTall4.originals) {
   near(b[1] - b[3], 209 * MM);
   near(b[2] - b[0], 297 * 209 / 210 * MM);
 }
-// Preflight canvas exhaustion must not rasterize sources or delete frames.
+// Khi bước kiểm tra trước thấy canvas hết chỗ thì không được raster hoá nguồn hay xoá khung.
 const failed = fixture(32, 14, 20, 7100);
 assert.match(failed.run(), /^ERR:/);
 assert.equal(failed.doc.artboards.length, 1);
@@ -474,8 +474,8 @@ assert.match(invalidSource.run(),/^ERR:.*Không đo được kích thước tran
 assert.equal(invalidSource.flatCalls.length,0,"invalid source must fail before any raster/write");
 assert.equal(invalidSource.doc.artboards.length,1);
 assert.equal(JSON.stringify(invalidSource.originals.map(p=>p.geometricBounds)),invalidBefore);
-// A4 max applies only to the large form; small forms use a proportional
-// 20.9 cm limit. Every mixed source now fills both nominal slot dimensions.
+// Giới hạn tối đa A4 chỉ áp dụng cho form lớn; form nhỏ dùng giới hạn 20.9 cm
+// theo tỉ lệ. Mọi nguồn lẫn kích thước giờ đều lấp đầy cả hai chiều danh định của slot.
 for (const n of [4,8,12,16,20,32,84]) {
   const f = fixture(n,21.2,30);
   f.originals.forEach((p,i)=>{
@@ -515,9 +515,9 @@ for (const n of [4,8,12,16,20,32,84]) {
     assert.ok(!f.originals.some(item=>{const b=item.geometricBounds;return x>b[0]+.01&&x<b[2]-.01&&y<b[1]-.01&&y>b[3]+.01;}),"Crop intrudes into fitted artwork");
   }
 }
-// Reported bug: 3722 x 5262 pixels at width 21.2 cm used to become
-// 29.971628 cm high. Exercise actual post-flatten measurement/placement,
-// both the large AB and smaller TT4 frame, including existing rotated art.
+// Lỗi được báo: ảnh 3722 x 5262 pixel ở chiều rộng 21.2 cm từng bị thành
+// cao 29.971628 cm. Chạy thử đúng phần đo/đặt bài sau bước flatten,
+// với cả khung AB lớn lẫn khung TT4 nhỏ hơn, kể cả bài đã bị xoay sẵn.
 for(const n of [16,20]) {
   const f=fixture(n,21.2,30);
   f.originals.forEach((p,i)=>p.rotate([0,90,180,270,17][i%5]));
@@ -537,7 +537,7 @@ for(const n of [16,20]) {
     near(b[1]-b[3],(small?209:300)*MM);
   }));
 }
-// Matrix application must use document axes on existing bitmap orientations.
+// Việc áp ma trận phải dùng trục của tài liệu với mọi hướng bitmap sẵn có.
 for(const angle of [0,90,180,270,17]) {
   const f=fixture(16,21.2,30);
   f.originals.forEach(p=>p.rotate(angle));
