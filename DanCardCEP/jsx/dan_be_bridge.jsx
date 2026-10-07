@@ -4,7 +4,7 @@
 // ExtendScript đọc path, tự tạo PON và render. Phần tối ưu hình học chạy ở
 // Chromium của CEP để Illustrator không bị treo khi thử nhiều bố cục.
 // ============================================================
-var dcDanBeNestingVersion = 10;
+var dcDanBeNestingVersion = 12;
 if (typeof dcDanBeJobs === "undefined") var dcDanBeJobs = {};
 if (typeof dcDanBeJobCounter === "undefined") var dcDanBeJobCounter = 1;
 
@@ -462,9 +462,9 @@ function dcDanBePrepare(
       } catch (e2) {}
       return null;
     }
-    // Tiếp xúc khi khe bằng 0 cần cận sai số đường cong bậc ba mịn hơn lưới lập phương án.
+    // Khe vật lý (cả 0 và khe dương) cần cận sai số đường cong mịn hơn lưới lập phương án.
     // Mang cận đó sang chốt chặn liên tục; không bao giờ thu nhỏ path gốc.
-    var FLATNESS = (gap === 0 ? 0.00025 : 0.025) * MM;
+    var FLATNESS = 0.00025 * MM;
     var modelHasCurve = false;
     function pointLineDistance(p, a, b) {
       var dx = b[0] - a[0],
@@ -512,11 +512,14 @@ function dcDanBePrepare(
       } catch (e) {
         return null;
       }
-      if (!pts || pts.length < 3) return null;
+      if (!pts || !pts.length) return null;
       var isClosed = false;
       try {
         isClosed = item.closed === true;
       } catch (closedError) {}
+      // Một đường cong kín có thể chỉ có 1–2 điểm neo nhưng vẫn tạo đủ biên dạng.
+      // Chỉ bỏ các đoạn phụ trợ hở ngắn; không để mất đường bao và dùng lỗ làm khuôn.
+      if (!isClosed && pts.length < 3) return null;
       if (!isClosed)
         fail("Khuôn bế phải là path khép kín; không dùng khung bao thay thế.");
       var out = [],
@@ -547,7 +550,9 @@ function dcDanBePrepare(
         )
           out.pop();
       }
-      return out.length >= 3 ? out : null;
+      if (out.length < 3)
+        fail("Đường kín của khuôn không tạo được biên dạng; hãy kiểm tra đường bao ngoài.");
+      return out;
     }
     // Mảng ngoài = các nhóm union. Mảng trong = một CompoundPath (đường bao
     // even/odd, gồm cả lỗ). Hai cấp này được cố ý giữ tách riêng.
@@ -560,9 +565,8 @@ function dcDanBePrepare(
         kind = item.typename;
       } catch (e) {}
       if (kind === "PathItem") {
-        try {
-          if (item.clipping === true) return;
-        } catch (clipError) {}
+        // Đây là Khuôn được chọn, không phải Bài: clipping path khép kín cũng có
+        // thể chính là đường bế bao ngoài. Bỏ nó sẽ biến lỗ đỏ bên trong thành footprint.
         var one = pathContour(item);
         if (one) out.push([one]);
         return;
@@ -852,7 +856,7 @@ function dcDanBePrepare(
       groups = normalizeMillimetres(groups);
       if (!groups)
         fail("Không đọc được path khép kín của khuôn " + (mi + 1) + ".");
-      types.push({ groups: groups, curveErrorMm: gap === 0 && modelHasCurve ? FLATNESS / MM : 0 });
+      types.push({ groups: groups, curveErrorMm: modelHasCurve ? FLATNESS / MM : 0 });
     }
     var jobId = "danbe_" + dcDanBeJobCounter++;
     var dotsMm = [],

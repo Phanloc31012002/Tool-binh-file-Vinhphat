@@ -138,7 +138,7 @@ assert.ok(
 );
 assert.match(main, /dcDanToiUuVersion[^\n]*22/);
 assert.match(main, /dcDanTuTroVersion[^\n]*11/);
-assert.match(main, /dcDanBeNestingVersion[^\n]*10/);
+assert.match(main, /dcDanBeNestingVersion[^\n]*12/);
 console.log(
   "Canvas cleanup: result-only frames on success, old frames retained on failure, reverse deletion and partial-removal warning passed.",
 );

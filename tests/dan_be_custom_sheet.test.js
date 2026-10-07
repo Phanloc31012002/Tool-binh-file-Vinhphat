@@ -134,14 +134,14 @@ function assertBezierAccuracy(groups, maximumErrorMm) {
   assert.equal(zero.types.length, 1);
   assert.equal(positive.gapMm, 1);
   assert.equal(zero.gapMm, 0);
-  assert.equal(positive.types[0].curveErrorMm, 0,
-    "positive-gap processing retains the existing 0.025 mm silhouette");
+  near(positive.types[0].curveErrorMm, 0.00025);
   near(zero.types[0].curveErrorMm, 0.00025);
-  assert.equal(positive.types[0].groups[0][0].length, 99);
+  assert.equal(positive.types[0].groups[0][0].length, 1027);
   assert.equal(zero.types[0].groups[0][0].length, 1027);
-  assert.ok(zero.types[0].groups[0][0].length >
-    10 * positive.types[0].groups[0][0].length);
-  assertBezierAccuracy(positive.types[0].groups, 0.025);
+  assert.equal(zero.types[0].groups[0][0].length,
+    positive.types[0].groups[0][0].length,
+    "positive and zero gaps use the same accurate native curve silhouette");
+  assertBezierAccuracy(positive.types[0].groups, 0.00025);
   assertBezierAccuracy(zero.types[0].groups, 0.00025);
   assert.equal(JSON.stringify(nodes), nodesBefore, "portable Bezier nodes stay unchanged");
   assert.equal(JSON.stringify(f.originals.map((i) => ({
@@ -165,7 +165,7 @@ function assertBezierAccuracy(groups, maximumErrorMm) {
 {
   const f = fixture(),
     { payload, job } = prepared(f);
-  assert.equal(f.c.dcDanBeNestingVersion, 10);
+  assert.equal(f.c.dcDanBeNestingVersion, 12);
   near(payload.sheet.widthMm, 330);
   near(payload.sheet.heightMm, 354);
   const expected = [

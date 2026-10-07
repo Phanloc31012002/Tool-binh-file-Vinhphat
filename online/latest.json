@@ -1,9 +1,9 @@
 {
     "product":  "com.locdev.dancard",
-    "version":  "2.16.15",
-    "title":  "bản vá sửa báo lỗi, code tiếng việt",
-    "description":  "bản vá sửa báo lỗi, code tiếng việt",
-    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.16.15.zip",
-    "sha256":  "352C93DB2F87587352E68AA45C6B82B278868B3812305DAABA6AD52A3B964EDA",
-    "publishedUtc":  "2026-10-06T02:33:40.1668271Z"
+    "version":  "2.16.20",
+    "title":  "PHÁT HÀNH SAU TEST",
+    "description":  "PHÁT HÀNH SAU TEST",
+    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.16.20.zip",
+    "sha256":  "D2171551A35F3F3BAE4E8E53E820AA9E354A24875931098A43272ABF33EE6C36",
+    "publishedUtc":  "2026-10-07T01:09:04.9251011Z"
 }

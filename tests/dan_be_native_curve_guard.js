@@ -119,7 +119,7 @@ function validateNativeReport(report) {
             minimum = Math.min(minimum, context.pointSegmentDistance(p, edge.a, edge.b));
           const clear = minimum - dot.r / MM;
           minimumPonEdgeClearance = Math.min(minimumPonEdgeClearance, clear);
-          assert.ok(clear + FLATNESS_MM >= input.ponClearMm - EPS_MM,
+          assert.ok(clear - mesh.flattenErrorMm >= input.ponClearMm - EPS_MM,
             `PON edge clearance ${clear} mm is below ${input.ponClearMm} mm`);
         }
       }

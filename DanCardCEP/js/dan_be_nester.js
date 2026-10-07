@@ -16,7 +16,7 @@
 })(typeof window !== "undefined" ? window : this, function () {
   "use strict";
 
-  var VERSION = 6;
+  var VERSION = 9;
 
   function now() { return new Date().getTime(); }
   function abs(v) { return v < 0 ? -v : v; }
@@ -928,6 +928,218 @@
     return out;
   }
 
+  // Ghép các hàng khác hướng/khác pha, thay vì bắt cả tờ lặp một băng duy nhất.
+  // Biên ngoài theo cột quyết định bước đi xuống; lỗ/lõm không làm phép thử
+  // khoảng cách trở thành đơn điệu giả. Các phương án cơ sở hữu hạn chạy trước
+  // beam có hạn giờ, nên một dải cuối xoay ngang không phụ thuộc tốc độ máy.
+  function compositionalBandPlans(variants, typeCount, rw, rh, dots, gap, step, deadline) {
+    if (typeCount !== 1 || !variants.length) return [];
+    var minSide = Infinity, areaWork = 0, i, j;
+    for (i=0;i<variants.length;i++) {
+      minSide=Math.min(minSide,variants[i].wCells,variants[i].hCells);
+      areaWork+=variants[i].wCells*variants[i].hCells;
+    }
+    // Đây là tìm kiếm tổ hợp cho số con vừa phải, không phải vòng nhân bản
+    // hàng nghìn khuôn nhỏ. Các seed lưới cũ vẫn xử lý trường hợp đó.
+    if (minSide<=0 || rw*rh/(minSide*minSide)>400 ||
+        Math.ceil(rw/minSide)>40 || Math.ceil(rh/minSide)>16 || areaWork>2400000) return [];
+    var local=[], columns=[], base=[], extra=[], pending=[], out=[];
+    var contacts={}, rowContacts={}, nextId=0, maxDepth=Math.min(12,Math.ceil(rh/minSide));
+    function columnEnvelope(v) {
+      var c={top:[],bottom:[],offset:v.padCells}, r, s, x, spans, ix;
+      for (r=0;r<v.clearRows.length;r++) {
+        spans=v.clearRows[r];
+        for (s=0;s<spans.length;s++) for(x=spans[s][0];x<spans[s][1];x++) {
+          ix=x+c.offset;
+          if (c.top[ix]===undefined) c.top[ix]=r-v.padCells;
+          c.bottom[ix]=r-v.padCells+1;
+        }
+      }
+      return c;
+    }
+    for(i=0;i<variants.length;i++) {
+      // Một ô dự phòng chỉ phục vụ tìm seed; hình nguồn và khe yêu cầu không đổi.
+      // Chốt kiểm tra vật lý phía dưới dùng chính variants và gap ban đầu.
+      var original=variants[i], padGap=gap+Math.max(step,2*(original.curveErrorMm||0));
+      var v=buildVariant(original.groups,original.mi,original.vi,0,padGap,step);
+      if (!v) return [];
+      v.angle=original.angle; local.push(v); columns.push(columnEnvelope(v));
+    }
+    function downContact(a,b,dx) {
+      var key=a+":"+b+":"+dx, cached=contacts[key];
+      if(cached!==undefined) return cached;
+      var ca=columns[a], cb=columns[b], y=0, x, bx, top, bottom;
+      for(x=0;x<ca.bottom.length;x++) {
+        bottom=ca.bottom[x]; if(bottom===undefined) continue;
+        bx=x-ca.offset-dx+cb.offset; top=cb.top[bx];
+        if(top!==undefined) y=Math.max(y,bottom-top);
+      }
+      y=Math.max(1,Math.ceil(y)); contacts[key]=y; return y;
+    }
+    function rowContact(a,b) {
+      var key=a.id+":"+b.id, cached=rowContacts[key];
+      if(cached!==undefined) return cached;
+      var y=1, ai, bi, pa, pb;
+      for(ai=0;ai<a.parts.length;ai++) for(bi=0;bi<b.parts.length;bi++) {
+        pa=a.parts[ai]; pb=b.parts[bi];
+        y=Math.max(y,downContact(pa.v,pb.v,pb.x-pa.x));
+      }
+      rowContacts[key]=y; return y;
+    }
+    function template(first,second,shorten,phase,target) {
+      var a=local[first], b=local[second], ab=rightProfileContact(a,b,0);
+      var cycle=first===second ? ab : Math.max(ab+rightProfileContact(b,a,0),
+        rightProfileContact(a,a,0),rightProfileContact(b,b,0));
+      var parts=[], x=0, col, vv, width=0, height=0;
+      for(col=0;col<40;col++) {
+        x=col*cycle; if(x+a.wCells>rw) break;
+        parts.push({v:first,x:x});
+        if(first!==second && x+ab+b.wCells<=rw) parts.push({v:second,x:x+ab});
+      }
+      if(shorten && parts.length>1) parts.pop();
+      if(!parts.length) return;
+      for(col=0;col<parts.length;col++) {
+        vv=local[parts[col].v]; width=Math.max(width,parts[col].x+vv.wCells);
+        height=Math.max(height,vv.hCells);
+      }
+      var offset=phase===0 ? 0 : phase===2 ? rw-width : Math.floor((rw-width)/2);
+      for(col=0;col<parts.length;col++) parts[col].x+=offset;
+      target.push({id:nextId++,family:first+":"+second,parts:parts,height:height});
+    }
+    for(i=0;i<local.length;i++) {
+      template(i,i,false,1,base);
+      for(j=0;j<local.length;j++) if(local[j].angle===(local[i].angle+180)%360) {
+        template(i,j,false,1,base); break;
+      }
+    }
+    function append(rows,t) {
+      var y=0, k;
+      for(k=0;k<rows.length;k++) y=Math.max(y,rows[k].y+rowContact(rows[k].t,t));
+      if(y+t.height>rh) return null;
+      var added=rows.slice(0); added.push({t:t,y:y});
+      added.height=Math.max(rows.height||0,y+t.height);
+      added.total=(rows.total||0)+t.parts.length;
+      return added;
+    }
+    function heightOf(rows) {
+      if(rows.height!==undefined) return rows.height;
+      var h=0, k;
+      for(k=0;k<rows.length;k++) h=Math.max(h,rows[k].y+rows[k].t.height);
+      return h;
+    }
+    function hitsPon(v,x,y) {
+      var k, d, dx, dy;
+      // Khung bao rời đĩa né PON thì đường bao bên trong chắc chắn cũng rời.
+      // Chỉ các khung gần chấm mới cần quét đầy đủ scanline như trước.
+      for(k=0;k<dots.length;k++) {
+        d=dots[k]; dx=Math.max(x-d.x,d.x-x-v.wCells,0);
+        dy=Math.max(y-d.y,d.y-y-v.hCells,0);
+        if(dx*dx+dy*dy<d.radius*d.radius) return rawHitsPon(v,x,y,dots);
+      }
+      return false;
+    }
+    function materialize(rows,offset) {
+      var plan=[], r, p, part, vv, x, y;
+      for(r=0;r<rows.length;r++) for(p=0;p<rows[r].t.parts.length;p++) {
+        part=rows[r].t.parts[p]; vv=variants[part.v]; x=part.x; y=rows[r].y+offset;
+        if(x<0 || y<0 || x+vv.wCells>rw || y+vv.hCells>rh || hitsPon(vv,x,y)) continue;
+        plan.push({mi:vv.mi,v:part.v,x:x,y:y});
+      }
+      return plan;
+    }
+    function retain(plan) {
+      if(!plan.length) return;
+      var k, p, equal, other, score, at;
+      if(pending.length===12 && plan.length<pending[pending.length-1].plan.length) return;
+      // Giữ nhiều phương án hình học khác nhau cho chốt vật lý, không chỉ một
+      // seed thắng phép đếm raster nhưng có thể không đạt khe thật.
+      for(k=0;k<pending.length;k++) if(pending[k].plan.length===plan.length) {
+        other=pending[k].plan;
+        equal=true;
+        for(p=0;p<plan.length;p++) if(other[p].mi!==plan[p].mi ||
+            other[p].v!==plan[p].v || other[p].x!==plan[p].x ||
+            other[p].y!==plan[p].y) { equal=false; break; }
+        if(equal) return;
+      }
+      // Cùng thứ tự comparePlans, nhưng mỗi score chỉ tính một lần, thay vì
+      // quét lại toàn bộ các con trong mỗi lần sort của mọi stack trung gian.
+      score=planScore(plan,variants); at=0;
+      while(at<pending.length && (pending[at].plan.length>plan.length ||
+          (pending[at].plan.length===plan.length && pending[at].score<=score))) at++;
+      pending.splice(at,0,{plan:plan,score:score});
+      if(pending.length>12) pending.pop();
+    }
+    function retainRows(rows) {
+      if(!rows || !rows.length) return;
+      // Chưa bỏ PON thì total đã là cận trên. Stack thấp hơn ngưỡng giữ lại
+      // không thể thắng ở bất kỳ pha dọc nào: bỏ quét nhưng vẫn cho ghép tiếp.
+      if(pending.length===12 && rows.total<pending[pending.length-1].plan.length) return;
+      var spare=rh-heightOf(rows), phases=[0,Math.floor(spare/2),spare], k;
+      for(k=0;k<phases.length;k++) retain(materialize(rows,phases[k]));
+    }
+    // Cơ sở tất định: một họ hàng đầy trước, rồi một họ khác lấp dải còn lại.
+    // Thử mọi điểm chuyển và mọi hướng, không có số con/kích thước đặt sẵn.
+    for(i=0;i<base.length;i++) {
+      var prefix=[], depth, tail, candidate, tailDepth;
+      for(depth=0;depth<maxDepth;depth++) {
+        prefix=append(prefix,base[i]); if(!prefix) break;
+        retainRows(prefix);
+        for(j=0;j<base.length;j++) {
+          tail=prefix;
+          for(tailDepth=depth+1;tailDepth<maxDepth;tailDepth++) {
+            candidate=append(tail,base[j]); if(!candidate) break;
+            tail=candidate; retainRows(tail);
+          }
+        }
+      }
+    }
+    // Beam bổ sung cho các hàng ngắn/so le và đổi hướng nhiều lần. Mỗi họ giữ
+    // cả phương án nhiều con lẫn frontier thấp; không cắt tỉa chỉ theo số con.
+    if(now()<deadline) {
+      for(i=0;i<local.length;i++) for(var phase=0;phase<3;phase++) {
+        template(i,i,false,phase,extra); template(i,i,true,phase,extra);
+        for(j=0;j<local.length;j++) if(local[j].angle===(local[i].angle+180)%360) {
+          template(i,j,false,phase,extra); template(i,j,true,phase,extra); break;
+        }
+      }
+      var beam=[{rows:[],count:0,height:0,last:-1}], next, d, si, ti, state, rows, count, best;
+      for(d=0;d<maxDepth && now()<deadline;d++) {
+        next=[];
+        for(si=0;si<beam.length && now()<deadline;si++) for(ti=0;ti<extra.length && now()<deadline;ti++) {
+          state=beam[si]; rows=append(state.rows,extra[ti]); if(!rows) continue;
+          count=materialize(rows,0).length;
+          next.push({rows:rows,count:count,height:heightOf(rows),last:ti});
+          retainRows(rows);
+        }
+        if(!next.length) break;
+        next.sort(function(a,b) { return b.count-a.count || a.height-b.height; });
+        beam=[]; best={};
+        // Hai nhánh mỗi họ: nhiều con hữu ích nhất và chiều cao nhỏ nhất.
+        for(si=0;si<next.length;si++) {
+          state=next[si]; var family=extra[state.last].family;
+          if(!best[family]) { best[family]={full:state,low:state}; }
+          else if(state.height<best[family].low.height ||
+              (state.height===best[family].low.height && state.count>best[family].low.count)) best[family].low=state;
+        }
+        for(si=0;si<extra.length;si++) {
+          var entry=best[extra[si].family]; if(!entry || entry.used) continue;
+          entry.used=true; beam.push(entry.full);
+          if(entry.low!==entry.full) beam.push(entry.low);
+        }
+        if(beam.length>16) beam.length=16;
+      }
+    }
+    // Không đưa seed cho nest() chỉ dựa vào hồ sơ rời rạc.
+    // Kết quả đầu tiên đã kiểm chứng vẫn được giữ khi hết thời gian bổ sung.
+    for(i=0;i<pending.length && (!out.length || now()<deadline);i++) {
+      var verified=pending[i].plan;
+      if(!verifyPlan(verified,variants,rw,rh,dots) ||
+          !verifyGeometry(verified,variants,rw,rh,dots,gap,step)) continue;
+      out.push(verified); if(out.length>=2) break;
+    }
+    return out;
+  }
+
   // Hai hàng đối hướng tạo thành một băng lặp lại được. Độ lệch A->B và
   // bước quay về băng kế tiếp không cần bằng nhau: đường bao thật có thể lồng
   // sâu vào nhau theo một chiều nhưng cần bước quay về dài hơn theo chiều kia.
@@ -1254,15 +1466,54 @@
     return moved(bestX,bestY);
   }
 
-  // Phép tìm vẫn chạy trên các lát ô nguyên thận trọng. Khi yêu cầu khe bằng 0,
+  // Khe lưới đúng số nhập có thể thiếu cận sai số rất nhỏ của đường cong.
+  // Mở riêng vị trí đặt, giữ nguyên khuôn, rồi kẹp tịnh tiến vào miền lề hợp lệ.
+  // Không đưa một khối vượt lề vào canh tâm và hy vọng nó tự phục hồi.
+  function openPhysicalGapPlan(plan, variants, rw, rh, dots, gap, step) {
+    if (plan.length < 2) return plan;
+    var xLo = Infinity, xHi = -Infinity, yLo = Infinity, yHi = -Infinity, i, axis;
+    for (i = 0; i < plan.length; i++) {
+      xLo = Math.min(xLo,plan[i].x); xHi = Math.max(xHi,plan[i].x);
+      yLo = Math.min(yLo,plan[i].y); yHi = Math.max(yHi,plan[i].y);
+    }
+    var cx = (xLo+xHi)/2, cy = (yLo+yHi)/2;
+    var maxShiftMm = Math.max(step,0.001);
+    for (var shiftMm = 0.001; shiftMm <= maxShiftMm + 1e-9;
+      shiftMm = shiftMm < maxShiftMm ? Math.min(maxShiftMm,shiftMm*2) : maxShiftMm+1) {
+      for (axis = 0; axis < 3; axis++) {
+        var trial = clonePlan(plan);
+        var fx = axis !== 2 && xHi > xLo ? 1+2*shiftMm/((xHi-xLo)*step) : 1;
+        var fy = axis !== 1 && yHi > yLo ? 1+2*shiftMm/((yHi-yLo)*step) : 1;
+        for (i = 0; i < trial.length; i++) {
+          trial[i].x = cx+(plan[i].x-cx)*fx;
+          trial[i].y = cy+(plan[i].y-cy)*fy;
+        }
+        var b = physicalPlanBounds(trial,variants,step);
+        if (b.x1-b.x0 > rw+1e-8 || b.y1-b.y0 > rh+1e-8) continue;
+        var tx = Math.max(-b.x0,Math.min(0,rw-b.x1));
+        var ty = Math.max(-b.y0,Math.min(0,rh-b.y1));
+        for (i = 0; i < trial.length; i++) { trial[i].x += tx; trial[i].y += ty; }
+        if (verifyGeometry(trial,variants,rw,rh,dots,gap,step)) return trial;
+        trial = centrePhysicalPlan(trial,variants,rw,rh,dots,gap,step);
+        if (verifyGeometry(trial,variants,rw,rh,dots,gap,step)) return trial;
+      }
+    }
+    return plan; // Không nới chốt chặn; nếu không phục hồi được, tìm lại phương án thận trọng.
+  }
+
+  // Phép tìm vẫn chạy trên các lát ô nguyên thận trọng. Với mọi khe đã nhập,
   // khử khoảng cách số học của chúng ở đầu ra bằng cách co VỊ TRÍ lại,
   // không bao giờ co hình học của khuôn bế/bài. Mỗi lần thử được nhận đều được
   // kiểm tra liên tục một cách độc lập; cho phép chạm biên, không cho chồng lấn vùng tô.
   // Co chung theo một trục sẽ khép các tiếp xúc lặp lại cùng một lúc thay vì
   // phải dời đi dời lại hàng nghìn object riêng lẻ trong Illustrator.
-  function closeZeroGapPlan(plan, variants, rw, rh, dots, step, deadline) {
+  function closePhysicalGapPlan(plan, variants, rw, rh, dots, gap, step, deadline) {
     if (plan.length < 2) return plan;
-    var best = clonePlan(plan), pass, axis, i, low, high, mid, trial;
+    var best = clonePlan(plan), pass, axis, i, low, high, mid, trial, curveError = 0;
+    for (i = 0; i < variants.length; i++) curveError = Math.max(curveError,variants[i].curveErrorMm || 0);
+    // Không để sai số kiểm tra 0,001 mm bị trừ vào khe dương đã nhập.
+    // Đường cong đã có dự phòng sai số riêng trong verifyGeometry.
+    var guardGap = gap > 0 && !curveError ? gap + 0.001 : gap;
     function contracted(base, coordinate, factor) {
       var lo = Infinity, hi = -Infinity, out = clonePlan(base), k;
       for (k = 0; k < base.length; k++) {
@@ -1273,19 +1524,47 @@
         out[k][coordinate] = centre+(base[k][coordinate]-centre)*factor;
       return out;
     }
-    if (!verifyGeometry(best,variants,rw,rh,dots,0,step)) return plan;
-    for (pass = 0; pass < 2; pass++) for (axis = 0; axis < 2; axis++) {
-      if (now() >= deadline) return best;
-      var base = best, coordinate = axis ? "y" : "x";
-      trial = contracted(base,coordinate,0);
-      if (verifyGeometry(trial,variants,rw,rh,dots,0,step)) { best = trial; continue; }
+    function closed(base, coordinate, required) {
+      function at(factor) {
+        var out = contracted(base,coordinate === "both" ? "x" : coordinate,factor);
+        return coordinate === "both" ? contracted(out,"y",factor) : out;
+      }
+      var xLo = Infinity, xHi = -Infinity, yLo = Infinity, yHi = -Infinity, k;
+      for (k = 0; k < base.length; k++) {
+        xLo = Math.min(xLo,base[k].x); xHi = Math.max(xHi,base[k].x);
+        yLo = Math.min(yLo,base[k].y); yHi = Math.max(yHi,base[k].y);
+      }
+      var spanMm = (coordinate === "both" ? Math.max(xHi-xLo,yHi-yLo) :
+        coordinate === "x" ? xHi-xLo : yHi-yLo) * step;
+      if (spanMm <= 0.00005) return base;
+      // Trục đã chạm khe thật thì không cần thử lại hàng chục phép kiểm tra.
+      trial = at(Math.max(0,1-0.00005/spanMm));
+      if (!verifyGeometry(trial,variants,rw,rh,[],guardGap,step)) return base;
+      var kept = verifyGeometry(trial,variants,rw,rh,dots,guardGap,step) ? trial : base;
+      trial = at(0);
+      if (verifyGeometry(trial,variants,rw,rh,dots,guardGap,step)) return trial;
       low = 0; high = 1;
-      for (i = 0; i < 28 && now() < deadline; i++) {
-        mid = (low+high)/2; trial = contracted(base,coordinate,mid);
-        if (verifyGeometry(trial,variants,rw,rh,dots,0,step)) {
-          high = mid; best = trial;
+      for (i = 0; i < 24 && (high-low)*spanMm > 0.00005 && (required || now() < deadline); i++) {
+        mid = (low+high)/2; trial = at(mid);
+        if (verifyGeometry(trial,variants,rw,rh,dots,guardGap,step)) {
+          high = mid; kept = trial;
         } else low = mid;
       }
+      return kept;
+    }
+    if (!verifyGeometry(best,variants,rw,rh,dots,guardGap,step)) {
+      if (gap > 0) best = openPhysicalGapPlan(best,variants,rw,rh,dots,guardGap,step);
+      if (!verifyGeometry(best,variants,rw,rh,dots,guardGap,step)) return plan;
+    }
+    // Khép đồng đều trước để khe cùng cột/hàng cũng đúng. Nếu khép riêng X
+    // ngay từ đầu, khe chéo có thể chặn Y trong khi khe cột còn dư 0,25 mm.
+    // Tờ thông thường phải khép xong ba bước chính, không bỏ dở do lát thời gian
+    // tìm kiếm ngắn. Với hàng nghìn con, giữ ngân sách để kiểm tra vẫn hữu hạn.
+    var required = gap > 0 && plan.length <= 400;
+    if (gap > 0 && (required || now() < deadline)) best = closed(best,"both",required);
+    for (pass = 0; pass < 2; pass++) for (axis = 0; axis < 2; axis++) {
+      if (!(required && pass === 0) && now() >= deadline) return best;
+      best = closed(best,axis ? "y" : "x",required && pass === 0);
     }
     return best;
   }
@@ -1609,10 +1888,22 @@
     for (i = 0; i < variants.length; i++)
       curveError = Math.max(curveError,variants[i].curveErrorMm || 0);
     // Đường cubic đã flatten lệch khỏi khuôn bế thật không quá sai số đã khai báo.
-    // Chừa cả hai sai số trước khi khép một tiếp xúc khe 0; bù thêm
+    // Chừa cả hai sai số trước khi khép một tiếp xúc; bù thêm
     // dung sai khoảng cách số học để nó không ăn vào giới hạn hình học đó.
     if (curveError) gap += 2 * curveError + tolerance;
-    var gapSq = sq(Math.max(0, gap - tolerance));
+    var physicalGap = Math.max(0, gap - tolerance), gapSq = sq(physicalGap);
+    // Đĩa bao chỉ dùng để NHẬN nhanh cặp chắc chắn không va nhau. Cặp sát
+    // đường bế thật vẫn phải qua phép đo cạnh đầy đủ, không thay khuôn bằng tròn.
+    var outerRadii = [];
+    for (i = 0; i < variants.length; i++) {
+      v = variants[i]; var radiusSqMax = 0;
+      for (gi = 0; gi < v.groups.length; gi++) for (ci = 0; ci < v.groups[gi].length; ci++)
+        for (pi = 0; pi < v.groups[gi][ci].length; pi++) {
+          p = v.groups[gi][ci][pi];
+          radiusSqMax = Math.max(radiusSqMax,sq(p[0]-v.w/2)+sq(p[1]-v.h/2));
+        }
+      outerRadii.push(Math.sqrt(radiusSqMax));
+    }
     var index = spatialIndex(Math.max(8, gap * 2));
     for (i = 0; i < plan.length; i++) {
       s = plan[i]; v = variants[s.v]; groups = copyGroups(v.groups); edges = [];
@@ -1627,7 +1918,8 @@
           edges.push({a:p,b:q,x0:Math.min(p[0],q[0]),x1:Math.max(p[0],q[0]),y0:Math.min(p[1],q[1]),y1:Math.max(p[1],q[1])});
         }
       }
-      var shape = {groups:groups, edges:edges, bounds:boundsOfGroups(groups)};
+      var shape = {groups:groups, edges:edges, bounds:boundsOfGroups(groups),
+        outerRadius:outerRadii[s.v], cx:s.x*step+v.w/2, cy:s.y*step+v.h/2};
       for (var di = 0; di < dots.length; di++) {
         var centre = [dots[di].x * step, dots[di].y * step], radiusSq = sq(Math.max(0, dots[di].radius * step + curveError - tolerance));
         if (insideGroups(centre, groups)) return false;
@@ -1639,7 +1931,9 @@
       for (j = 0; j < near.length; j++) {
         var other = mapped[near[j]], ob = other.bounds;
         if (bb.x0 >= ob.x1 + gap || ob.x0 >= bb.x1 + gap || bb.y0 >= ob.y1 + gap || ob.y0 >= bb.y1 + gap) continue;
-        // Cubic chia mịn ở khe 0 có thể có hàng nghìn cạnh. Lập chỉ mục mỗi đường bao
+        if (sq(shape.cx-other.cx)+sq(shape.cy-other.cy) >=
+          sq(shape.outerRadius+other.outerRadius+physicalGap)+1e-10) continue;
+        // Cubic chia mịn có thể có hàng nghìn cạnh. Lập chỉ mục mỗi đường bao
         // lân cận một lần thay vì so từng cạnh với mọi cạnh khác.
         if (!other.edgeIndex && other.edges.length > 160) {
           other.edgeIndex = spatialIndex(Math.max(1,gap*2));
@@ -1674,12 +1968,14 @@
     return true;
   }
 
-  function nest(input) {
+  function nest(input, planningPadMm) {
     var began = now();
     try {
       if (!input || !input.sheet || !input.types || !input.types.length) throw new Error("Thiếu dữ liệu khuôn bế.");
       var step = Number(input.resolutionMm) || 0.25;
       if (!(step > 0 && step <= 1)) step = 0.25;
+      planningPadMm = Number(planningPadMm) || 0;
+      if (!(planningPadMm >= 0 && planningPadMm <= 2*step)) planningPadMm = 0;
       var gap = Number(input.gapMm), margin = Number(input.marginMm), ponClear = Number(input.ponClearMm);
       if (!(gap >= 0) || !(margin >= 0) || !(ponClear >= 0)) throw new Error("Thông số khe/lề/PON không hợp lệ.");
       var rw = Math.floor((Number(input.sheet.widthMm) - 2 * margin) / step + 1e-7);
@@ -1696,7 +1992,7 @@
         if (!isFinite(curveError) || !(curveError >= 0)) curveError = 0;
         curveError = Math.min(0.025,curveError);
         for (ri = 0; ri < rots.length; ri++) {
-          v = buildVariant(g, ti, ri, rots[ri], gap, step);
+          v = buildVariant(g, ti, ri, rots[ri], gap+planningPadMm, step);
           if (v) {
             v.curveErrorMm = curveError;
             variants.push(v);
@@ -1782,11 +2078,15 @@
 
       var seeds = [], si, candidate;
       if (!isRound) {
+        // Ghép các cụm khác hướng và tận dụng dải dư trước các phần tìm thêm có hạn giờ.
+        // Cơ sở hữu hạn đã kiểm chứng không được mất vì các seed lặp cũ dùng hết thời gian.
+        var composedBands = compositionalBandPlans(planningVariants, planningTypeCount, rw, rh, dots,
+          gap, step, Math.min(deadline, now() + budget * 0.2));
         var mixedRows = mixedRowPlans(planningVariants, planningTypeCount, rw, rh, dots, Math.min(deadline, now() + budget * 0.08));
         var alternating = alternatingRowPlans(planningVariants, planningTypeCount, rw, rh, dots, Math.min(deadline, now() + budget * 0.12));
         var bands = bandPlans(planningVariants, planningTypeCount, rw, rh, dots, gap, step, Math.min(deadline, now() + budget * 0.15));
         var lattice = latticePlans(planningVariants, planningTypeCount, rw, rh, dots, Math.min(deadline, now() + budget * 0.2));
-        seeds = seedPlans(planningVariants, planningTypeCount, rw, rh, dots, Math.min(deadline, now() + budget * 0.35)).concat(lattice, alternating, bands, mixedRows);
+        seeds = seedPlans(planningVariants, planningTypeCount, rw, rh, dots, Math.min(deadline, now() + budget * 0.35)).concat(lattice, alternating, bands, mixedRows, composedBands);
         seeds.sort(function (u, w) { return -comparePlans(u, w, variants); });
       }
       // Giữ mọi seed đã kiểm chứng làm phương án dự phòng ngay cả khi bước tiền xử lý chạm
@@ -1834,11 +2134,15 @@
 
       var physicalRw = (Number(input.sheet.widthMm) - 2 * margin) / step;
       var physicalRh = (Number(input.sheet.heightMm) - 2 * margin) / step;
-      if (gap === 0) best = closeZeroGapPlan(best,variants,physicalRw,physicalRh,dots,step,
-        now()+Math.min(1600,Math.max(450,budget*0.4)));
+      best = closePhysicalGapPlan(best,variants,physicalRw,physicalRh,dots,gap,step,
+        now()+(best.length <= 400 ? 5000 : Math.min(2000,Math.max(750,budget*0.5))));
       best = centrePhysicalPlan(best, variants, physicalRw, physicalRh, dots, gap, step);
-      if (!verifyGeometry(best, variants, physicalRw, physicalRh, dots, gap, step))
+      if (!verifyGeometry(best, variants, physicalRw, physicalRh, dots, gap, step)) {
+        // Chỉ tìm lại khoảng trống lưới, không tăng khe đầu ra hay bỏ kiểm tra thật.
+        // Giới hạn tối đa hai lượt dự phòng; đầu vào và nguồn vẫn giữ nguyên.
+        if (gap > 0 && planningPadMm < 2*step-1e-8) return nest(input,Math.min(2*step,planningPadMm+step));
         throw new Error("Bộ kiểm tra an toàn từ chối phương án canh tâm.");
+      }
       var physicalBounds = physicalPlanBounds(best, variants, step);
       var centreOffsetX = best.length ? (physicalBounds.x0 + physicalBounds.x1 - physicalRw) * step / 2 : 0;
       var centreOffsetY = best.length ? (physicalBounds.y0 + physicalBounds.y1 - physicalRh) * step / 2 : 0;
@@ -1876,8 +2180,9 @@
       planBounds: planBounds, augmentWithPair: augmentWithPair, seedPlans: seedPlans,
       contactOffsets: contactOffsets, verifyGeometry: verifyGeometry, latticePlans:latticePlans,
       alternatingRowPlans:alternatingRowPlans,rightProfileContact:rightProfileContact,
-      bandPlans:bandPlans,
+      bandPlans:bandPlans,compositionalBandPlans:compositionalBandPlans,
       centrePhysicalPlan:centrePhysicalPlan,physicalPlanBounds:physicalPlanBounds,
+      openPhysicalGapPlan:openPhysicalGapPlan,
       balancedPlan: balancedPlan, mixedRowPlans: mixedRowPlans, polishEdges: polishEdges, edgeMargin:edgeMargin
     }
   };

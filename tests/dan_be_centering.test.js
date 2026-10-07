@@ -209,12 +209,14 @@ function centreError(input, slots) {
 function exactPublicCentre(input, count, label, allowPonFallback = false) {
   const result = nester.nest(input);
   assert.equal(result.ok, true, `${label}: ${result.error}`);
-  assert.equal(
-    result.count,
-    count,
-    `${label}: centering cannot discard or add copies`,
+  // Historical search counts are proven minimums, not global-optimal ceilings:
+  // a stronger planner can add copies; the direct helper tests below still
+  // require centering itself to preserve every copy and its identity.
+  assert.ok(
+    result.count >= count,
+    `${label}: search must retain at least the proven ${count} copies`,
   );
-  assert.equal(result.slots.length, count);
+  assert.equal(result.slots.length, result.count);
   physicalGuard(input, result.slots);
   const error = centreError(input, result.slots);
   assert.ok(
@@ -265,7 +267,7 @@ function exactPublicCentre(input, count, label, allowPonFallback = false) {
     assert.doesNotMatch(result.detail, /Canh tâm bị giới hạn bởi vùng né PON/);
   }
   console.log(
-    `${label}: ${count} copies, physical centre residual [${error}] mm`,
+    `${label}: ${result.count} copies, physical centre residual [${error}] mm`,
   );
   return result;
 }

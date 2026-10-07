@@ -341,11 +341,13 @@
     return Math.sqrt(dx * dx + dy * dy);
   }
   function flattenedNativePath(item) {
-    var pp = item.pathPoints, out = [copy(pp[0].anchor)], i;
+    var pp = item.pathPoints, out = [copy(pp[0].anchor)], i, hasCurve = false;
     function midpoint(a, b) { return [(a[0]+b[0])/2,(a[1]+b[1])/2]; }
     function flatten(a, b, c, d, depth) {
       var error = Math.max(pointSegmentDistance(b, a, d), pointSegmentDistance(c, a, d));
-      if (error <= CURVE_FLATNESS_MM * MM || depth >= 24) { out.push(copy(d)); return; }
+      if (error > 0) hasCurve = true;
+      if (error <= CURVE_FLATNESS_MM * MM) { out.push(copy(d)); return; }
+      assert(depth < 24, "Native cubic flattening exceeded its precision bound");
       var ab = midpoint(a,b), bc = midpoint(b,c), cd = midpoint(c,d),
         abc = midpoint(ab,bc), bcd = midpoint(bc,cd), m = midpoint(abc,bcd);
       flatten(a,ab,abc,m,depth+1); flatten(m,bcd,cd,d,depth+1);
@@ -356,6 +358,9 @@
         copy(next.leftDirection),copy(next.anchor),0);
     }
     out.pop(); // Điểm cuối của đường kín chính là điểm đầu.
+    // Một cubic có cả hai tay nắm trên đoạn dây cung không cần xấp xỉ.
+    // Đặc biệt, hình chữ nhật có tay nắm trùng điểm neo có sai số đúng bằng 0.
+    out.flattenErrorMm = hasCurve ? CURVE_FLATNESS_MM : 0;
     return out;
   }
 
@@ -383,7 +388,8 @@
         for (y=Math.floor(e.y0/pitch);y<=Math.floor(e.y1/pitch);y++) add(grid,x+":"+y,i);
       for (y=Math.floor(e.y0/pitch);y<=Math.floor(e.y1/pitch);y++) add(bands,String(y),i);
     }
-    return {points:points,edges:edges,grid:grid,bands:bands,pitch:pitch,bounds:bounds,stamp:0};
+    return {points:points,edges:edges,grid:grid,bands:bands,pitch:pitch,bounds:bounds,stamp:0,
+      flattenErrorMm:raw.flattenErrorMm};
   }
   function nearbyMeshEdges(mesh, bounds, fn) {
     var stamp = ++mesh.stamp, x, y, bucket, i, edge;
@@ -452,14 +458,22 @@
   }
   function checkNativeCutters(cuts, rect, label) {
     var meshes=[],i,j,k,a,b,e, minimumSq=Infinity,checkedPairs=0,
-      radius=Math.max(2,input.gapMm+0.01),segments=0;
+      radius=Math.max(2,input.gapMm+0.01),segments=0,maximumError=0,
+      pathErrors=[],minimumCertifiedGap=Infinity;
     for(i=0;i<cuts.length;i++) {
       var mesh=nativeMesh(cuts[i].item,rect); meshes.push(mesh);segments+=mesh.edges.length;
+      pathErrors.push(mesh.flattenErrorMm); maximumError=Math.max(maximumError,mesh.flattenErrorMm);
     }
     for(i=0;i<meshes.length;i++) for(j=0;j<i;j++) {
       a=meshes[i];b=meshes[j];checkedPairs++;
-      var queryRadius=Math.min(radius,Math.sqrt(minimumSq));
-      if (bboxDistance(a.bounds,b.bounds)>queryRadius) continue;
+      var pairError=a.flattenErrorMm+b.flattenErrorMm,
+        requiredGap=Math.max(0,input.gapMm-0.001),pairMinimumSq=Infinity,
+        queryRadius=Math.max(Math.min(radius,Math.sqrt(minimumSq)),requiredGap+pairError),
+        boxGap=bboxDistance(a.bounds,b.bounds);
+      if (boxGap>queryRadius) {
+        minimumCertifiedGap=Math.min(minimumCertifiedGap,boxGap-pairError);
+        continue;
+      }
       for(k=0;k<a.edges.length;k++) {
         e=a.edges[k];
         nearbyMeshEdges(b,[e.x0-queryRadius-1e-8,e.y0-queryRadius-1e-8,
@@ -470,18 +484,22 @@
           var d=Math.min(nativePointSegmentDistanceSq(e.a,f.a,f.b),nativePointSegmentDistanceSq(e.b,f.a,f.b),
             nativePointSegmentDistanceSq(f.a,e.a,e.b),nativePointSegmentDistanceSq(f.b,e.a,e.b));
           minimumSq=Math.min(minimumSq,d);
+          pairMinimumSq=Math.min(pairMinimumSq,d);
         });
       }
       if (bboxDistance(a.bounds,b.bounds)<=1e-8)
         assert(!nativeFilledOverlap(a,b),label+" native cubic cutters have filled overlap: "+i+"/"+j);
+      var pairLowerBound=(pairMinimumSq===Infinity ? queryRadius : Math.sqrt(pairMinimumSq))-pairError;
+      assert(pairLowerBound>=requiredGap,
+        label+" native cubic minimum gap bound "+pairLowerBound+" mm is below requested "+input.gapMm+" mm: "+i+"/"+j);
+      minimumCertifiedGap=Math.min(minimumCertifiedGap,pairLowerBound);
     }
     var minimum=Math.sqrt(minimumSq);
     assert(minimum<=radius,"Native fixture has no measurable close contour pairs");
-    // Trừ đi cả hai cận sai số dây cung: riêng việc mesh không chồng lấn thì chưa
-    // đủ để chứng minh các đường cubic gốc không chồng lấn tại chỗ tiếp xúc khe bằng 0.
-    assert(minimum-2*CURVE_FLATNESS_MM>=Math.max(0,input.gapMm-0.001),
-      label+" native cubic minimum gap "+minimum+" mm is below requested "+input.gapMm+" mm");
-    return {minimumGapMm:minimum,flattenErrorMm:CURVE_FLATNESS_MM,
+    // Cận dây cung được trừ riêng cho từng cặp: thẳng/thẳng là 0,
+    // thẳng/cong là một cận, cong/cong là hai cận. Không nới kiểm tra vùng tô/giao cắt.
+    return {minimumGapMm:minimum,flattenErrorMm:maximumError,
+      nativePathFlattenErrorsMm:pathErrors,minimumCertifiedGapMm:minimumCertifiedGap,
       denseSegments:segments,checkedPairs:checkedPairs,noFilledOverlap:true};
   }
   function insidePolygon(p, polygon) {
@@ -559,9 +577,15 @@
         '{"flags":[true,false,null],"nested":{"closed":true}}',
     "Native JSON nested boolean types or round trip changed",
   );
-  var captured = dcDanBeJSON.parse(
-    readUtf8(root + "/tmp/dan_be_spoon_capture.json"),
+  var data = dcDanBeJSON.parse(
+    readUtf8(root + "/tmp/dan_be_variable_native_plan.json"),
   );
+  var capturePath=data.capturePath ? String(data.capturePath) : root+"/tmp/dan_be_spoon_capture.json";
+  if(!/^[A-Za-z]:[\\\/]/.test(capturePath)) capturePath=root+"/"+capturePath;
+  var captureResolved=new File(capturePath).fsName.replace(/\\/g,"/");
+  assert(captureResolved.toLowerCase().indexOf((root+"/tmp/").toLowerCase())===0,
+    "Native capture must be an owned fixture inside workspace tmp");
+  var captured = dcDanBeJSON.parse(readUtf8(captureResolved));
   assert(
     captured.input && captured.sources && captured.sources.length,
     "Missing captured variable contour",
@@ -571,8 +595,8 @@
     nodes = [],
     ni;
   assert(
-    source.kind === "PathItem" && source.closed && source.nodes.length === 7,
-    "Expected captured seven-node closed native fixture",
+    source.kind === "PathItem" && source.closed && source.nodes.length >= 3,
+    "Expected captured closed native path with at least three nodes",
   );
   function localPair(p) {
     return [(p[0] - source.bounds[0]) / MM, (p[1] - source.bounds[3]) / MM];
@@ -585,9 +609,6 @@
     });
   var sourceWidthMm = (source.bounds[2] - source.bounds[0]) / MM,
     sourceHeightMm = (source.bounds[1] - source.bounds[3]) / MM;
-  var data = dcDanBeJSON.parse(
-    readUtf8(root + "/tmp/dan_be_variable_native_plan.json"),
-  );
   input=data.input || input;
   var tag=data.tag ? String(data.tag).replace(/[^a-zA-Z0-9_-]/g,"_") : "";
   report.tag=tag;

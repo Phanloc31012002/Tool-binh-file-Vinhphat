@@ -2,6 +2,58 @@
 
 _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
+## v2.16.20 — PHÁT HÀNH SAU TEST
+
+- PHÁT HÀNH SAU TEST
+
+---
+
+## v2.16.19 — Đọc đủ đường bao ngoài của khuôn có lỗ (06/10/2026)
+
+- Sửa đọc **Group khuôn**: giữ đường bao khép kín kể cả khi nó là clipping path. Trước đây đường bao này bị bỏ qua, nên tool có thể dùng vòng tròn/lỗ bên trong làm biên dạng để dàn.
+- Đọc đường cong kín có **1–2 điểm neo** bằng đường Bézier thật, thay vì loại vì ít điểm neo. Đường kín không tạo được biên dạng được báo lỗi, không âm thầm chuyển sang dùng lỗ bên trong.
+- Dàn vẫn dùng toàn bộ biên dạng ngoài; khi nhân bản/xoay giữ nguyên Group gốc, gồm đường bao và các lỗ, màu stroke và tay nắm. Không đoán vai trò theo tên màu hay thứ tự path; giữ nguyên union của Group và lỗ even/odd của Compound Path.
+- Thêm **12 ca kiểm thử**: Group lồng, clipping path, đường ngoài thẳng/cong hai điểm neo, đảo thứ tự đường ngoài/lỗ, Compound Path và tính bất biến của nguồn. Khôi phục riêng hai điều kiện cũ trong bộ thử làm tái hiện **8 ca đọc nhầm đường ngoài 40 mm thành lỗ 14 mm**. Các bộ kiểm thử bridge/panel/hai mặt/canvas và chức năng CEP liên quan đạt.
+- Chạy **Illustrator thật** trên ba tài liệu thử riêng: Group có đường bao clipping, Group có đường ngoài cong hai điểm neo và Compound Path với lỗ đứng trước. Cả ba đều đọc đủ khuôn **92 × 56 mm**, không dùng vòng tròn lỗ 12 mm làm khuôn; qua bốn hướng xoay với nguyên màu, điểm neo/tay nắm, kích thước và độ lệch lỗ so với đường bao. Nguồn và trạng thái tài liệu người dùng không thay đổi.
+- Nạp cầu nối Dàn bế **12**, giữ lõi tìm bố cục **9**; không đổi thuật toán KTS/CTL hoặc cấu hình raster/JPG. Chỉ cập nhật local, chưa phát hành GitHub.
+
+---
+
+## v2.16.18 — Dàn bế ghép nhiều cụm khác hướng (06/10/2026)
+
+- Bổ sung tìm kiếm ghép **nhiều cụm khác hướng, khác pha và số cột** trên cùng tờ, kể cả xoay cụm ở dải dư. Khoảng tiếp xúc lấy từ biên dạng khuôn thật; không nhận diện tên hình, không đặt sẵn tọa độ hoặc số con cho mẫu.
+- Rút kinh nghiệm từ ca lưới ngang **28 con**: giữ các hàng hữu ích quanh PON thay vì bỏ cả hàng khi một con ở góc bị chặn; thử mọi điểm chuyển giữa các họ hàng. Phần cơ sở hữu hạn chạy trước tìm thêm có hạn giờ, giữ phương án đã kiểm chứng khi hết thời gian. Tìm thêm giữ cả số con lẫn biên phía trước thấp, không chỉ chọn cụm có số con lớn ngay tại bước đầu.
+- Mọi phương án ghép mới qua cả kiểm tra lưới và hình học liên tục theo đúng khe/lề/PON yêu cầu; không co khuôn, sửa điểm neo/tay nắm hay giảm khe để tăng số con. Giữ các bộ tìm cũ làm phương án cạnh tranh, giới hạn khối lượng tìm tổ hợp để không làm chậm bài hàng nghìn khuôn nhỏ.
+- Đo đọc trực tiếp hai artboard **33 × 35,4 cm** của file so sánh: khuôn **40 × 70 mm**, tool cũ **28 con/khe nhỏ nhất 5,000495 mm**; bản dàn tay **30 con/khe nhỏ nhất 4,452765 mm** (lề và PON đạt). Dựng độc lập một phương án **30 con/khe 5,001 mm**, đủ lề/PON, làm mốc hồi quy; không lấy tọa độ dàn tay thiếu khe làm đáp án.
+- Giảm quét PON lặp lại bằng phép lọc khung bao/đĩa chắc chắn rời nhau; cặp gần vẫn quét biên dạng như cũ. Lưu điểm đánh giá và cận trên số con theo cụm, bỏ việc dựng phương án trung gian chắc chắn không vào danh sách nhưng vẫn ghép tiếp cụm đó. Phương án cơ sở trước/sau tối ưu tốc độ giống từng slot; bộ hồi quy tốc độ chạy khoảng **10 giây**, dưới giới hạn **20 giây** cũ, không nới giới hạn kiểm thử.
+- **38 bộ kiểm thử tự động đạt**: mốc 30 con ở khe 5 mm qua bốn hướng xoay, hai tỷ lệ bổ sung, lặp thời gian tìm ngắn và nhiều bài chung khuôn; khe 0, đa giác bất đối xứng, hình lõm, compound có lỗ, tròn/muỗng/lá và các chức năng khác. Khuôn cong 53 × 26,51 mm ở khe 2 mm tăng từ mốc 86 lên **92 con**, vẫn canh giữa và qua kiểm tra vật lý; chỉ đổi khẳng định số con lịch sử của test thành cận dưới, giữ các chốt hình học và thời gian.
+- Chạy bản sửa trong Illustrator trên tài liệu thử riêng với khuôn gốc **40 × 70 mm**, giấy **33 × 35,4 cm**, khe **5 mm**, một/hai mặt: tìm được **31 con**, canh giữa chính xác. Đo độc lập **465 cặp mỗi mặt** từ điểm neo/tay nắm thật: khe nhỏ nhất **5,000499 mm**, né mép PON nhỏ nhất **8,521094 mm**, đủ lề, không chồng khuôn, không đổi kích thước và giữ đăng ký mặt sau. Tài liệu người dùng và trạng thái ứng dụng không thay đổi.
+- Nạp lõi Dàn bế **9**, giữ cầu nối **11**. Không đổi CTL/KTS, raster hay JPG. Đây là cải tiến tìm kiếm có kiểm chứng, không cam kết tối ưu toán học tuyệt đối cho mọi biên dạng.
+
+---
+
+## v2.16.17 — Dàn bế phục hồi khe sát giới hạn (06/10/2026)
+
+- Sửa lỗi **“Bộ kiểm tra an toàn từ chối phương án canh tâm”** ở khuôn có cạnh thẳng và đường cong: bố cục lưới đạt khe danh định, nhưng thiếu khoảng dự phòng sai số đường cong 0,0005 mm. Trước khi khép khe, mở nhẹ **vị trí đặt** và kiểm tra lại; không đổi kích thước, tỷ lệ, điểm neo hay tay nắm khuôn/bài.
+- Kẹp phép dịch khối vào giới hạn lề trước khi canh tâm, không dùng một khối vượt mép làm phương án dự phòng. Mọi vị trí nhận đều qua kiểm tra đầy đủ khe/PON/lề. Thử đủ giới hạn mở cho phép; nếu chưa phục hồi được thì tìm lại với lưới thận trọng, tối đa hai lượt, không bỏ chốt chặn.
+- Áp dụng chung theo hình học, không nhận diện riêng tên hình hoặc gắn công thức cho khuôn mẫu. Giữ sửa khe tròn v2.16.16, khe 0, luân phiên mẫu và đăng ký hai mặt.
+- Kiểm chứng **37 bộ kiểm thử tự động**. Khuôn sáu điểm **42 × 72 mm**: khe 5 mm → **27 con**, khe 1,5 mm → **28 con**; **40 × 70 mm**: lần lượt **28/32 con**. Qua cả bốn hướng xoay, hai bài chung khuôn, giới hạn phục hồi và trường hợp thực sự không đủ chỗ; giữ nguyên nguồn và kích thước.
+- Chạy Illustrator trên tài liệu thử riêng với đường bế thực **42 × 72 mm**, giấy **33 × 35,4 cm**, khe **5 mm**, một/hai mặt: **27 con**. Đo độc lập **351 cặp mỗi mặt** từ điểm neo/tay nắm gốc, khe nhỏ nhất **5,000499 mm**, không chồng khuôn, không co bài, giữ đăng ký mặt sau. Tài liệu người dùng và trạng thái ứng dụng không thay đổi.
+- Nạp lõi Dàn bế **8**, giữ cầu nối **11**. Chỉ cài local, chưa phát hành GitHub; không đổi CTL/KTS, raster hoặc JPG.
+
+---
+
+## v2.16.16 — Dàn bế khép đúng khe dương (06/10/2026)
+
+- Sửa khe nhập **1,5 mm** nhưng khuôn tròn ra **1,75 mm**, hiển thị thành **1,8 mm**: bước tìm làm tròn ra ngoài theo lưới 0,25 mm, nhưng bước khử phần đệm trước đây chỉ chạy khi khe bằng 0. Nay tinh chỉnh **vị trí đặt** cho cả khe dương, không thu nhỏ/đổi tỷ lệ khuôn hoặc bài.
+- Khép đồng đều trước, rồi tinh chỉnh từng trục để khe cùng hàng/cột và khe chéo đều được kiểm tra theo biên dạng thật. Tờ thông thường hoàn thành ba bước chính, không bỏ dở vì hết lát thời gian tìm kiếm. Đường cong dùng độ chính xác **0,00025 mm** với dự phòng sai số; không dùng đường cong thô để ép khuôn vào nhau.
+- Giữ kiểm tra hình học, lề và vùng né PON. Đĩa bao chỉ nhận nhanh các cặp chắc chắn xa nhau; cặp gần vẫn đo đường bế thật. Ca **13.440 khuôn tròn nhỏ** vẫn qua kiểm tra tốc độ hữu hạn.
+- Kiểm chứng **36 bộ kiểm thử tự động**: các khe tròn 0,7 / 1,1 / 1,5 / 1,9 mm, kích thước lẻ, nhiều bài chung khuôn, muỗng, lá, compound, khe 0, một/hai mặt và các chức năng khác.
+- Chạy trực tiếp Illustrator trên tài liệu thử riêng: tròn **50 × 50 mm**, giấy **33 × 35,4 cm**, khe **1,5 mm** → **42 con**, một/hai mặt. Đo độc lập điểm neo/tay nắm đường cong thực trên **861 cặp mỗi mặt**: khe nhỏ nhất **1,500490 mm**, không chồng khuôn; giữ nguyên kích thước, nguồn và đăng ký hai mặt. Tài liệu người dùng và trạng thái ứng dụng không thay đổi.
+- Nạp lõi Dàn bế **7**, cầu nối **11**. Chỉ cài local, chưa phát hành GitHub; không đổi CTL/KTS, raster 500 ppi hay JPG 300 ppi.
+
+---
+
 ## v2.16.15 — bản vá sửa báo lỗi, code tiếng việt
 
 - bản vá sửa báo lỗi, code tiếng việt

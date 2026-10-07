@@ -1407,7 +1407,7 @@
         "if (typeof dcDanToiUu !== 'function' || typeof dcCopyToiUuNoteToAllArtboards !== 'function' || typeof dcCopyToiUuNoteToOddArtboards !== 'function' || typeof dcDanToiUuVersion === 'undefined' || dcDanToiUuVersion < 22) { $.evalFile(" +
         jsStr(jsxPath) +
         "); } " +
-        "if (typeof dcDanBePrepare !== 'function' || typeof dcDanBeRender !== 'function' || typeof dcDanBeNestingVersion === 'undefined' || dcDanBeNestingVersion < 10) { $.evalFile(" +
+        "if (typeof dcDanBePrepare !== 'function' || typeof dcDanBeRender !== 'function' || typeof dcDanBeNestingVersion === 'undefined' || dcDanBeNestingVersion < 12) { $.evalFile(" +
         jsStr(danBeBridgePath) +
         "); } "
       );
