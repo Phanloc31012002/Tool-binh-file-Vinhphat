@@ -2,6 +2,32 @@
 
 _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
+## v2.17.1 — Dàn bế decal xếp hàng lồng theo biên dạng thật
+
+- Dàn bế decal dùng lõi mới "xếp hàng lồng": tự tìm cách lồng khuôn theo đường bế thật cho mọi hình (tròn, tim, sao, giọt nước, mũ cong, con vật…), không cần chọn kiểu dàn hay cài sẵn cho từng loại khuôn.
+- Dàn được nhiều con hơn: thử 44 dạng khuôn × khe 1 và 2 mm được 4.692 con so với 4.390 của bản cũ (+6,9%), không ca nào ít hơn; khuôn tròn 2,5 cm được 174 con, 3 cm 118 con, 4 cm 67 con.
+- Tự dịch từng hàng và dịch cả cụm qua trái/phải để né PON, rồi canh giữa tờ; khép đúng khe theo đường bế thật, không co giãn hay sửa khuôn.
+- Cùng số con thì chọn bố cục gọn, đều hàng; khuôn trong file nguồn đặt xoay hướng nào cũng ra cùng một kết quả.
+- Bộ dàn cũ vẫn chạy song song và chỉ được chọn khi nhiều con hơn; mọi phương án đều qua kiểm tra khe, lề và PON trước khi vẽ.
+- Cập nhật xong cần đóng hẳn Illustrator rồi mở lại.
+
+---
+
+## v2.17.0 — Dàn bế decal: xếp hàng lồng theo biên dạng thật (21/10/2026)
+
+- Viết mới lõi tìm bố cục **Dàn bế** cho decal nhiều hình dạng. Không nhận diện tên hình, không cài sẵn tọa độ hay số con cho mẫu nào: lõi đọc đường bế thật (điểm neo/tay nắm đã làm phẳng), dựng bảng tiếp xúc giữa bốn hướng xoay rồi tạo **mẫu hàng**: một hướng, cặp đối đầu 180°, cặp lồng sóng cùng hướng, cặp vuông góc. Các hàng chồng lồng sát nhau theo kiểu thẳng, so le, zigzag hoặc thuận/ngược (hàng xoay 180° xen kẽ).
+- **Ghép dải**: phần thân dùng kiểu hàng dày nhất, dải sát đáy/đỉnh dùng kiểu khác (ví dụ đứng + nằm) để tận dụng phần tờ còn dư; pha của dải được dò để lồng khít vào hàng bên dưới.
+- **Dịch cả cụm**: dịch từng hàng, rồi dịch nguyên dải trên/dưới qua trái/phải và chấm bằng **số con thật sau khi né PON**; sau đó dịch cả khối và canh giữa tờ. PON chặn thì giữ đúng tâm một trục và ghi rõ trong kết quả. Cuối cùng khép đúng khe bằng tiếp xúc chính xác và lấp thêm con vào chỗ trống từ bốn phía nếu còn vừa.
+- Thứ tự ưu tiên: **nhiều con nhất** → cùng số con thì chọn bố cục **gọn hơn** (ít đổi kiểu hàng, so le đều, ít con lấp lẻ, lề cân hai bên). Thử cả hàng ngang và hàng dọc tờ; với ngân sách thường của panel (3 giây) chạy thêm lượt thứ hai với khuôn xoay 180° để bù chỗ lượt đầu bỏ sót khi nhiều mẫu bằng điểm nhau.
+- Kết quả **không phụ thuộc** khuôn trong file nguồn đặt xoay hướng nào hay path bắt đầu ở điểm nào (lấy hướng chuẩn theo hình học); chạy lại cùng đầu vào cho đúng cùng vị trí. Nhiều bài chung khuôn vẫn dàn một lần, chia bài xoay vòng, chênh tối đa 1 con.
+- Bộ tìm cũ (silhouette) vẫn chạy **thi đua**, chỉ được chọn khi nhiều con hơn (ví dụ khuôn chữ L lồng ghép: **71 con**). Khuôn **khác nhau** trên cùng tờ vẫn dùng bộ cũ để cân bằng số con. Mọi phương án của lõi mới phải qua **chốt chặn hình học độc lập** (khe, lề, né PON tính từ mép chấm) trước khi trả về; không co, giãn hay sửa khuôn.
+- Đo trên **44 biên dạng × 2 khe (1 và 2 mm)** — tròn, elip, tim, giọt nước, khiên, sao, mũi tên, tam giác, hình thang, lục/bát giác, trăng khuyết, compound có lỗ, muỗng, lá, mũ cong, vòm 40 × 70, mèo, thỏ… — tờ **33 × 35,4 cm**, PON 5 mm cách mép 10 mm: tổng **4.692 con** so với **4.390** của bản cũ (**+6,9%**), nhiều hơn ở **68 ca**, bằng **20 ca**, **không ca nào ít hơn**. Trên máy thử, thời gian trung bình khoảng **3,4 giây/tờ** (bản cũ khoảng 5 giây; ca chậm nhất từ 56 giây xuống khoảng 10 giây).
+- Khuôn tròn thực tế của xưởng (khe 1 mm): 2,5 cm **174** con (khuôn xưởng 162), 3 cm **118** (114), 4 cm **67** (63), 5 cm **42** (42), 6 cm **28** (27), 7,5 cm **18** (18), 8 cm **16** (14).
+- Thêm bộ test **dan_be_rows.test.js** và thư viện biên dạng tổng quát **dan_be_shape_library.js**. Mốc canh giữa của khuôn mũ cong 1 mm: nay dàn nhiều hơn 94 con, khối dày hơn chạm vùng né PON nên cho lệch tâm có báo, vẫn kiểm tra PON thật sự chặn tâm. **41 bộ kiểm thử tự động đạt**, giữ nguyên các giới hạn thời gian cũ.
+- Nạp lõi Dàn bế **10**, giữ cầu nối **12**. Không đổi giao diện, CTL/KTS, raster hay JPG. **Chưa chạy trong Illustrator thật** ở lần cập nhật này: cần tắt hẳn Illustrator, mở lại rồi thử với file khuôn thật. Chỉ cài local, chưa phát hành GitHub.
+
+---
+
 ## v2.16.20 — PHÁT HÀNH SAU TEST
 
 - PHÁT HÀNH SAU TEST

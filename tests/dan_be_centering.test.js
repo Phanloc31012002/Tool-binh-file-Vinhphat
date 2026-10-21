@@ -333,7 +333,9 @@ function centredHelper(input, variants, plan) {
 }
 
 const began = Date.now();
-exactPublicCentre(inputFor([cap()]), 94, "Actual curved cap, 1 mm gap");
+// Lõi xếp hàng lồng (v2.17) dàn được nhiều hơn mốc 94 con cũ; khối dày hơn có thể chạm vùng né PON
+// khi canh giữa tuyệt đối. Cho phép lệch nhưng hàm kiểm tra bên trong vẫn bắt chứng minh PON thật sự chặn tâm.
+exactPublicCentre(inputFor([cap()]), 94, "Actual curved cap, 1 mm gap", true);
 exactPublicCentre(
   inputFor([cap()], standardSheet(), 2),
   86,

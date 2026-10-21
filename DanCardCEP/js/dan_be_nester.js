@@ -16,7 +16,7 @@
 })(typeof window !== "undefined" ? window : this, function () {
   "use strict";
 
-  var VERSION = 9;
+  var VERSION = 10;
 
   function now() { return new Date().getTime(); }
   function abs(v) { return v < 0 ? -v : v; }
@@ -1968,7 +1968,9 @@
     return true;
   }
 
-  function nest(input, planningPadMm) {
+  // Bộ tìm silhouette cũ (lưới raster + tìm tham lam). Vẫn dùng cho tờ có nhiều KHUÔN khác nhau
+  // (luân phiên cân bằng số con) và chạy thi đua với lõi xếp hàng để không bao giờ ít con hơn trước.
+  function nestLegacy(input, planningPadMm, searchOnly) {
     var began = now();
     try {
       if (!input || !input.sheet || !input.types || !input.types.length) throw new Error("Thiếu dữ liệu khuôn bế.");
@@ -2132,46 +2134,1548 @@
       valid = valid && balancedPlan(best, input.types.length);
       if (!valid) throw new Error("Bộ kiểm tra an toàn từ chối phương án dàn.");
 
-      var physicalRw = (Number(input.sheet.widthMm) - 2 * margin) / step;
-      var physicalRh = (Number(input.sheet.heightMm) - 2 * margin) / step;
-      best = closePhysicalGapPlan(best,variants,physicalRw,physicalRh,dots,gap,step,
-        now()+(best.length <= 400 ? 5000 : Math.min(2000,Math.max(750,budget*0.5))));
-      best = centrePhysicalPlan(best, variants, physicalRw, physicalRh, dots, gap, step);
-      if (!verifyGeometry(best, variants, physicalRw, physicalRh, dots, gap, step)) {
-        // Chỉ tìm lại khoảng trống lưới, không tăng khe đầu ra hay bỏ kiểm tra thật.
-        // Giới hạn tối đa hai lượt dự phòng; đầu vào và nguồn vẫn giữ nguyên.
-        if (gap > 0 && planningPadMm < 2*step-1e-8) return nest(input,Math.min(2*step,planningPadMm+step));
-        throw new Error("Bộ kiểm tra an toàn từ chối phương án canh tâm.");
-      }
-      var physicalBounds = physicalPlanBounds(best, variants, step);
-      var centreOffsetX = best.length ? (physicalBounds.x0 + physicalBounds.x1 - physicalRw) * step / 2 : 0;
-      var centreOffsetY = best.length ? (physicalBounds.y0 + physicalBounds.y1 - physicalRh) * step / 2 : 0;
-      var centredExactly = abs(centreOffsetX) <= 0.001 && abs(centreOffsetY) <= 0.001;
+      // Phần khép khe/canh tâm tốn thời gian nhất: khi chạy thi đua chỉ trả số con trước,
+      // phần này chỉ chạy nếu phương án cũ thắng.
+      var finishLegacy = function () {
 
-      var slots = [], i, s, vv;
-      for (i = 0; i < best.length; i++) {
-        s = best[i]; vv = variants[s.v];
-        slots.push({ mi: s.mi, vi: vv.vi, x: margin + s.x * step, y: margin + s.y * step, angle: vv.angle });
-      }
-      var counts = countTypes(best, input.types.length), countText = [], total;
-      for (i = 0; i < counts.length; i++) countText.push("loại " + (i + 1) + ": " + counts[i]);
-      total = now() - began;
-      return {
-        ok: true, slots: slots, mode: mode, count: slots.length, counts: counts,
-        centering: {exact:centredExactly,offsetXmm:centreOffsetX,offsetYmm:centreOffsetY},
-        detail: "Dàn silhouette thật: " + slots.length + " con (" + countText.join(", ") + "). " +
-          "Lưới kiểm tra " + step.toFixed(2) + " mm, khe " + gap.toFixed(2) + " mm; " +
-          "đã thử xoay/lồng biên dạng trong " + total + " ms." +
-          (centredExactly ? "" : " Canh tâm bị giới hạn bởi vùng né PON.")
+        var physicalRw = (Number(input.sheet.widthMm) - 2 * margin) / step;
+        var physicalRh = (Number(input.sheet.heightMm) - 2 * margin) / step;
+        best = closePhysicalGapPlan(best,variants,physicalRw,physicalRh,dots,gap,step,
+          now()+(best.length <= 400 ? 5000 : Math.min(2000,Math.max(750,budget*0.5))));
+        best = centrePhysicalPlan(best, variants, physicalRw, physicalRh, dots, gap, step);
+        if (!verifyGeometry(best, variants, physicalRw, physicalRh, dots, gap, step)) {
+          // Chỉ tìm lại khoảng trống lưới, không tăng khe đầu ra hay bỏ kiểm tra thật.
+          // Giới hạn tối đa hai lượt dự phòng; đầu vào và nguồn vẫn giữ nguyên.
+          if (gap > 0 && planningPadMm < 2*step-1e-8) return nestLegacy(input,Math.min(2*step,planningPadMm+step));
+          throw new Error("Bộ kiểm tra an toàn từ chối phương án canh tâm.");
+        }
+        var physicalBounds = physicalPlanBounds(best, variants, step);
+        var centreOffsetX = best.length ? (physicalBounds.x0 + physicalBounds.x1 - physicalRw) * step / 2 : 0;
+        var centreOffsetY = best.length ? (physicalBounds.y0 + physicalBounds.y1 - physicalRh) * step / 2 : 0;
+        var centredExactly = abs(centreOffsetX) <= 0.001 && abs(centreOffsetY) <= 0.001;
+
+        var slots = [], i, s, vv;
+        for (i = 0; i < best.length; i++) {
+          s = best[i]; vv = variants[s.v];
+          slots.push({ mi: s.mi, vi: vv.vi, x: margin + s.x * step, y: margin + s.y * step, angle: vv.angle });
+        }
+        var counts = countTypes(best, input.types.length), countText = [], total;
+        for (i = 0; i < counts.length; i++) countText.push("loại " + (i + 1) + ": " + counts[i]);
+        total = now() - began;
+        return {
+          ok: true, slots: slots, mode: mode, count: slots.length, counts: counts,
+          centering: {exact:centredExactly,offsetXmm:centreOffsetX,offsetYmm:centreOffsetY},
+          detail: "Dàn silhouette thật: " + slots.length + " con (" + countText.join(", ") + "). " +
+            "Lưới kiểm tra " + step.toFixed(2) + " mm, khe " + gap.toFixed(2) + " mm; " +
+            "đã thử xoay/lồng biên dạng trong " + total + " ms." +
+            (centredExactly ? "" : " Canh tâm bị giới hạn bởi vùng né PON.")
+        };
       };
+      if (searchOnly) return { ok: true, count: best.length, finish: function () {
+        try { return finishLegacy(); }
+        catch (finishError) { return { ok: false, error: finishError && finishError.message ? finishError.message : String(finishError) }; }
+      } };
+      return finishLegacy();
     } catch (err) {
       return { ok: false, error: err && err.message ? err.message : String(err) };
     }
   }
 
+  // =====================================================================
+  // LÕI XẾP HÀNG LỒNG (v10)
+  // Mọi khuôn bế được xử lý chung theo hình học, không nhận diện tên hình:
+  //  1. Đo đường bao thật của khuôn ở 4 hướng xoay, dựng "bảng tiếp xúc" bảo thủ
+  //     cho mọi cặp hướng (con B nằm trên / bên phải con A gần nhất bao nhiêu mm).
+  //  2. Lập các MẪU HÀNG: một hướng lặp đều, hoặc hai con (cùng/khác hướng) lệch
+  //     dọc dy lồng vào nhau (đối đầu 180°, so le răng cưa...). Chọn dy theo mật độ
+  //     thật khi chồng nhiều hàng.
+  //  3. Dựng KHỐI: nhiều hàng chồng sát nhau, mỗi hàng dịch trái/phải (pha) để lồng
+  //     sâu vào hàng dưới: so le đều, zigzag, hàng thuận/ngược 180° xen kẽ. Ghép khối
+  //     của mẫu khác ở dải dư phía trên (đứng + nằm...). Dịch từng hàng để thêm con.
+  //  4. Khép đúng khe bằng tiếp xúc chính xác trên đường bế thật, lấp chỗ trống,
+  //     dịch cả bố cục để né PON và canh giữa tờ.
+  //  5. Chốt kiểm tra hình học liên tục độc lập (verifyGeometry) trước khi trả kết quả.
+  // Toạ độ trong lõi này là mm trong vùng dàn (đã trừ lề), trục y hướng lên.
+  // =====================================================================
+  var RowNest = (function () {
+    var NEG = -Infinity, POS = Infinity, EXACT_TOL = 0.0004;
+
+    function pointInContour(px, py, c) {
+      var inside = false, i, j, a, b;
+      for (i = 0, j = c.length - 1; i < c.length; j = i++) {
+        a = c[i]; b = c[j];
+        if ((a[1] > py) !== (b[1] > py) && px < a[0] + (py - a[1]) * (b[0] - a[0]) / (b[1] - a[1])) inside = !inside;
+      }
+      return inside;
+    }
+
+    // Trong mỗi CompoundPath (even/odd) chỉ lấy contour không nằm trong contour nào khác:
+    // lỗ được coi như tô kín khi tìm bố cục (bảo thủ); chốt kiểm tra cuối vẫn dùng hình gốc có lỗ.
+    function outerContours(groups) {
+      var out = [], gi, ci, di, g, c, depth, px, py;
+      for (gi = 0; gi < groups.length; gi++) {
+        g = groups[gi];
+        for (ci = 0; ci < g.length; ci++) {
+          c = g[ci];
+          if (!c || c.length < 3) continue;
+          px = (c[0][0] + c[1][0]) / 2; py = (c[0][1] + c[1][1]) / 2;
+          depth = 0;
+          for (di = 0; di < g.length; di++)
+            if (di !== ci && g[di].length >= 3 && pointInContour(px, py, g[di])) depth++;
+          if (depth === 0) out.push(c);
+        }
+      }
+      return out;
+    }
+
+    function turnPoint(p, deg) {
+      if (deg === 90) return [-p[1], p[0]];
+      if (deg === 180) return [-p[0], -p[1]];
+      if (deg === 270) return [p[1], -p[0]];
+      return [p[0], p[1]];
+    }
+
+    // Một hướng xoay: chuẩn hoá về góc (0,0) của khung bao, khớp buildVariant/rotateGroups.
+    function orientShape(groups, deg) {
+      var x0 = POS, y0 = POS, x1 = NEG, y1 = NEG, gi, ci, pi, p, g, c, rotated = [];
+      for (gi = 0; gi < groups.length; gi++) for (ci = 0; ci < groups[gi].length; ci++)
+        for (pi = 0; pi < groups[gi][ci].length; pi++) {
+          p = turnPoint(groups[gi][ci][pi], deg);
+          if (p[0] < x0) x0 = p[0]; if (p[0] > x1) x1 = p[0];
+          if (p[1] < y0) y0 = p[1]; if (p[1] > y1) y1 = p[1];
+        }
+      for (gi = 0; gi < groups.length; gi++) {
+        g = [];
+        for (ci = 0; ci < groups[gi].length; ci++) {
+          c = [];
+          for (pi = 0; pi < groups[gi][ci].length; pi++) {
+            p = turnPoint(groups[gi][ci][pi], deg);
+            c.push([p[0] - x0, p[1] - y0]);
+          }
+          if (c.length >= 3) g.push(c);
+        }
+        if (g.length) rotated.push(g);
+      }
+      return { deg: deg, groups: rotated, outer: outerContours(rotated), w: x1 - x0, h: y1 - y0 };
+    }
+
+    // Gói cạnh/đỉnh (đỉnh sắp theo y) để tính tiếp xúc chính xác. swap: đổi trục cho trượt dọc.
+    function packEdges(contours, swap) {
+      var n = 0, ci, pi, c, k = 0, p, q, i;
+      for (ci = 0; ci < contours.length; ci++) n += contours[ci].length;
+      var ax = new Float64Array(n), ay = new Float64Array(n), bx = new Float64Array(n), by = new Float64Array(n);
+      var ylo = new Float64Array(n), yhi = new Float64Array(n), order = [];
+      for (ci = 0; ci < contours.length; ci++) {
+        c = contours[ci];
+        for (pi = 0; pi < c.length; pi++) {
+          p = c[pi]; q = c[(pi + 1) % c.length];
+          if (swap) { ax[k] = p[1]; ay[k] = p[0]; bx[k] = q[1]; by[k] = q[0]; }
+          else { ax[k] = p[0]; ay[k] = p[1]; bx[k] = q[0]; by[k] = q[1]; }
+          ylo[k] = Math.min(ay[k], by[k]); yhi[k] = Math.max(ay[k], by[k]);
+          order.push(k); k++;
+        }
+      }
+      order.sort(function (u, v) { return ay[u] - ay[v]; });
+      var sx = new Float64Array(n), sy = new Float64Array(n);
+      for (i = 0; i < n; i++) { sx[i] = ax[order[i]]; sy[i] = ay[order[i]]; }
+      return { n: n, ax: ax, ay: ay, bx: bx, by: by, ylo: ylo, yhi: yhi, sx: sx, sy: sy };
+    }
+
+    function lowerBound(arr, n, value) {
+      var lo = 0, hi = n, mid;
+      while (lo < hi) { mid = (lo + hi) >> 1; if (arr[mid] < value) lo = mid + 1; else hi = mid; }
+      return lo;
+    }
+
+    // Điểm xa nhất về phía dir (1 = phải, -1 = trái) trên đường ngang y = c mà còn cách
+    // đoạn (a,b) không quá g. NaN nếu đường ngang không chạm "viên nang" bán kính g quanh đoạn.
+    function lineCapsuleExtreme(ax, ay, bx, by, c, g, dir) {
+      var best = NaN, d, x, ex, ey, L2, L, base, half, lo, hi, x0, x1, sLo, sHi, lam;
+      d = c - ay;
+      if (d <= g && d >= -g) best = ax + dir * Math.sqrt(Math.max(0, g * g - d * d));
+      d = c - by;
+      if (d <= g && d >= -g) {
+        x = bx + dir * Math.sqrt(Math.max(0, g * g - d * d));
+        if (best !== best || (dir > 0 ? x > best : x < best)) best = x;
+      }
+      ex = bx - ax; ey = by - ay; L2 = ex * ex + ey * ey;
+      if (L2 > 0) {
+        if (ey === 0) {
+          if (c - ay <= g && c - ay >= -g) {
+            x = dir > 0 ? Math.max(ax, bx) : Math.min(ax, bx);
+            if (best !== best || (dir > 0 ? x > best : x < best)) best = x;
+          }
+        } else {
+          L = Math.sqrt(L2);
+          base = ax + ex * (c - ay) / ey;
+          half = g * L / Math.abs(ey);
+          lo = base - half; hi = base + half;
+          if (ex === 0) {
+            lam = (c - ay) * ey / L2;
+            if (lam < 0 || lam > 1) return best;
+            sLo = lo; sHi = hi;
+          } else {
+            x0 = ax - (c - ay) * ey / ex; x1 = x0 + L2 / ex;
+            sLo = Math.min(x0, x1); sHi = Math.max(x0, x1);
+          }
+          lo = Math.max(lo, sLo); hi = Math.min(hi, sHi);
+          if (lo <= hi) {
+            x = dir > 0 ? hi : lo;
+            if (best !== best || (dir > 0 ? x > best : x < best)) best = x;
+          }
+        }
+      }
+      return best;
+    }
+
+    // Tiếp xúc CHÍNH XÁC trên đường bế đã làm phẳng: B đặt tại (s, t) so với gốc A, trượt từ
+    // bên phải vào. Trả về s nhỏ nhất mà mọi s' >= s đều cách A ít nhất g (-Infinity: không chạm).
+    function exactRight(A, B, t, g) {
+      var best = NEG, e, lo, hi, k, x, cand;
+      for (e = 0; e < A.n; e++) {
+        lo = lowerBound(B.sy, B.n, A.ylo[e] - g - t);
+        hi = A.yhi[e] + g - t;
+        for (k = lo; k < B.n && B.sy[k] <= hi; k++) {
+          x = lineCapsuleExtreme(A.ax[e], A.ay[e], A.bx[e], A.by[e], B.sy[k] + t, g, 1);
+          if (x === x) { cand = x - B.sx[k]; if (cand > best) best = cand; }
+        }
+      }
+      for (e = 0; e < B.n; e++) {
+        lo = lowerBound(A.sy, A.n, B.ylo[e] - g + t);
+        hi = B.yhi[e] + g + t;
+        for (k = lo; k < A.n && A.sy[k] <= hi; k++) {
+          x = lineCapsuleExtreme(B.ax[e], B.ay[e], B.bx[e], B.by[e], A.sy[k] - t, g, -1);
+          if (x === x) { cand = A.sx[k] - x; if (cand > best) best = cand; }
+        }
+      }
+      return best;
+    }
+
+    // Bao theo dải (cột: đỉnh/đáy; hàng khi swap: phải/trái). Giá trị cực trị trong cả dải: bảo thủ.
+    function stripEnvelope(contours, extent, res, swap) {
+      var n = Math.max(1, Math.ceil(extent / res - 1e-9));
+      var hiArr = new Float64Array(n), loArr = new Float64Array(n), i, ci, pi, c, p, q;
+      var px, py, qx, qy, x0, x1, i0, i1, xa, xb, ya, yb, slope, tmp;
+      for (i = 0; i < n; i++) { hiArr[i] = NEG; loArr[i] = POS; }
+      for (ci = 0; ci < contours.length; ci++) {
+        c = contours[ci];
+        for (pi = 0; pi < c.length; pi++) {
+          p = c[pi]; q = c[(pi + 1) % c.length];
+          if (swap) { px = p[1]; py = p[0]; qx = q[1]; qy = q[0]; } else { px = p[0]; py = p[1]; qx = q[0]; qy = q[1]; }
+          x0 = Math.min(px, qx); x1 = Math.max(px, qx);
+          i0 = Math.floor(x0 / res); i1 = Math.floor(x1 / res);
+          if (i0 < 0) i0 = 0; if (i0 > n - 1) i0 = n - 1;
+          if (i1 < 0) i1 = 0; if (i1 > n - 1) i1 = n - 1;
+          if (i0 === i1 || !(x1 - x0 > 0)) {
+            ya = Math.min(py, qy); yb = Math.max(py, qy);
+            for (i = i0; i <= i1; i++) {
+              if (yb > hiArr[i]) hiArr[i] = yb;
+              if (ya < loArr[i]) loArr[i] = ya;
+            }
+            continue;
+          }
+          slope = (qy - py) / (qx - px);
+          for (i = i0; i <= i1; i++) {
+            xa = i === 0 ? x0 : Math.max(x0, i * res);
+            xb = i === n - 1 ? x1 : Math.min(x1, (i + 1) * res);
+            ya = py + (xa - px) * slope; yb = py + (xb - px) * slope;
+            if (ya > yb) { tmp = ya; ya = yb; yb = tmp; }
+            if (yb > hiArr[i]) hiArr[i] = yb;
+            if (ya < loArr[i]) loArr[i] = ya;
+          }
+        }
+      }
+      return { n: n, hi: hiArr, lo: loArr };
+    }
+
+    // Nở bao trên theo khe g (cận trên bảo thủ của hình ⊕ đĩa bán kính g).
+    function dilateHigh(env, res, g) {
+      var pad = Math.ceil(g / res) + 1, n = env.n, out = new Float64Array(n + 2 * pad), i, j, d, dx, v, best;
+      for (i = -pad; i < n + pad; i++) {
+        best = NEG;
+        for (j = Math.max(0, i - pad); j <= Math.min(n - 1, i + pad); j++) {
+          v = env.hi[j];
+          if (v === NEG) continue;
+          d = i > j ? i - j : j - i;
+          dx = d <= 1 ? 0 : (d - 1) * res;
+          if (dx >= g && !(g === 0 && d <= 1)) continue;
+          v += Math.sqrt(Math.max(0, g * g - dx * dx));
+          if (v > best) best = v;
+        }
+        out[i + pad] = best;
+      }
+      return { pad: pad, vals: out };
+    }
+
+    // Bảng tiếp xúc: T[k] = độ lệch tối thiểu (theo trục trượt) của B so với A khi B lệch k dải.
+    function contactTable(dilA, nA, envB) {
+      var pad = dilA.pad, vals = dilA.vals, nB = envB.n, lo = envB.lo;
+      var kLo = -pad - (nB - 1), kHi = nA + pad - 1, T = new Float64Array(kHi - kLo + 1), k, m, mLo, mHi, best, v;
+      for (k = kLo; k <= kHi; k++) {
+        best = NEG;
+        mLo = Math.max(0, -pad - k); mHi = Math.min(nB - 1, nA + pad - 1 - k);
+        for (m = mLo; m <= mHi; m++) {
+          v = vals[m + k + pad] - lo[m];
+          if (v > best) best = v;
+        }
+        T[k - kLo] = best;
+      }
+      return { kLo: kLo, kHi: kHi, T: T };
+    }
+    // Lệch không nguyên ô: lấy max hai ô kề (vẫn bảo thủ).
+    function tableAt(tab, s, res) {
+      var k = Math.floor(s / res + 1e-9), a = NEG, b = NEG;
+      if (k >= tab.kLo && k <= tab.kHi) a = tab.T[k - tab.kLo];
+      if (k + 1 >= tab.kLo && k + 1 <= tab.kHi) b = tab.T[k + 1 - tab.kLo];
+      return a > b ? a : b;
+    }
+
+    // Rút gọn contour kín (Douglas–Peucker), sai lệch Hausdorff hai chiều <= tol.
+    function simplifyClosed(c, tol) {
+      var n = c.length;
+      if (n <= 8 || !(tol > 0)) return c.slice(0);
+      var far = 0, d, i, best = -1, keep = [], stack, s, a, b, k, m, dm, dd, out = [];
+      for (i = 0; i < n; i++) keep.push(0);
+      for (i = 1; i < n; i++) {
+        d = (c[i][0] - c[0][0]) * (c[i][0] - c[0][0]) + (c[i][1] - c[0][1]) * (c[i][1] - c[0][1]);
+        if (d > best) { best = d; far = i; }
+      }
+      keep[0] = 1; keep[far] = 1;
+      function seg(p, u, v) {
+        var ex = v[0] - u[0], ey = v[1] - u[1], den = ex * ex + ey * ey;
+        var t = den ? ((p[0] - u[0]) * ex + (p[1] - u[1]) * ey) / den : 0;
+        if (t < 0) t = 0; else if (t > 1) t = 1;
+        var qx = u[0] + t * ex - p[0], qy = u[1] + t * ey - p[1];
+        return Math.sqrt(qx * qx + qy * qy);
+      }
+      stack = [[0, far], [far, n]];
+      while (stack.length) {
+        s = stack.pop(); a = s[0]; b = s[1]; m = -1; dm = tol;
+        for (k = a + 1; k < b; k++) {
+          dd = seg(c[k % n], c[a % n], c[b % n]);
+          if (dd > dm) { dm = dd; m = k; }
+        }
+        if (m >= 0) { keep[m % n] = 1; stack.push([a, m]); stack.push([m, b]); }
+      }
+      for (i = 0; i < n; i++) if (keep[i]) out.push(c[i]);
+      return out;
+    }
+
+    // Tâm chấm PON (px,py) cách hình đặt tại (ox,oy) ít nhất R và không nằm trong hình.
+    function pointClear(px, py, shape, ox, oy, R) {
+      var x = px - ox, y = py - oy, ci, c, i, a, b, ex, ey, den, t, qx, qy, R2 = R * R;
+      var dx = Math.max(-x, x - shape.w, 0), dy = Math.max(-y, y - shape.h, 0);
+      if (dx * dx + dy * dy >= R2) return true;
+      for (ci = 0; ci < shape.outer.length; ci++) if (pointInContour(x, y, shape.outer[ci])) return false;
+      for (ci = 0; ci < shape.outer.length; ci++) {
+        c = shape.outer[ci];
+        for (i = 0; i < c.length; i++) {
+          a = c[i]; b = c[(i + 1) % c.length];
+          ex = b[0] - a[0]; ey = b[1] - a[1]; den = ex * ex + ey * ey;
+          t = den ? ((x - a[0]) * ex + (y - a[1]) * ey) / den : 0;
+          if (t < 0) t = 0; else if (t > 1) t = 1;
+          qx = a[0] + t * ex - x; qy = a[1] + t * ey - y;
+          if (qx * qx + qy * qy < R2) return false;
+        }
+      }
+      return true;
+    }
+
+    function sameContourTol(a, b, tol) {
+      if (a.length !== b.length) return false;
+      var start, dir, i, j, ok;
+      for (start = 0; start < b.length; start++) {
+        if (Math.abs(a[0][0] - b[start][0]) > tol || Math.abs(a[0][1] - b[start][1]) > tol) continue;
+        for (dir = -1; dir <= 1; dir += 2) {
+          ok = true;
+          for (i = 1; i < a.length; i++) {
+            j = (start + dir * i + b.length * 2) % b.length;
+            if (Math.abs(a[i][0] - b[j][0]) > tol || Math.abs(a[i][1] - b[j][1]) > tol) { ok = false; break; }
+          }
+          if (ok) return true;
+        }
+      }
+      return false;
+    }
+    function sameOuter(A, B) {
+      if (Math.abs(A.w - B.w) > 1e-6 || Math.abs(A.h - B.h) > 1e-6 || A.outer.length !== B.outer.length) return false;
+      var used = {}, i, j, f;
+      for (i = 0; i < A.outer.length; i++) {
+        f = false;
+        for (j = 0; j < B.outer.length; j++)
+          if (!used[j] && sameContourTol(A.outer[i], B.outer[j], 1e-6)) { used[j] = true; f = true; break; }
+        if (!f) return false;
+      }
+      return true;
+    }
+
+    // Hình học dùng chung cho cả tờ đứng và tờ xoay 90°.
+    function prepareShapes(groups, g, res) {
+      var shapes = [], o, uniq = [], k, s, a, b, V = [], H = [], dup;
+      for (o = 0; o < 4; o++) shapes.push(orientShape(groups, o * 90));
+      for (o = 0; o < 4; o++) {
+        dup = -1;
+        for (k = 0; k < uniq.length; k++) if (sameOuter(shapes[o], shapes[uniq[k]])) { dup = uniq[k]; break; }
+        shapes[o].same = dup < 0 ? o : dup;
+        if (dup < 0) uniq.push(o);
+      }
+      for (o = 0; o < 4; o++) {
+        s = shapes[o];
+        // Tiếp xúc chính xác dùng contour rút gọn (lệch tối đa EXACT_TOL); khe khép cộng 2 lần độ lệch đó
+        // nên khoảng cách trên đường bế gốc vẫn >= khe yêu cầu, chỉ dư tối đa 0,001 mm.
+        var reduced = [];
+        for (k = 0; k < s.outer.length; k++) reduced.push(simplifyClosed(s.outer[k], EXACT_TOL));
+        s.E = packEdges(reduced, false);
+        s.Et = packEdges(reduced, true);
+        s.col = stripEnvelope(s.outer, s.w, res, false);
+        s.row = stripEnvelope(s.outer, s.h, res, true);
+        s.colDil = dilateHigh(s.col, res, g);
+        s.rowDil = dilateHigh(s.row, res, g);
+        // Hình rút gọn cho phép thử PON nhanh; bán kính né cộng thêm sai lệch rút gọn (bảo thủ).
+        s.ponTol = 0.004;
+        s.pon = { w: s.w, h: s.h, outer: [] };
+        for (k = 0; k < s.outer.length; k++) s.pon.outer.push(simplifyClosed(s.outer[k], s.ponTol));
+      }
+      for (a = 0; a < 4; a++) {
+        V.push([]); H.push([]);
+        for (b = 0; b < 4; b++) {
+          V[a].push(contactTable(shapes[a].colDil, shapes[a].col.n, shapes[b].col));
+          H[a].push(contactTable(shapes[a].rowDil, shapes[a].row.n, shapes[b].row));
+        }
+      }
+      return { shapes: shapes, uniq: uniq, V: V, H: H, g: g, res: res };
+    }
+
+    function Ctx(prep, W, Hh, dots, deadline) {
+      this.p = prep; this.s = prep.shapes; this.W = W; this.H = Hh; this.dots = dots;
+      this.res = prep.res; this.g = prep.g; this.gExact = prep.g + 2 * EXACT_TOL; this.deadline = deadline; this.cache = {};
+      this.rowCache = {}; this.rowCacheSize = 0;
+    }
+    Ctx.prototype.vAt = function (a, b, dx) { return tableAt(this.p.V[a][b], dx, this.res); };
+    Ctx.prototype.hAt = function (a, b, dy) { return tableAt(this.p.H[a][b], dy, this.res); };
+    Ctx.prototype.exactH = function (a, b, t) {
+      var key = "h" + a + b + ":" + Math.round(t * 1e7), c = this.cache[key];
+      if (c === undefined) { c = exactRight(this.s[a].E, this.s[b].E, t, this.gExact); this.cache[key] = c; }
+      return c;
+    };
+    Ctx.prototype.exactV = function (a, b, s) {
+      var key = "v" + a + b + ":" + Math.round(s * 1e7), c = this.cache[key];
+      if (c === undefined) { c = exactRight(this.s[a].Et, this.s[b].Et, s, this.gExact); this.cache[key] = c; }
+      return c;
+    };
+    Ctx.prototype.ponSafe = function (o, x, y) {
+      var i, d, sh = this.s[o];
+      for (i = 0; i < this.dots.length; i++) {
+        d = this.dots[i];
+        if (!pointClear(d.x, d.y, sh.pon, x, y, d.R + sh.ponTol)) return false;
+      }
+      return true;
+    };
+    Ctx.prototype.late = function () { return now() > this.deadline; };
+
+    // ---------- Mẫu hàng ----------
+    // Vị trí các con của một hàng (mẫu T, pha cho trước) — dùng lại rất nhiều lần nên giữ trong bộ nhớ đệm
+    // của tờ đang xét (kết quả chỉ được đọc, không sửa).
+    var rowUid = 0;
+    function rowPositions(ctx, T, phase) {
+      if (!T.uid) T.uid = ++rowUid;
+      var key = T.uid + "|" + phase, hit = ctx.rowCache[key];
+      if (hit) return hit;
+      if (ctx.rowCacheSize > 40000) { ctx.rowCache = {}; ctx.rowCacheSize = 0; }
+      hit = rowPositionsRaw(ctx, T, phase);
+      ctx.rowCache[key] = hit; ctx.rowCacheSize++;
+      return hit;
+    }
+    function rowPositionsRaw(ctx, T, phase) {
+      var out = [], i, e, k0, k1, k, x, w;
+      for (i = 0; i < T.el.length; i++) {
+        e = T.el[i]; w = ctx.s[e.o].w;
+        k0 = Math.ceil((-phase - e.x) / T.P - 1e-7);
+        k1 = Math.floor((ctx.W - w - phase - e.x + 1e-6) / T.P + 1e-9);
+        for (k = k0; k <= k1; k++) {
+          x = phase + e.x + k * T.P;
+          if (x < -1e-6 || x + w > ctx.W + 1e-6) continue;
+          out.push({ o: e.o, x: x, ey: e.y, h: ctx.s[e.o].h, w: w });
+        }
+      }
+      out.sort(function (a, b) { return a.x - b.x; });
+      return out;
+    }
+
+    // Baseline nhỏ nhất của hàng mới (vị trí qs) để không chạm mọi hàng đã đặt bên dưới.
+    function rowOffset(ctx, rows, qs, exact) {
+      var Y = NEG, r, row, maxTop = NEG, i, j, p, q, v, lo, g = ctx.g, topUpTo = [];
+      for (r = 0; r < rows.length; r++) { maxTop = Math.max(maxTop, rows[r].top); topUpTo.push(maxTop); }
+      for (r = rows.length - 1; r >= 0; r--) {
+        if (Y !== NEG && topUpTo[r] + g + 1e-9 <= Y) break;
+        row = rows[r]; lo = 0;
+        for (j = 0; j < qs.length; j++) {
+          q = qs[j];
+          while (lo < row.pieces.length && row.pieces[lo].x + row.pieces[lo].w + g + 1e-9 < q.x) lo++;
+          for (i = lo; i < row.pieces.length; i++) {
+            p = row.pieces[i];
+            if (p.x > q.x + q.w + g + 1e-9) break;
+            v = exact ? ctx.exactV(p.o, q.o, q.x - p.x) : ctx.vAt(p.o, q.o, q.x - p.x);
+            if (v === NEG) continue;
+            v = p.y + v - q.ey;
+            if (v > Y) Y = v;
+          }
+        }
+      }
+      return Y;
+    }
+
+    // Chênh baseline nhỏ nhất giữa hàng dưới mẫu T và hàng trên mẫu U lệch s (cùng chu kỳ).
+    function periodicOffset(ctx, T, U, s) {
+      var best = NEG, i, j, m, ei, ej, dx, v, reach, base, PP = Math.max(T.P, U.P), mLo, mHi;
+      for (i = 0; i < T.el.length; i++) for (j = 0; j < U.el.length; j++) {
+        ei = T.el[i]; ej = U.el[j];
+        reach = ctx.s[ei.o].w + ctx.s[ej.o].w + 2 * ctx.g + 2 * ctx.res;
+        base = ej.x + s - ei.x;
+        mLo = Math.ceil((-reach - base) / PP); mHi = Math.floor((reach - base) / PP);
+        for (m = mLo; m <= mHi; m++) {
+          dx = base + m * PP;
+          v = ctx.vAt(ei.o, ej.o, dx);
+          if (v === NEG) continue;
+          v += ei.y - ej.y;
+          if (v > best) best = v;
+        }
+      }
+      return best;
+    }
+
+    // Mật độ khi chồng lặp chính mẫu này (so le tối ưu), độ dư ngang, các độ so le nên thử.
+    function analyseTemplate(ctx, T) {
+      var N = 96, k, s, v, v2, list = [], shifts = [], q, dup, dd;
+      for (k = 0; k < N; k++) {
+        s = T.P * k / N;
+        v = periodicOffset(ctx, T, T, s);
+        v2 = periodicOffset(ctx, T, T, 2 * s);
+        if (v2 !== NEG) v = Math.max(v, v2 / 2);
+        list.push({ s: s, v: v });
+      }
+      list.sort(function (a, b) { return a.v - b.v; });
+      for (k = 0; k < list.length && shifts.length < 3; k++) {
+        dup = false;
+        for (q = 0; q < shifts.length; q++) {
+          dd = Math.abs(shifts[q].s - list[k].s); dd = Math.min(dd, T.P - dd);
+          if (dd < T.P / 12) dup = true;
+        }
+        if (!dup) shifts.push(list[k]);
+      }
+      var qs0 = rowPositions(ctx, T, 0), ext = 0, keep = null, perRow = 0;
+      for (k = 0; k < qs0.length; k++) ext = Math.max(ext, qs0[k].x + qs0[k].w);
+      T.slack = qs0.length ? Math.max(0, ctx.W - ext) : 0;
+      // Lệch tốt nhất mà vẫn giữ đủ số con của hàng (nằm trong độ dư ngang).
+      for (k = 0; k < list.length; k++) {
+        dd = Math.min(list[k].s, T.P - list[k].s);
+        if (dd <= T.slack + 1e-9) { keep = list[k]; break; }
+      }
+      if (keep) {
+        dup = false;
+        for (q = 0; q < shifts.length; q++) if (Math.abs(shifts[q].s - keep.s) < 1e-9) dup = true;
+        if (!dup) shifts.push(keep);
+      }
+      T.shifts = shifts;
+      T.stack = Math.max(list[0].v, 1e-6);
+      T.perRow = qs0.length;
+      T.density = T.perRow / T.stack;
+    }
+
+    function pairTemplate(ctx, a, b, dy) {
+      var s = ctx.s, d, back, Paa, Pbb, P, xb, y0, ea, eb, height;
+      if (a === b && Math.abs(dy) < 1e-9) return null;
+      d = ctx.hAt(a, b, dy); back = ctx.hAt(b, a, -dy);
+      Paa = ctx.hAt(a, a, 0); Pbb = ctx.hAt(b, b, 0);
+      if (d === NEG) d = 0;
+      if (back === NEG) back = 0;
+      P = Math.max(d + back, Paa, Pbb);
+      if (!(P > 0)) return null;
+      // Chu kỳ bị giới hạn bởi con cùng hướng: đặt con thứ hai giữa khoảng còn trống cho đều.
+      xb = d + (P - d - back) / 2;
+      y0 = Math.min(0, dy);
+      ea = { o: a, x: 0, y: -y0 }; eb = { o: b, x: xb, y: dy - y0 };
+      height = Math.max(ea.y + s[a].h, eb.y + s[b].h);
+      if (height > ctx.H + 1e-9) return null;
+      return { kind: 2, el: [ea, eb], P: P, dy: dy, height: height, key: "p" + a + b + ":" + dy.toFixed(2) };
+    }
+
+    // Mẫu xoay 180° (cùng chu kỳ): dùng cho khối hàng thuận/ngược xen kẽ.
+    function rotateTemplate(ctx, T) {
+      if (T.rot !== undefined) return T.rot;
+      var el = [], i, e, minX = POS, minY = POS, same, sx;
+      for (i = 0; i < T.el.length; i++) {
+        e = T.el[i];
+        el.push({ o: ctx.s[(e.o + 2) % 4].same, x: -(e.x + ctx.s[e.o].w), y: -(e.y + ctx.s[e.o].h) });
+      }
+      for (i = 0; i < el.length; i++) { minX = Math.min(minX, el[i].x); minY = Math.min(minY, el[i].y); }
+      for (i = 0; i < el.length; i++) { el[i].x -= minX; el[i].y -= minY; }
+      el.sort(function (a, b) { return a.x - b.x; });
+      sx = el[0].x;
+      for (i = 0; i < el.length; i++) el[i].x -= sx;
+      same = el.length === T.el.length;
+      for (i = 0; same && i < el.length; i++)
+        if (el[i].o !== T.el[i].o || Math.abs(el[i].x - T.el[i].x) > 1e-9 || Math.abs(el[i].y - T.el[i].y) > 1e-9) same = false;
+      if (same) { T.rot = null; return null; }
+      var U = { kind: T.kind, el: el, P: T.P, height: T.height, key: T.key + "r", rot: T };
+      analyseTemplate(ctx, U);
+      T.rot = U;
+      return U;
+    }
+
+    function makeTemplates(ctx, pairSamples) {
+      var s = ctx.s, uniq = ctx.p.uniq, out = [], i, j, a, b, k, t, q, P;
+      for (i = 0; i < uniq.length; i++) {
+        a = uniq[i];
+        P = ctx.hAt(a, a, 0);
+        if (!(P > 0) || s[a].w > ctx.W + 1e-9 || s[a].h > ctx.H + 1e-9) continue;
+        var T1 = { kind: 1, el: [{ o: a, x: 0, y: 0 }], P: P, height: s[a].h, key: "s" + a };
+        analyseTemplate(ctx, T1);
+        if (T1.perRow > 0) out.push(T1);
+      }
+      if (!pairSamples) return out;
+      for (i = 0; i < uniq.length; i++) for (j = i; j < uniq.length; j++) {
+        a = uniq[i]; b = uniq[j];
+        if (s[a].h > ctx.H || s[b].h > ctx.H || s[a].w > ctx.W || s[b].w > ctx.W) continue;
+        var lo = -s[b].h, hi = s[a].h, N = pairSamples, step = (hi - lo) / N;
+        var dys = [0, s[a].h - s[b].h, (s[a].h - s[b].h) / 2], cands = [], refined = [], kept = [], T2, T3, c0, dup;
+        for (k = 0; k <= N; k++) dys.push(lo + step * k);
+        for (k = 0; k < dys.length; k++) {
+          T2 = pairTemplate(ctx, a, b, dys[k]);
+          if (!T2) continue;
+          analyseTemplate(ctx, T2);
+          if (T2.perRow > 0) cands.push(T2);
+        }
+        cands.sort(function (u, v) { return v.density - u.density; });
+        for (k = 0; k < Math.min(3, cands.length); k++) {
+          c0 = cands[k];
+          for (t = -4; t <= 4; t++) {
+            if (!t) continue;
+            T3 = pairTemplate(ctx, a, b, c0.dy + t * step / 4);
+            if (!T3) continue;
+            analyseTemplate(ctx, T3);
+            if (T3.perRow > 0) refined.push(T3);
+          }
+        }
+        cands = cands.concat(refined);
+        cands.sort(function (u, v) { return v.density - u.density; });
+        for (k = 0; k < cands.length && kept.length < 3; k++) {
+          dup = false;
+          for (q = 0; q < kept.length; q++) if (Math.abs(kept[q].dy - cands[k].dy) < Math.max(0.5, step / 2)) dup = true;
+          if (!dup) kept.push(cands[k]);
+        }
+        for (k = 0; k < kept.length; k++) out.push(kept[k]);
+      }
+      out.sort(function (u, v) { return v.density - u.density; });
+      return out;
+    }
+
+    // Mọi mẫu đơn + mẫu cặp: mỗi cặp hướng tối đa 2 mẫu dày hơn mẫu đơn; riêng cặp đối đầu 180°
+    // luôn giữ một mẫu dù chỉ ngang mật độ (hai đầu hàng cùng quay phần bo/vát ra ngoài, dễ né PON).
+    function pickTemplates(T, cap) {
+      var singles = [], pairs = [], extra = [], i, t, a, b, key, ref, bestSingle = {}, used = {}, opp = {}, out;
+      for (i = 0; i < T.length; i++) if (T[i].kind === 1) { singles.push(T[i]); bestSingle[T[i].el[0].o] = T[i].density; }
+      for (i = 0; i < T.length; i++) {
+        t = T[i];
+        if (t.kind !== 2) continue;
+        a = t.el[0].o; b = t.el[1].o; key = Math.min(a, b) + "-" + Math.max(a, b);
+        ref = Math.max(bestSingle[a] || 0, bestSingle[b] || 0);
+        if (t.density > ref * 1.002) {
+          if ((used[key] || 0) >= 2) continue;
+          used[key] = (used[key] || 0) + 1;
+          pairs.push(t);
+        } else if (a !== b && (a + 2) % 4 === b % 4 && !opp[key] && t.density >= ref * 0.97) {
+          opp[key] = 1;
+          extra.push(t);
+        }
+      }
+      out = singles.concat(pairs.slice(0, Math.max(2, cap - singles.length)), extra.slice(0, 2));
+      out.sort(function (u, v) { return v.density - u.density; });
+      return out;
+    }
+
+    // ---------- Khối hàng ----------
+    function makeRow(ctx, rows, T, phase, exact) {
+      var qs = rowPositions(ctx, T, phase), Y, pieces = [], top = NEG, i, q, y;
+      if (!qs.length) return null;
+      Y = rows.length ? rowOffset(ctx, rows, qs, exact) : 0;
+      if (Y === NEG || Y < 0) Y = 0;
+      for (i = 0; i < qs.length; i++) {
+        q = qs[i]; y = Y + q.ey;
+        if (y + q.h > ctx.H + 1e-6) continue;
+        pieces.push({ o: q.o, x: q.x, y: y, w: q.w, h: q.h });
+        if (y + q.h > top) top = y + q.h;
+      }
+      if (!pieces.length) return null;
+      return { T: T, phase: phase, Y: Y, pieces: pieces, top: top, n: pieces.length };
+    }
+
+    // Hàng chẵn mẫu T, hàng lẻ mẫu U (nếu có). Pha hàng sau = pha hàng trước + s (U: s rồi s2),
+    // hoặc zigzag (lệch s rồi trả về). Không xét PON ở đây.
+    function buildBlock(ctx, T, phi0, s, zigzag, below, maxRows, U, s2) {
+      var rows = below ? below.slice(0) : [], r, phase = phi0, Tr, row;
+      for (r = 0; r < (maxRows || 1000); r++) {
+        Tr = U && r % 2 ? U : T;
+        if (r > 0) {
+          if (U) phase += r % 2 ? s : (s2 === undefined ? s : s2);
+          else phase = zigzag ? phi0 + (r % 2) * s : phi0 + r * s;
+        }
+        phase = ((phase % Tr.P) + Tr.P) % Tr.P;
+        row = makeRow(ctx, rows, Tr, phase, false);
+        if (!row) break;
+        rows.push(row);
+      }
+      return rows;
+    }
+
+    function layoutStats(rows) {
+      var n = 0, top = 0, i;
+      for (i = 0; i < rows.length; i++) { n += rows[i].pieces.length; top = Math.max(top, rows[i].top); }
+      return { n: n, top: top };
+    }
+
+    function flatten(rows) {
+      var out = [], i, j;
+      for (i = 0; i < rows.length; i++) for (j = 0; j < rows[i].pieces.length; j++) {
+        rows[i].pieces[j].row = i;
+        out.push(rows[i].pieces[j]);
+      }
+      return out;
+    }
+
+    function shiftOptions(ctx, T, U) {
+      var N = 96, k, s, v, best = null, keep = null, slack = Math.min(T.slack || 0, U.slack || 0), out = [];
+      for (k = 0; k < N; k++) {
+        s = T.P * k / N;
+        v = periodicOffset(ctx, T, U, s);
+        if (!best || v < best.v) best = { s: s, v: v };
+        if (Math.min(s, T.P - s) <= slack + 1e-9 && (!keep || v < keep.v)) keep = { s: s, v: v };
+      }
+      out.push(best ? best.s : 0);
+      if (keep && Math.abs(keep.s - out[0]) > 1e-9) out.push(keep.s);
+      if (out.indexOf(0) < 0) out.push(0);
+      return out;
+    }
+
+    // Pha để hàng của mẫu T nằm giữa khoảng [a, b] (mặc định cả bề rộng tờ).
+    function centredPhase(ctx, T, a, b) {
+      var qs = rowPositions(ctx, T, 0), x0 = POS, x1 = NEG, i;
+      if (a === undefined) { a = 0; b = ctx.W; }
+      for (i = 0; i < qs.length; i++) { x0 = Math.min(x0, qs[i].x); x1 = Math.max(x1, qs[i].x + qs[i].w); }
+      if (!qs.length) return 0;
+      return (((a + b) / 2 - (x0 + x1) / 2) % T.P + T.P) % T.P;
+    }
+
+    function searchBlocks(ctx, templates, nPhi) {
+      var cands = [], ti, T, si, z, pi, list, rows, st, U, ups, downs, ua, da, phi;
+      function push(rowsIn, desc, gen) {
+        var st0 = layoutStats(rowsIn);
+        if (st0.n) cands.push({ rows: rowsIn, n: st0.n, top: st0.top, desc: desc, gen: gen });
+      }
+      for (ti = 0; ti < templates.length && !ctx.late(); ti++) {
+        T = templates[ti];
+        list = [0];
+        for (si = 0; si < T.shifts.length; si++) list.push(T.shifts[si].s);
+        for (si = 0; si < list.length; si++) for (z = 0; z < 2; z++) {
+          if (z === 1 && (list[si] === 0 || Math.abs(list[si] * 2 - T.P) < 1e-6)) continue;
+          for (pi = 0; pi <= nPhi; pi++) {
+            phi = pi < nPhi ? T.P * pi / nPhi : centredPhase(ctx, T);
+            push(buildBlock(ctx, T, phi, list[si], z === 1, null, 0), T.key + (z ? " zigzag" : " so le"),
+              { T: T, s: list[si], z: z === 1, U: null });
+          }
+        }
+        U = rotateTemplate(ctx, T);
+        if (!U) continue;
+        ups = shiftOptions(ctx, T, U); downs = shiftOptions(ctx, U, T);
+        for (ua = 0; ua < ups.length; ua++) for (da = 0; da < downs.length; da++)
+          for (pi = 0; pi < nPhi; pi++) {
+            push(buildBlock(ctx, T, T.P * pi / nPhi, ups[ua], false, null, 0, U, downs[da]), T.key + " thuận/ngược",
+              { T: T, s: ups[ua], z: false, U: U, s2: downs[da] });
+            push(buildBlock(ctx, U, U.P * pi / nPhi, downs[da], false, null, 0, T, ups[ua]), U.key + " thuận/ngược",
+              { T: U, s: downs[da], z: false, U: T, s2: ups[ua] });
+          }
+      }
+      return cands;
+    }
+
+    // Pha cho dải đặt lên trên: dò riêng hàng đầu của dải (12 pha + tinh chỉnh), giữ pha cho hàng đầu thấp nhất
+    // (lồng sát hàng dưới nhất) và pha nhiều con nhất, tinh chỉnh quanh đó; thêm pha canh giữa tờ và
+    // canh theo hàng dưới cho bố cục cân đối. Dải lồng khớp hay không quyết định cả dải vừa thêm hàng.
+    function bandPhases(ctx, below, T2, lx0, lx1) {
+      var list = [], k, ph, row, out = [], P = T2.P, i, j, dup, cand, best;
+      function probe(phv) {
+        phv = ((phv % P) + P) % P;
+        row = makeRow(ctx, below, T2, phv, false);
+        if (row) list.push({ ph: phv, top: row.top, n: row.n });
+      }
+      for (k = 0; k < 12; k++) probe(P * k / 12);
+      list.sort(function (a, b) { return a.top - b.top || b.n - a.n; });
+      best = list.slice(0, 2);
+      for (i = 0; i < best.length; i++) for (k = -2; k <= 2; k++) if (k) probe(best[i].ph + k * P / 48);
+      list.sort(function (a, b) { return a.top - b.top || b.n - a.n; });
+      cand = list.slice(0, 2).map(function (e) { return e.ph; });
+      list.sort(function (a, b) { return b.n - a.n || a.top - b.top; });
+      if (list.length) cand.push(list[0].ph);
+      cand.push(centredPhase(ctx, T2), centredPhase(ctx, T2, lx0, lx1));
+      for (i = 0; i < cand.length; i++) {
+        dup = false;
+        for (j = 0; j < out.length; j++) if (Math.abs(out[j] - cand[i]) < 1e-6) dup = true;
+        if (!dup) out.push(cand[i]);
+      }
+      return out;
+    }
+
+    // Dựng lại từ hàng r với pha mới; các hàng trên giữ mẫu/pha, hạ sát xuống; hàng tràn thì bỏ.
+    function rebuildFrom(ctx, rows, r, phase) {
+      var out = rows.slice(0, r), i, row;
+      for (i = r; i < rows.length; i++) {
+        row = makeRow(ctx, out, rows[i].T, i === r ? phase : rows[i].phase, false);
+        if (row) out.push(row);
+      }
+      return out;
+    }
+
+    // Thêm hàng lên phần còn trống phía trên (mẫu bất kỳ) tới khi không vừa nữa.
+    function appendRows(ctx, rows, templates, nPhi) {
+      var out = rows.slice(0), guard = 0, best, ti, pi, T, add;
+      while (guard++ < 60) {
+        best = null;
+        for (ti = 0; ti < templates.length; ti++) {
+          T = templates[ti];
+          for (pi = 0; pi < nPhi; pi++) {
+            add = makeRow(ctx, out, T, T.P * pi / nPhi, false);
+            if (add && (!best || add.n > best.n || (add.n === best.n && add.top < best.top))) best = add;
+          }
+        }
+        if (!best) break;
+        out.push(best);
+      }
+      return out;
+    }
+
+    // "Di chuyển cả cụm qua trái/phải": dịch từng hàng (giữ mẫu) để các hàng trên hạ thấp hơn
+    // hoặc thêm được con, rồi dùng phần đỉnh vừa dư để thêm hàng.
+    function optimiseRowPhases(ctx, rows, templates) {
+      var best = rows, bs = layoutStats(rows), pass, r, k, T, cand, ph, trial, ts, improved, grown, gs;
+      for (pass = 0; pass < 2; pass++) {
+        improved = false;
+        for (r = 0; r < best.length && !ctx.late(); r++) {
+          T = best[r].T; cand = [];
+          for (k = 0; k < 24; k++) cand.push(T.P * k / 24);
+          for (k = 0; r > 0 && k < (T.shifts || []).length; k++) {
+            cand.push(best[r - 1].phase + T.shifts[k].s);
+            cand.push(best[r - 1].phase - T.shifts[k].s);
+          }
+          for (k = 0; k < cand.length; k++) {
+            ph = ((cand[k] % T.P) + T.P) % T.P;
+            if (Math.abs(ph - best[r].phase) < 1e-6) continue;
+            trial = rebuildFrom(ctx, best, r, ph);
+            ts = layoutStats(trial);
+            if (ts.n > bs.n || (ts.n === bs.n && ts.top < bs.top - 0.05)) { best = trial; bs = ts; improved = true; }
+          }
+        }
+        if (!improved) break;
+      }
+      grown = appendRows(ctx, best, templates, 8); gs = layoutStats(grown);
+      return gs.n > bs.n ? grown : best;
+    }
+
+    // ---------- Né PON + canh giữa ----------
+    // Tìm phép dịch cả bố cục (trong phần dư) né PON nhiều con nhất, rồi gần tâm tờ nhất.
+    function optimiseShift(ctx, pieces) {
+      var x0 = POS, y0 = POS, x1 = NEG, y1 = NEG, i, j, p, d, ex, ey, risky = [], dxLo, dxHi, dyLo, dyHi, cx, cy;
+      for (i = 0; i < pieces.length; i++) {
+        p = pieces[i];
+        x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y); x1 = Math.max(x1, p.x + p.w); y1 = Math.max(y1, p.y + p.h);
+      }
+      dxLo = -x0; dxHi = ctx.W - x1; dyLo = -y0; dyHi = ctx.H - y1;
+      if (dxHi < dxLo) dxHi = dxLo;
+      if (dyHi < dyLo) dyHi = dyLo;
+      cx = (dxLo + dxHi) / 2; cy = (dyLo + dyHi) / 2;
+      for (i = 0; i < pieces.length; i++) {
+        p = pieces[i];
+        for (j = 0; j < ctx.dots.length; j++) {
+          d = ctx.dots[j];
+          ex = Math.max(p.x + dxLo - d.x, d.x - (p.x + p.w + dxHi), 0);
+          ey = Math.max(p.y + dyLo - d.y, d.y - (p.y + p.h + dyHi), 0);
+          if (ex * ex + ey * ey < d.R * d.R + 1) { risky.push(p); break; }
+        }
+      }
+      function blocked(dx, dy) {
+        var b = 0, k;
+        for (k = 0; k < risky.length; k++) if (!ctx.ponSafe(risky[k].o, risky[k].x + dx, risky[k].y + dy)) b++;
+        return b;
+      }
+      var bc = blocked(cx, cy);
+      if (!bc || !risky.length) return { dx: cx, dy: cy, blocked: bc };
+      var best = null, a, c, dx, dy, bb, dist, top = [];
+      function tryAt(tx, ty) {
+        if (tx < dxLo - 1e-9 || tx > dxHi + 1e-9 || ty < dyLo - 1e-9 || ty > dyHi + 1e-9) return;
+        bb = blocked(tx, ty);
+        dist = (tx - cx) * (tx - cx) + (ty - cy) * (ty - cy);
+        var cand = { dx: tx, dy: ty, b: bb, dist: dist };
+        if (!best || bb < best.b || (bb === best.b && dist < best.dist)) best = cand;
+        top.push(cand);
+      }
+      // Lưới thô theo độ dư (bước <= ~1 mm), thêm hai đường qua tâm, rồi lưới mịn quanh các điểm tốt.
+      var nx = Math.max(1, Math.min(40, Math.ceil(dxHi - dxLo))), ny = Math.max(1, Math.min(40, Math.ceil(dyHi - dyLo)));
+      for (a = 0; a <= nx; a++) for (c = 0; c <= ny; c++) tryAt(dxLo + (dxHi - dxLo) * a / nx, dyLo + (dyHi - dyLo) * c / ny);
+      for (a = 0; a <= 4 * nx; a++) tryAt(dxLo + (dxHi - dxLo) * a / (4 * nx), cy);
+      for (c = 0; c <= 4 * ny; c++) tryAt(cx, dyLo + (dyHi - dyLo) * c / (4 * ny));
+      top.sort(function (u, v) { return u.b - v.b || u.dist - v.dist; });
+      var seeds = top.slice(0, 6), si, hx = (dxHi - dxLo) / nx, hy = (dyHi - dyLo) / ny;
+      for (si = 0; si < seeds.length; si++)
+        for (a = -3; a <= 3; a++) for (c = -3; c <= 3; c++) tryAt(seeds[si].dx + a * hx / 3, seeds[si].dy + c * hy / 3);
+      if (bc <= best.b) return { dx: cx, dy: cy, blocked: bc };
+      // Tiến dần về tâm từ phương án tốt nhất mà không thêm con bị chặn.
+      var lo = 0, hi = 1, mid, it, bx = best.dx, by = best.dy, tx, ty;
+      for (it = 0; it < 24; it++) {
+        mid = (lo + hi) / 2; tx = bx + (cx - bx) * mid; ty = by + (cy - by) * mid;
+        if (blocked(tx, ty) <= best.b) { lo = mid; best.dx = tx; best.dy = ty; } else hi = mid;
+      }
+      return { dx: best.dx, dy: best.dy, blocked: best.b };
+    }
+
+    // Số con chạm PON khi canh giữa nguyên bố cục (dùng để xếp hạng nhanh).
+    function centreBlocked(ctx, pieces) {
+      var x0 = POS, y0 = POS, x1 = NEG, y1 = NEG, i, p, dx, dy, b = 0, j, d, ex, ey, near;
+      for (i = 0; i < pieces.length; i++) {
+        p = pieces[i];
+        x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y); x1 = Math.max(x1, p.x + p.w); y1 = Math.max(y1, p.y + p.h);
+      }
+      dx = (ctx.W - x1 - x0) / 2; dy = (ctx.H - y1 - y0) / 2;
+      for (i = 0; i < pieces.length; i++) {
+        p = pieces[i]; near = false;
+        for (j = 0; j < ctx.dots.length; j++) {
+          d = ctx.dots[j];
+          ex = Math.max(p.x + dx - d.x, d.x - (p.x + p.w + dx), 0);
+          ey = Math.max(p.y + dy - d.y, d.y - (p.y + p.h + dy), 0);
+          if (ex * ex + ey * ey < d.R * d.R) { near = true; break; }
+        }
+        if (near && !ctx.ponSafe(p.o, p.x + dx, p.y + dy)) b++;
+      }
+      return b;
+    }
+
+    // Sau khi bỏ các con không né được PON: canh giữa đúng khung các con còn lại nếu PON cho phép.
+    // Bị PON chặn thì giữ đúng tâm ít nhất một trục, trục còn lại lệch ít nhất có thể.
+    function centreKept(ctx, kept, dx, dy) {
+      var x0 = POS, y0 = POS, x1 = NEG, y1 = NEG, i, p, tx, ty;
+      for (i = 0; i < kept.length; i++) {
+        p = kept[i];
+        x0 = Math.min(x0, p.x + dx); y0 = Math.min(y0, p.y + dy);
+        x1 = Math.max(x1, p.x + p.w + dx); y1 = Math.max(y1, p.y + p.h + dy);
+      }
+      tx = (ctx.W - x1 - x0) / 2; ty = (ctx.H - y1 - y0) / 2;
+      var sxLo = -x0, sxHi = ctx.W - x1, syLo = -y0, syHi = ctx.H - y1;
+      function safe(sx, sy) {
+        for (var k = 0; k < kept.length; k++) {
+          var q = kept[k], qx = q.x + dx + sx, qy = q.y + dy + sy;
+          if (qx < -1e-6 || qy < -1e-6 || qx + q.w > ctx.W + 1e-6 || qy + q.h > ctx.H + 1e-6) return false;
+          if (!ctx.ponSafe(q.o, qx, qy)) return false;
+        }
+        return true;
+      }
+      if (safe(tx, ty)) return { dx: dx + tx, dy: dy + ty };
+      // Giữ một trục đúng tâm, dò trục kia: điểm an toàn gần tâm nhất rồi chia đôi tới biên chặn.
+      function along(fixedX, fixedValue, lo, hi, target) {
+        var N = 160, k, v, bestV = null, bestD = POS, d;
+        for (k = 0; k <= N; k++) {
+          v = lo + (hi - lo) * k / N;
+          if (!(fixedX ? safe(fixedValue, v) : safe(v, fixedValue))) continue;
+          d = Math.abs(v - target);
+          if (d < bestD) { bestD = d; bestV = v; }
+        }
+        if (bestV === null) return null;
+        var a = bestV, b = target, it, m;
+        for (it = 0; it < 30; it++) {
+          m = (a + b) / 2;
+          if (fixedX ? safe(fixedValue, m) : safe(m, fixedValue)) a = m; else b = m;
+        }
+        return { v: a, d: Math.abs(a - target) };
+      }
+      var A = along(true, tx, syLo, syHi, ty), Bq = along(false, ty, sxLo, sxHi, tx);
+      if (A && (!Bq || A.d <= Bq.d)) return { dx: dx + tx, dy: dy + A.v };
+      if (Bq) return { dx: dx + Bq.v, dy: dy + ty };
+      var lo = 0, hi = 1, mid, it2;
+      for (it2 = 0; it2 < 24; it2++) {
+        mid = (lo + hi) / 2;
+        if (safe(tx * mid, ty * mid)) lo = mid; else hi = mid;
+      }
+      return { dx: dx + tx * lo, dy: dy + ty * lo };
+    }
+
+    // ---------- Khép đúng khe bằng tiếp xúc chính xác ----------
+    function exactTemplate(ctx, T) {
+      if (T.exact) return T.exact;
+      var el = T.el, P, out, a, b, dy, d, back;
+      if (el.length === 1) {
+        P = ctx.exactH(el[0].o, el[0].o, 0);
+        out = { el: [{ o: el[0].o, x: 0, y: el[0].y }], P: P };
+      } else {
+        a = el[0].o; b = el[1].o; dy = el[1].y - el[0].y;
+        d = ctx.exactH(a, b, dy); back = ctx.exactH(b, a, -dy);
+        if (d === NEG) d = 0;
+        if (back === NEG) back = 0;
+        P = Math.max(d + back, ctx.exactH(a, a, 0), ctx.exactH(b, b, 0));
+        out = { el: [{ o: a, x: 0, y: el[0].y }, { o: b, x: d + (P - d - back) / 2, y: el[1].y }], P: P };
+      }
+      if (!(out.P > 0) || out.P > T.P + 1e-9) out = { el: T.el, P: T.P };
+      T.exact = out;
+      return out;
+    }
+
+    // Dựng lại bố cục bằng tiếp xúc chính xác: bước hàng thu về đúng khe (neo theo tâm tờ),
+    // mỗi hàng hạ sát hàng dưới theo đường bế thật.
+    function refineExact(ctx, rows) {
+      var out = [], r, row, T, X, f, c, anchor0, kLo, kHi, k, i, e, sh, x, qs, Y, pieces, top, q, y;
+      for (r = 0; r < rows.length; r++) {
+        row = rows[r]; T = row.T; X = exactTemplate(ctx, T); f = X.P / T.P;
+        c = ctx.W / 2; anchor0 = c + (row.phase - c) * f;
+        kLo = -Math.ceil((anchor0 + 1e-9) / X.P) - 2; kHi = Math.ceil((ctx.W - anchor0) / X.P) + 2;
+        qs = [];
+        for (k = kLo; k <= kHi; k++) for (i = 0; i < X.el.length; i++) {
+          e = X.el[i]; sh = ctx.s[e.o]; x = anchor0 + k * X.P + e.x;
+          if (x < -1e-6 || x + sh.w > ctx.W + 1e-6) continue;
+          qs.push({ o: e.o, x: x, ey: e.y, w: sh.w, h: sh.h });
+        }
+        qs.sort(function (u, v) { return u.x - v.x; });
+        if (!qs.length) continue;
+        Y = out.length ? rowOffset(ctx, out, qs, true) : row.Y;
+        if (Y === NEG || Y < 0) Y = 0;
+        pieces = []; top = NEG;
+        for (i = 0; i < qs.length; i++) {
+          q = qs[i]; y = Y + q.ey;
+          if (y + q.h > ctx.H + 1e-6) continue;
+          pieces.push({ o: q.o, x: q.x, y: y, w: q.w, h: q.h });
+          if (y + q.h > top) top = y + q.h;
+        }
+        if (pieces.length) out.push({ T: T, phase: anchor0, Y: Y, pieces: pieces, top: top, n: pieces.length });
+      }
+      return out;
+    }
+
+    // ---------- Lấp chỗ trống ----------
+    // Hai con tách được theo một trong bốn hướng (trên/dưới/trái/phải) theo bảng tiếp xúc bảo thủ.
+    function separated(ctx, p, q) {
+      var g = ctx.g;
+      if (q.x >= p.x + p.w + g || p.x >= q.x + q.w + g || q.y >= p.y + p.h + g || p.y >= q.y + q.h + g) return true;
+      if (q.x >= p.x + ctx.hAt(p.o, q.o, q.y - p.y) - 1e-9) return true;
+      if (p.x >= q.x + ctx.hAt(q.o, p.o, p.y - q.y) - 1e-9) return true;
+      if (q.y >= p.y + ctx.vAt(p.o, q.o, q.x - p.x) - 1e-9) return true;
+      if (p.y >= q.y + ctx.vAt(q.o, p.o, p.x - q.x) - 1e-9) return true;
+      return false;
+    }
+
+    // Trượt thêm con vào từ bốn phía (đầu/cuối hàng, dải trên/dưới, góc PON); mọi vị trí phải tách
+    // được với mọi con lân cận và né PON. Ưu tiên vị trí thấp-trái để các con lấp sau còn chỗ.
+    function freeFill(ctx, pieces, maxAdd) {
+      var added = [], all = pieces.slice(0), uniq = ctx.p.uniq, g = ctx.g, cell = 1, bins = {}, i;
+      for (i = 0; i < ctx.s.length; i++) cell = Math.max(cell, ctx.s[i].w + g, ctx.s[i].h + g);
+      function binAdd(p) {
+        var x0 = Math.floor(p.x / cell), x1 = Math.floor((p.x + p.w) / cell), y0 = Math.floor(p.y / cell), y1 = Math.floor((p.y + p.h) / cell), bx, by, key;
+        for (bx = x0; bx <= x1; bx++) for (by = y0; by <= y1; by++) {
+          key = bx + "," + by;
+          if (!bins[key]) bins[key] = [];
+          bins[key].push(p);
+        }
+      }
+      for (i = 0; i < all.length; i++) binAdd(all[i]);
+      function valid(cn) {
+        if (cn.x < -1e-6 || cn.y < -1e-6 || cn.x + cn.w > ctx.W + 1e-6 || cn.y + cn.h > ctx.H + 1e-6) return false;
+        var x0 = Math.floor((cn.x - g) / cell), x1 = Math.floor((cn.x + cn.w + g) / cell), y0 = Math.floor((cn.y - g) / cell), y1 = Math.floor((cn.y + cn.h + g) / cell), bx, by, list, k;
+        for (bx = x0; bx <= x1; bx++) for (by = y0; by <= y1; by++) {
+          list = bins[bx + "," + by];
+          if (!list) continue;
+          for (k = 0; k < list.length; k++) if (!separated(ctx, list[k], cn)) return false;
+        }
+        return ctx.ponSafe(cn.o, cn.x, cn.y);
+      }
+      var ui, o, sh, w, h, step, x, y, xl, yt, p, c, t, cands, best, band, bi2, list2;
+      // Chỉ mục theo dải ngang (cho trượt ngang) và dải dọc (cho trượt dọc).
+      function bands(axisY) {
+        var out = {}, k, q, a0, a1, b;
+        for (k = 0; k < all.length; k++) {
+          q = all[k];
+          a0 = Math.floor(((axisY ? q.y : q.x) - g) / cell); a1 = Math.floor(((axisY ? q.y + q.h : q.x + q.w) + g) / cell);
+          for (b = a0; b <= a1; b++) { if (!out[b]) out[b] = []; out[b].push(q); }
+        }
+        return out;
+      }
+      var stamp = 0;
+      function near(idx, lo, hi) {
+        var out = [], b, k, q, l;
+        stamp++;
+        for (b = Math.floor(lo / cell); b <= Math.floor(hi / cell); b++) {
+          l = idx[b];
+          if (!l) continue;
+          for (k = 0; k < l.length; k++) { q = l[k]; if (q._seen !== stamp) { q._seen = stamp; out.push(q); } }
+        }
+        return out;
+      }
+      while (added.length < maxAdd && !ctx.late()) {
+        cands = [];
+        var rowsIdx = bands(true), colsIdx = bands(false);
+        for (ui = 0; ui < uniq.length; ui++) {
+          o = uniq[ui]; sh = ctx.s[o]; w = sh.w; h = sh.h;
+          if (w > ctx.W || h > ctx.H) continue;
+          step = Math.max(0.25, Math.min(w, h) / 32);
+          for (y = 0; y <= ctx.H - h + 1e-9; y += step) {
+            x = 0; xl = ctx.W - w;
+            list2 = near(rowsIdx, y - g, y + h + g);
+            for (i = 0; i < list2.length; i++) {
+              p = list2[i];
+              if (p.y >= y + h + g || y >= p.y + p.h + g) continue;
+              c = ctx.hAt(p.o, o, y - p.y); if (c !== NEG && p.x + c > x) x = p.x + c;
+              c = ctx.hAt(o, p.o, p.y - y); if (c !== NEG && p.x - c < xl) xl = p.x - c;
+            }
+            if (x + w <= ctx.W + 1e-9) cands.push({ o: o, x: x, y: y, w: w, h: h, score: y * 1000 + x });
+            if (xl >= -1e-9) cands.push({ o: o, x: xl, y: y, w: w, h: h, score: y * 1000 + xl });
+          }
+          for (x = 0; x <= ctx.W - w + 1e-9; x += step) {
+            y = 0; yt = ctx.H - h;
+            list2 = near(colsIdx, x - g, x + w + g);
+            for (i = 0; i < list2.length; i++) {
+              p = list2[i];
+              if (p.x >= x + w + g || x >= p.x + p.w + g) continue;
+              c = ctx.vAt(p.o, o, x - p.x); if (c !== NEG && p.y + c > y) y = p.y + c;
+              c = ctx.vAt(o, p.o, p.x - x); if (c !== NEG && p.y - c < yt) yt = p.y - c;
+            }
+            if (y + h <= ctx.H + 1e-9) cands.push({ o: o, x: x, y: y, w: w, h: h, score: y * 1000 + x });
+            if (yt >= -1e-9) cands.push({ o: o, x: x, y: yt, w: w, h: h, score: yt * 1000 + x });
+          }
+        }
+        cands.sort(function (u, v) { return u.score - v.score || u.o - v.o; });
+        best = null;
+        for (t = 0; t < cands.length; t++) if (valid(cands[t])) { best = cands[t]; break; }
+        if (!best) break;
+        delete best.score;
+        best.fill = true;
+        added.push(best); all.push(best); binAdd(best);
+      }
+      return added;
+    }
+
+    // Điểm gọn đẹp (nhỏ = đẹp): ít đổi mẫu hàng, so le đều, ít con lấp lẻ, lề cân hai bên.
+    function neatScore(ctx, L) {
+      var rows = L.rows || [], changes = 0, r, steps = {}, nSteps = 0, key, prev, d;
+      for (r = 1; r < rows.length; r++) {
+        if (rows[r].T !== rows[r - 1].T && (r < 2 || rows[r].T !== rows[r - 2].T)) changes++;
+        prev = rows[r].T === rows[r - 1].T ? rows[r - 1] : (r >= 2 && rows[r].T === rows[r - 2].T ? rows[r - 2] : null);
+        if (prev) {
+          d = ((rows[r].phase - prev.phase) % rows[r].T.P + rows[r].T.P) % rows[r].T.P;
+          key = rows[r].T.key + ":" + Math.round(d * 4);
+          if (!steps[key]) { steps[key] = 1; nSteps++; }
+        }
+      }
+      var pcs = L.pieces || [], x0 = POS, x1 = NEG, y0 = POS, y1 = NEG, i, fill = 0, sh = L.shift || { dx: 0, dy: 0 };
+      for (i = 0; i < pcs.length; i++) {
+        x0 = Math.min(x0, pcs[i].x); x1 = Math.max(x1, pcs[i].x + pcs[i].w);
+        y0 = Math.min(y0, pcs[i].y); y1 = Math.max(y1, pcs[i].y + pcs[i].h);
+        if (pcs[i].fill) fill++;
+      }
+      var asym = Math.abs((x0 + sh.dx) - (ctx.W - x1 - sh.dx)) + Math.abs((y0 + sh.dy) - (ctx.H - y1 - sh.dy));
+      return 10 * changes + 3 * Math.max(0, nSteps - 2) + 2 * fill + asym;
+    }
+
+    function evaluate(ctx, rows) {
+      var pieces = flatten(rows), sh = optimiseShift(ctx, pieces);
+      return { rows: rows, pieces: pieces, shift: sh, count: pieces.length - sh.blocked };
+    }
+
+    // Dựng lại từ hàng r: mọi hàng từ r trở lên dịch ngang thêm delta (giữ mẫu), xếp chồng lại sát nhau.
+    function shiftFrom(ctx, rows, r, delta) {
+      var out = rows.slice(0, r), i, row;
+      for (i = r; i < rows.length; i++) {
+        row = makeRow(ctx, out, rows[i].T, rows[i].phase + delta, false);
+        if (row) out.push(row);
+      }
+      return out;
+    }
+
+    // "Dịch cả cụm" có tính PON: cắt bố cục ở ranh giới dải (chỗ đổi mẫu hàng) hoặc ở hàng đầu/cuối,
+    // dịch ngang cả phần phía trên so với phần dưới rồi chấm bằng số con thật sau khi né PON.
+    // Nhận khi thêm con, hoặc cùng số con mà gọn hơn.
+    function bandShift(ctx, ev) {
+      var rows = ev.rows, best = ev, bestNeat = neatScore(ctx, ev), cuts = [], r, ci, k, K = 8, Pmax, delta, trial, st, e, nn,
+        tried = {}, top3, ti, base, sub;
+      if (rows.length < 2) return ev;
+      for (r = 1; r < rows.length; r++)
+        if (rows[r].T !== rows[r - 1].T && (r < 2 || rows[r].T !== rows[r - 2].T)) cuts.push(r);
+      if (cuts.indexOf(1) < 0) cuts.push(1);
+      if (cuts.indexOf(rows.length - 1) < 0) cuts.push(rows.length - 1);
+      function attempt(rc, d) {
+        var key = rc + ":" + Math.round(d * 1000);
+        if (tried[key] || ctx.late()) return null;
+        tried[key] = 1;
+        trial = shiftFrom(ctx, rows, rc, d); st = layoutStats(trial);
+        if (st.n < best.count) return null;
+        e = evaluate(ctx, trial);
+        if (e.count < best.count) return e;
+        nn = neatScore(ctx, e);
+        if (e.count > best.count || nn < bestNeat - 0.5) { best = e; bestNeat = nn; best.desc = (ev.desc || "") + " + dịch cụm né PON"; }
+        return e;
+      }
+      for (ci = 0; ci < cuts.length && !ctx.late(); ci++) {
+        r = cuts[ci]; Pmax = 0;
+        for (k = r; k < rows.length; k++) Pmax = Math.max(Pmax, rows[k].T.P);
+        top3 = [];
+        for (k = -K; k < K; k++) {
+          delta = Pmax * k / (2 * K);
+          if (!k) continue;
+          e = attempt(r, delta);
+          if (e) top3.push({ d: delta, c: e.count });
+        }
+        top3.sort(function (u, v) { return v.c - u.c || Math.abs(u.d) - Math.abs(v.d); });
+        for (ti = 0; ti < Math.min(3, top3.length); ti++) {
+          base = top3[ti].d;
+          for (sub = -3; sub <= 3; sub++) if (sub) attempt(r, base + sub * Pmax / (8 * K));
+        }
+      }
+      return best;
+    }
+
+    // Một chiều tờ: khối → ghép dải → dịch hàng → chấm điểm có PON → khép chính xác → lấp trống.
+    function solveSheet(ctx, opts) {
+      var T = makeTemplates(ctx, opts.pairSamples), tpl, cands, base, seen = {}, bi, k, ti, pi, rr, key0, below, T2, built, st;
+      if (!T.length) return null;
+      tpl = pickTemplates(T, opts.templates);
+      cands = searchBlocks(ctx, tpl, opts.phases);
+      cands.sort(function (a, b) { return b.n - a.n || a.top - b.top; });
+      if (opts.compose) {
+        // Gốc ghép: vài khối dẫn đầu + khối tốt nhất của từng kiểu (mẫu hàng 1/hàng 2).
+        // Ưu tiên mỗi mẫu hàng (đơn hay cặp) có một khối gốc thuần một mẫu, rồi tới các kiểu khối khác.
+        base = cands.slice(0, 4);
+        for (bi = 0; bi < cands.length; bi++) {
+          rr = cands[bi].rows;
+          if (rr.length > 1 && rr[1].T !== rr[0].T) continue;
+          key0 = rr[0].T.key + "/" + (rr.length > 1 ? rr[1].T.key : "");
+          if (seen[key0]) continue;
+          seen[key0] = 1;
+          if (base.indexOf(cands[bi]) < 0) base.push(cands[bi]);
+        }
+        for (bi = 0; bi < cands.length && base.length < 14; bi++) {
+          rr = cands[bi].rows; key0 = rr[0].T.key + "/" + (rr.length > 1 ? rr[1].T.key : "");
+          if (seen[key0]) continue;
+          seen[key0] = 1;
+          if (base.indexOf(cands[bi]) < 0) base.push(cands[bi]);
+        }
+        // Dải đặt lên trên: mỗi mẫu (thẳng/so le) + vài kiểu khối luân phiên thuận/ngược, zigzag tốt nhất.
+        // Nhờ vậy cả hai thứ tự "dải A dưới, dải B trên" và "B dưới, A trên" đều được thử.
+        var bands = [], bandSeen = {}, perPair = {}, gk, pk, gen;
+        for (ti = 0; ti < tpl.length; ti++) {
+          bands.push({ T: tpl[ti], s: 0, z: false, U: null });
+          if (tpl[ti].shifts.length) bands.push({ T: tpl[ti], s: tpl[ti].shifts[0].s, z: false, U: null });
+        }
+        for (bi = 0; bi < cands.length && bands.length < 2 * tpl.length + 6; bi++) {
+          gen = cands[bi].gen;
+          if (!gen || !(gen.U || gen.z)) continue;
+          gk = gen.T.key + "/" + (gen.U ? gen.U.key : "z") + "/" + Math.round(gen.s * 4) + "/" + Math.round((gen.s2 || 0) * 4);
+          pk = gen.T.key + "/" + (gen.U ? gen.U.key : "z");
+          if (bandSeen[gk] || (perPair[pk] || 0) >= 2) continue;
+          bandSeen[gk] = 1; perPair[pk] = (perPair[pk] || 0) + 1;
+          bands.push(gen);
+        }
+        // Phương án kém hơn số con dẫn đầu quá 6 con sẽ bị bỏ ở bước lọc trùng: không cần giữ (đỡ tốn bộ nhớ).
+        var runMax = cands.length ? cands[0].n : 0;
+        for (bi = 0; bi < base.length && !ctx.late(); bi++) {
+          rr = base[bi].rows;
+          // Khối một mẫu: thử cắt ở các hàng gần đáy và gần đỉnh (dải khác hướng nằm dưới/trên tuỳ PON);
+          // khối khác: chỉ thay vài hàng trên cùng.
+          var single = rr.length < 2 || rr[1].T === rr[0].T;
+          for (k = single ? 1 : Math.max(1, rr.length - 2); k <= rr.length && !ctx.late(); k++) {
+            // Dải thay thế nằm sát đáy (1–3 hàng) hoặc sát đỉnh (3 hàng cuối); cắt ở giữa khối hiếm khi lợi.
+            if (single && k > 3 && k < rr.length - 3) continue;
+            below = rr.slice(0, k);
+            var lastRow = below[below.length - 1], lx0 = POS, lx1 = NEG, li, phCache = {};
+            for (li = 0; li < lastRow.pieces.length; li++) {
+              lx0 = Math.min(lx0, lastRow.pieces[li].x); lx1 = Math.max(lx1, lastRow.pieces[li].x + lastRow.pieces[li].w);
+            }
+            for (ti = 0; ti < bands.length; ti++) {
+              gen = bands[ti]; T2 = gen.T;
+              if (!gen.U && !gen.z && T2 === lastRow.T) continue;
+              if (gen === base[bi].gen) continue;
+              var phs = phCache[T2.key] || (phCache[T2.key] = bandPhases(ctx, below, T2, lx0, lx1));
+              for (pi = 0; pi < phs.length; pi++) {
+                built = buildBlock(ctx, T2, phs[pi], gen.s, gen.z, below, 0, gen.U, gen.s2);
+                if (built.length === below.length) continue;
+                st = layoutStats(built);
+                if (st.n > runMax) runMax = st.n;
+                if (st.n < runMax - 6) continue;
+                cands.push({ rows: built, n: st.n, top: st.top, desc: "ghép dải" });
+              }
+            }
+          }
+        }
+        cands.sort(function (a, b) { return b.n - a.n || a.top - b.top; });
+      }
+      // Bỏ các phương án trùng cấu trúc (cùng mẫu từng hàng, cùng số con từng hàng, cùng độ lệch
+      // giữa các hàng): chúng chỉ khác nhau một phép tịnh tiến mà bước né PON/canh giữa đã thử.
+      var topN = cands.length ? cands[0].n : 0, evals = [], i, ev, sigs = {}, sg, r, rowsI, dph, uniqC = [];
+      for (i = 0; i < cands.length && uniqC.length < 400; i++) {
+        if (cands[i].n < topN - 6) break;
+        rowsI = cands[i].rows; sg = cands[i].n + ":";
+        for (r = 0; r < rowsI.length; r++) {
+          dph = r ? rowsI[r].phase - rowsI[r - 1].phase : 0;
+          dph = ((dph % rowsI[r].T.P) + rowsI[r].T.P) % rowsI[r].T.P;
+          sg += rowsI[r].T.key + "#" + rowsI[r].n + "@" + Math.round(dph * 4) + "|";
+        }
+        if (sigs[sg]) continue;
+        sigs[sg] = 1;
+        // Ước lượng nhanh: số con còn lại khi canh giữa (chưa né PON) để xếp hạng trước khi tìm kỹ.
+        cands[i].quick = cands[i].n - centreBlocked(ctx, flatten(rowsI));
+        uniqC.push(cands[i]);
+      }
+      uniqC.sort(function (a, b) { return b.quick - a.quick || b.n - a.n || a.top - b.top; });
+      // Dịch từng hàng (giữ mẫu) cho vài phương án dẫn đầu theo ước lượng đã tính PON.
+      if (opts.tune) {
+        var tuned = [], sig = {}, ci, opt, os, tc;
+        for (ci = 0; ci < uniqC.length && tuned.length < opts.tune && !ctx.late(); ci++) {
+          key0 = uniqC[ci].n + "/" + uniqC[ci].rows.map(function (r0) { return r0.T.key; }).join(",");
+          if (sig[key0]) continue;
+          sig[key0] = 1;
+          opt = optimiseRowPhases(ctx, uniqC[ci].rows, tpl); os = layoutStats(opt);
+          if (os.n > uniqC[ci].n || (os.n === uniqC[ci].n && os.top < uniqC[ci].top)) {
+            tc = { rows: opt, n: os.n, top: os.top, desc: uniqC[ci].desc + " + dịch hàng" };
+            tc.quick = tc.n - centreBlocked(ctx, flatten(opt));
+            tuned.push(tc);
+          }
+        }
+        uniqC = uniqC.concat(tuned);
+        uniqC.sort(function (a, b) { return b.quick - a.quick || b.n - a.n || a.top - b.top; });
+      }
+      for (i = 0; i < uniqC.length && evals.length < opts.evaluate; i++) {
+        ev = evaluate(ctx, uniqC[i].rows); ev.desc = uniqC[i].desc;
+        evals.push(ev);
+      }
+      evals.sort(function (a, b) { return b.count - a.count || neatScore(ctx, a) - neatScore(ctx, b); });
+      // Dịch cả cụm (dải trên/dưới, hàng đầu/cuối) để né PON cho vài phương án dẫn đầu.
+      for (i = 0; i < evals.length && i < opts.refine && !ctx.late(); i++) {
+        ev = bandShift(ctx, evals[i]);
+        if (ev !== evals[i]) evals[i] = ev;
+      }
+      evals.sort(function (a, b) { return b.count - a.count || neatScore(ctx, a) - neatScore(ctx, b); });
+      var finals = [], ex, chosen, fill, all, sh2;
+      for (i = 0; i < evals.length && i < opts.refine; i++) {
+        ex = evaluate(ctx, refineExact(ctx, evals[i].rows)); ex.exact = true;
+        chosen = ex.count >= evals[i].count ? ex : evals[i];
+        finals.push({ pieces: chosen.pieces, shift: chosen.shift, count: chosen.count, rows: chosen.rows, fill: 0,
+          exact: chosen === ex, desc: evals[i].desc });
+      }
+      finals.sort(function (a, b) { return b.count - a.count || neatScore(ctx, a) - neatScore(ctx, b); });
+      // Lấp chỗ trống cho hai phương án dẫn đầu (lấp có thể đổi thứ hạng).
+      for (i = 0; opts.fill && i < finals.length && i < 2; i++) {
+        fill = freeFill(ctx, finals[i].pieces, opts.fill);
+        if (!fill.length) continue;
+        all = finals[i].pieces.concat(fill); sh2 = optimiseShift(ctx, all);
+        if (all.length - sh2.blocked > finals[i].count)
+          finals[i] = { pieces: all, shift: sh2, count: all.length - sh2.blocked, rows: finals[i].rows, fill: fill.length,
+            exact: finals[i].exact, desc: finals[i].desc };
+      }
+      finals.sort(function (a, b) { return b.count - a.count || neatScore(ctx, a) - neatScore(ctx, b); });
+      return finals[0] || null;
+    }
+
+    // input: như nest(); groups = khuôn dùng chung. Trả về slots trong toạ độ tờ (mm, y lên).
+    function plan(input, groups, curveError, budgetMs, deadlineAt) {
+      var began = now(), gap = Number(input.gapMm), margin = Number(input.marginMm), ponClear = Number(input.ponClearMm);
+      var W = Number(input.sheet.widthMm) - 2 * margin, H = Number(input.sheet.heightMm) - 2 * margin;
+      var ce = Math.min(0.025, Math.max(0, Number(curveError) || 0)), span = 0, gi, ci, pi, p;
+      for (gi = 0; gi < groups.length; gi++) for (ci = 0; ci < groups[gi].length; ci++)
+        for (pi = 0; pi < groups[gi][ci].length; pi++) {
+          p = groups[gi][ci][pi];
+          span = Math.max(span, Math.abs(p[0]), Math.abs(p[1]));
+        }
+      // Lưới tính bảng tiếp xúc theo cỡ khuôn; khe tìm/khép = khe nhập + dự phòng sai số cong hai khuôn.
+      var res = Math.min(0.2, Math.max(0.02, span / 600));
+      var g = gap + 2 * ce + (ce > 0 ? 0.000001 : 0);
+      var prep = prepareShapes(groups, g, res), s0 = prep.shapes[0];
+      if (!(s0.w > 0 && s0.h > 0)) return null;
+      // Ước lượng số con để chọn mức tìm kiếm (khuôn tí hon hàng nghìn con: tìm gọn hơn).
+      var est = (W * H) / Math.max(1e-6, (s0.w + gap) * (s0.h + gap));
+      var opts = est > 2500 ? { pairSamples: 0, templates: 3, phases: 4, compose: false, tune: 0, evaluate: 6, refine: 1, fill: 0, fillMs: 0 } :
+        est > 500 ? { pairSamples: 16, templates: 5, phases: 12, compose: false, tune: 1, evaluate: 12, refine: 2, fill: 20, fillMs: 250 } :
+          { pairSamples: 40, templates: 8, phases: 24, compose: true, tune: 4, evaluate: 30, refine: 3, fill: 40, fillMs: 400 };
+      // Khối lượng tìm đã giới hạn cố định theo cỡ bài (kết quả lặp lại được); hạn giờ chỉ là chốt an toàn.
+      var budget = Math.max(6000, Math.min(20000, (Number(budgetMs) || 1500) * 3));
+      if (deadlineAt && deadlineAt - began < budget) budget = Math.max(1, deadlineAt - began);
+      var best = null, which, transposed, dots, ctx, sol, d, x, y, Rr;
+      for (which = 0; which < 2; which++) {
+        transposed = which === 1; dots = [];
+        for (d = 0; d < (input.sheet.dots || []).length; d++) {
+          x = Number(input.sheet.dots[d].x) - margin; y = Number(input.sheet.dots[d].y) - margin;
+          Rr = Number(input.sheet.dots[d].r) + ponClear + ce + 0.000002;
+          dots.push(transposed ? { x: H - y, y: x, R: Rr } : { x: x, y: y, R: Rr });
+        }
+        ctx = new Ctx(prep, transposed ? H : W, transposed ? W : H, dots, began + budget * (which ? 1 : 0.55));
+        sol = solveSheet(ctx, opts);
+        if (!sol) continue;
+        sol.transposed = transposed; sol.ctx = ctx;
+        if (!best || sol.count > best.count || (sol.count === best.count && neatScore(ctx, sol) < neatScore(best.ctx, best))) best = sol;
+      }
+      if (!best) return null;
+      ctx = best.ctx;
+      var kept = [], i, q;
+      for (i = 0; i < best.pieces.length; i++) {
+        q = best.pieces[i];
+        if (ctx.ponSafe(q.o, q.x + best.shift.dx, q.y + best.shift.dy)) kept.push(q);
+      }
+      var cen = centreKept(ctx, kept, best.shift.dx, best.shift.dy);
+      // Thứ tự đọc: theo hàng (hàng trên cùng trước), trong hàng từ trái sang; con lấp lẻ sau cùng.
+      kept.sort(function (a, b) {
+        var ra = a.fill ? -1 : a.row, rb = b.fill ? -1 : b.row;
+        if (ra !== rb) return rb - ra;
+        return a.x - b.x || a.y - b.y;
+      });
+      var slots = [], o, ox, oy;
+      for (i = 0; i < kept.length; i++) {
+        q = kept[i]; x = q.x + cen.dx; y = q.y + cen.dy; o = q.o; ox = x; oy = y;
+        if (best.transposed) { o = (q.o + 3) % 4; ox = y; oy = H - x - q.w; }
+        slots.push({ vi: o, x: margin + ox, y: margin + oy });
+      }
+      return { slots: slots, count: slots.length, transposed: best.transposed, fill: best.fill, exact: best.exact,
+        desc: best.desc, ms: now() - began, rows: best.rows.length, neat: neatScore(ctx, best) };
+    }
+
+    return { plan: plan, prepareShapes: prepareShapes, exactRight: exactRight, stripEnvelope: stripEnvelope,
+      contactTable: contactTable, dilateHigh: dilateHigh, tableAt: tableAt, simplifyClosed: simplifyClosed, orientShape: orientShape };
+  })();
+
+  // Các bài có khuôn bế giống hệt nhau (chỉ khác toạ độ nguồn, điểm bắt đầu, chiều path) dàn chung.
+  function sharedCutter(input) {
+    var first = normalizeGroups(input.types[0].groups || []), ti, g;
+    if (!first) return null;
+    for (ti = 1; ti < input.types.length; ti++) {
+      g = normalizeGroups(input.types[ti].groups || []);
+      if (!g || !sameGroups(first, g)) return null;
+    }
+    return first;
+  }
+
+  function cutterVariants(groups, curve) {
+    var out = [], vi, rg, b;
+    for (vi = 0; vi < 4; vi++) {
+      rg = rotateGroups(groups, vi * 90); b = boundsOfGroups(rg);
+      out.push({ mi: 0, vi: vi, angle: vi * 90, groups: rg, w: b.w, h: b.h, curveErrorMm: curve });
+    }
+    return out;
+  }
+
+  // Hướng chuẩn của khuôn: cùng một khuôn đặt nguồn xoay 0/90/180/270 phải ra cùng bố cục.
+  // Chọn hướng có khung ngang (rộng >= cao), rồi trọng tâm diện tích thấp nhất, rồi lệch trái nhất.
+  function canonicalTurn(groups) {
+    var best = -1, bestKey = null, k, rg, b, gi, ci, i, c, a, cx, cy, area, cross, key, j;
+    for (k = 0; k < 4; k++) {
+      rg = rotateGroups(groups, k * 90); b = boundsOfGroups(rg);
+      cx = 0; cy = 0; area = 0;
+      for (gi = 0; gi < rg.length; gi++) for (ci = 0; ci < rg[gi].length; ci++) {
+        c = rg[gi][ci];
+        for (i = 0; i < c.length; i++) {
+          a = c[i]; j = c[(i + 1) % c.length];
+          cross = a[0] * j[1] - j[0] * a[1];
+          area += cross; cx += (a[0] + j[0]) * cross; cy += (a[1] + j[1]) * cross;
+        }
+      }
+      if (abs(area) > 1e-12) { cx /= 3 * area; cy /= 3 * area; } else { cx = b.w / 2; cy = b.h / 2; }
+      key = [b.w >= b.h - 1e-6 ? 0 : 1, Math.round(cy / Math.max(b.h, 1e-9) * 1e6), Math.round(cx / Math.max(b.w, 1e-9) * 1e6)];
+      if (!bestKey || key[0] < bestKey[0] || (key[0] === bestKey[0] && (key[1] < bestKey[1] ||
+          (key[1] === bestKey[1] && key[2] < bestKey[2])))) { bestKey = key; best = k; }
+    }
+    return best < 0 ? 0 : best;
+  }
+
+  // Chốt chặn độc lập cho kết quả lõi xếp hàng: đường bế đã làm phẳng + khe + dự phòng cong, lề, PON.
+  function verifyRowSlots(input, variants, slots) {
+    var margin = Number(input.marginMm), plan = [], dots = [], i, d;
+    for (i = 0; i < slots.length; i++) plan.push({ mi: 0, v: slots[i].vi, x: slots[i].x - margin, y: slots[i].y - margin });
+    for (i = 0; i < (input.sheet.dots || []).length; i++) {
+      d = input.sheet.dots[i];
+      dots.push({ x: Number(d.x) - margin, y: Number(d.y) - margin, radius: Number(d.r) + Number(input.ponClearMm) });
+    }
+    return verifyGeometry(plan, variants, Number(input.sheet.widthMm) - 2 * margin,
+      Number(input.sheet.heightMm) - 2 * margin, dots, Number(input.gapMm), 1);
+  }
+
+  function formatRows(input, rows, variants, began) {
+    var n = input.types.length, slots = [], counts = [], i, s, v, countText = [];
+    var x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (i = 0; i < n; i++) counts.push(0);
+    for (i = 0; i < rows.slots.length; i++) {
+      s = rows.slots[i]; v = variants[s.vi];
+      slots.push({ mi: i % n, vi: s.vi, x: s.x, y: s.y, angle: s.vi * 90 });
+      counts[i % n]++;
+      x0 = Math.min(x0, s.x); y0 = Math.min(y0, s.y); x1 = Math.max(x1, s.x + v.w); y1 = Math.max(y1, s.y + v.h);
+    }
+    var offX = slots.length ? (x0 + x1 - Number(input.sheet.widthMm)) / 2 : 0;
+    var offY = slots.length ? (y0 + y1 - Number(input.sheet.heightMm)) / 2 : 0;
+    var exact = abs(offX) <= 0.001 && abs(offY) <= 0.001;
+    for (i = 0; i < counts.length; i++) countText.push("loại " + (i + 1) + ": " + counts[i]);
+    return {
+      ok: true, slots: slots, count: slots.length, counts: counts,
+      mode: "xếp hàng lồng theo biên dạng thật" + (n > 1 ? " + luân phiên các bài cùng khuôn" : ""),
+      centering: { exact: exact, offsetXmm: offX, offsetYmm: offY },
+      detail: "Dàn xếp hàng lồng: " + slots.length + " con (" + countText.join(", ") + "). " +
+        "Khép đúng khe " + Number(input.gapMm).toFixed(2) + " mm theo đường bế thật; đã thử hàng thẳng, so le, " +
+        "đối đầu 180°, ghép dải đứng/nằm, dịch từng hàng và dịch cả cụm né PON trong " + (now() - began) + " ms." +
+        (rows.transposed ? " Hàng chạy theo chiều dọc tờ." : "") +
+        (rows.fill ? " Lấp thêm " + rows.fill + " con vào chỗ trống." : "") +
+        (exact ? "" : " Canh tâm bị giới hạn bởi vùng né PON.")
+    };
+  }
+
+  // Bộ điều phối: lõi xếp hàng lồng chạy trước; bộ tìm cũ chạy thi đua phần tìm (rẻ).
+  // Lấy phương án nhiều con hơn; bằng nhau thì giữ bố cục xếp hàng (gọn, đều, khép đúng khe).
+  function nest(input) {
+    var began = now(), groups = null, rows = null, variants = null, curve = 0, ti, ce, budget;
+    if (!input || !input.sheet || !input.types || !input.types.length) return nestLegacy(input);
+    var gap = Number(input.gapMm), margin = Number(input.marginMm), ponClear = Number(input.ponClearMm);
+    if (!(gap >= 0) || !(margin >= 0) || !(ponClear >= 0) ||
+        !(Number(input.sheet.widthMm) - 2 * margin > 0) || !(Number(input.sheet.heightMm) - 2 * margin > 0))
+      return nestLegacy(input);
+    try { groups = sharedCutter(input); } catch (cutterError) { groups = null; }
+    // Nhiều khuôn KHÁC nhau trên cùng tờ: giữ bộ tìm cũ (luân phiên cân bằng số con giữa các mẫu).
+    if (!groups) return nestLegacy(input);
+    for (ti = 0; ti < input.types.length; ti++) {
+      ce = Number(input.types[ti].curveErrorMm);
+      if (isFinite(ce) && ce > curve) curve = ce;
+    }
+    curve = Math.min(0.025, curve);
+    budget = clamp(Number(input.budgetMs) || 1450, 250, 4000);
+    try {
+      variants = cutterVariants(groups, curve);
+      // Hướng chuẩn lấy theo hình học nên kết quả không phụ thuộc file nguồn đặt khuôn xoay hướng nào.
+      // Ngân sách thường (panel dùng 3 giây): thêm lượt thứ hai với khuôn xoay 180° — cùng không gian bố cục
+      // nhưng thứ tự xét mẫu khác, bù chỗ lượt đầu bỏ sót khi nhiều mẫu bằng điểm nhau. Ngân sách ngắn: một lượt.
+      var turn = canonicalTurn(groups), runs = budget >= 1500 ? [turn, (turn + 2) % 4] : [turn], plans = [], ri, si, one,
+        safety = Math.max(6000, Math.min(20000, budget * 3));
+      for (ri = 0; ri < runs.length; ri++) {
+        one = RowNest.plan(input, runs[ri] ? rotateGroups(groups, runs[ri] * 90) : groups, curve, budget,
+          began + safety * (ri + 1) / runs.length);
+        if (!one || !one.count) continue;
+        for (si = 0; si < one.slots.length; si++) one.slots[si].vi = (one.slots[si].vi + runs[ri]) % 4;
+        one.turn = runs[ri];
+        plans.push(one);
+      }
+      plans.sort(function (a, b) { return b.count - a.count || a.neat - b.neat || a.turn - b.turn; });
+      for (ri = 0; ri < plans.length && !rows; ri++)
+        if (verifyRowSlots(input, variants, plans[ri].slots)) rows = plans[ri];
+    } catch (rowError) { rows = null; }
+    var legacyInput = {}, key;
+    for (key in input) if (Object.prototype.hasOwnProperty.call(input, key)) legacyInput[key] = input[key];
+    legacyInput.budgetMs = Math.max(250, budget - (now() - began));
+    var legacy = nestLegacy(legacyInput, 0, true);
+    if (!legacy.ok) return rows ? formatRows(input, rows, variants, began) : legacy;
+    if (!rows || legacy.count > rows.count) {
+      var finished = legacy.finish();
+      if (finished.ok || !rows) return finished;
+    }
+    return formatRows(input, rows, variants, began);
+  }
+
   return {
     version: VERSION,
     nest: nest,
+    nestLegacy: nestLegacy,
     // Chỉ mở ra cho dữ liệu mẫu test hồi quy chạy bằng Node; panel thì dùng nest().
     _test: {
       buildVariant: buildVariant, circleLike: circleLike, verifyPlan: verifyPlan,
@@ -2183,7 +3687,9 @@
       bandPlans:bandPlans,compositionalBandPlans:compositionalBandPlans,
       centrePhysicalPlan:centrePhysicalPlan,physicalPlanBounds:physicalPlanBounds,
       openPhysicalGapPlan:openPhysicalGapPlan,
-      balancedPlan: balancedPlan, mixedRowPlans: mixedRowPlans, polishEdges: polishEdges, edgeMargin:edgeMargin
+      balancedPlan: balancedPlan, mixedRowPlans: mixedRowPlans, polishEdges: polishEdges, edgeMargin:edgeMargin,
+      rowNest: RowNest, sharedCutter: sharedCutter, verifyRowSlots: verifyRowSlots, cutterVariants: cutterVariants,
+      canonicalTurn: canonicalTurn
     }
   };
 });
