@@ -27,9 +27,8 @@ function checkMixed(name, groups, sheet, minimum) {
     result.count >= minimum,
     name + ": a balanced fallback must remain useful",
   );
-  assert.ok(
-    Math.max(...result.counts) - Math.min(...result.counts) <= 1,
-    name + ": counts must not be skewed by homogeneous seeds",
+  result.counts.forEach((n, k) =>
+    assert.ok(n >= 1, name + ": type " + (k + 1) + " must be present"),
   );
   const step = input.resolutionMm,
     margin = input.marginMm,

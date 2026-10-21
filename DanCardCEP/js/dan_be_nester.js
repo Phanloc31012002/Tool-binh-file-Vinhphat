@@ -3684,7 +3684,8 @@
   // dots: chấm PON toạ độ trong khung, {x, y, r}. Trả {count, slots:[{vi, x, y}]} với vi theo hướng của `groups`;
   // chỉ trả phương án đã qua chốt chặn độc lập; không có thì {count: 0, slots: []}.
   // effort "full": hai lượt hướng chuẩn như nest(); "quick": một lượt, mức tìm gọn.
-  function planCutterRect(groups, curveErrorMm, rect, dots, gapMm, ponClearMm, effort) {
+  // skipVerify: bỏ chốt chặn từng khu (bộ chia khu chốt chặn cả tờ một lần ở cuối, rẻ hơn nhiều với khuôn nhiều đỉnh).
+  function planCutterRect(groups, curveErrorMm, rect, dots, gapMm, ponClearMm, effort, skipVerify) {
     var none = { count: 0, slots: [] }, w = Number(rect && rect.w), h = Number(rect && rect.h);
     if (!(w > 0) || !(h > 0)) return none;
     var norm = normalizeGroups(groups);
@@ -3706,7 +3707,7 @@
     }
     plans.sort(function (a, b) { return b.count - a.count || a.neat - b.neat || a.turn - b.turn; });
     for (ri = 0; ri < plans.length; ri++) {
-      if (!verifyRowSlots(fake, variants, plans[ri].slots)) continue;
+      if (!skipVerify && !verifyRowSlots(fake, variants, plans[ri].slots)) continue;
       var slots = [];
       for (si = 0; si < plans[ri].slots.length; si++)
         slots.push({ vi: plans[ri].slots[si].vi, x: plans[ri].slots[si].x, y: plans[ri].slots[si].y });
@@ -3721,21 +3722,77 @@
     sameGroups: sameGroups, boundsOfGroups: boundsOfGroups, nestLegacy: nestLegacy
   };
 
+  // Bản chạy từng bước cho panel: bộ chia khu nhường Chromium vẽ lại giữa các bước và báo tiến độ
+  // onProgress({done, total}); các trường hợp khác chạy nest() liền một mạch rồi onDone(kết quả).
+  function nestAsync(input, onProgress, onDone) {
+    var zones = zonesModule(), cutters = inputUsable(input) ? cutterGroupsOf(input) : null, job = null;
+    if (!zones || !cutters || cutters.length < 2 || !allCuttersFit(input, cutters)) {
+      setTimeout(function () { onDone(nest(input)); }, 0);
+      return;
+    }
+    try { job = zones.createJob(input, coreApi); } catch (createError) { job = null; }
+    if (!job) { setTimeout(function () { onDone(rescueLegacy(input)); }, 0); return; }
+    function tick() {
+      var r;
+      try { r = job.step(); } catch (stepError) { onDone(rescueLegacy(input)); return; }
+      if (typeof onProgress === "function") onProgress(r.progress);
+      if (r.done) { onDone(r.result && r.result.ok ? r.result : rescueLegacy(input)); return; }
+      setTimeout(tick, 0);
+    }
+    setTimeout(tick, 0);
+  }
+
+  var RESCUE_NOTE = "Chia khu không xếp đủ mọi mẫu, tạm dùng cách dàn xen kẽ cũ.";
+
+  function inputUsable(input) {
+    if (!input || !input.sheet || !input.types || !input.types.length) return false;
+    var gap = Number(input.gapMm), margin = Number(input.marginMm), ponClear = Number(input.ponClearMm);
+    return gap >= 0 && margin >= 0 && ponClear >= 0 &&
+      Number(input.sheet.widthMm) - 2 * margin > 0 && Number(input.sheet.heightMm) - 2 * margin > 0;
+  }
+
+  // Khuôn nào không vừa vùng dùng được ở cả 4 hướng thì để bộ cũ báo lỗi "Khuôn loại N không vừa khổ tờ".
+  function allCuttersFit(input, cutters) {
+    var W = Number(input.sheet.widthMm) - 2 * Number(input.marginMm), H = Number(input.sheet.heightMm) - 2 * Number(input.marginMm);
+    var c, b, fits;
+    for (c = 0; c < cutters.length; c++) {
+      b = boundsOfGroups(cutters[c].groups);
+      fits = (b.w <= W + 1e-9 && b.h <= H + 1e-9) || (b.h <= W + 1e-9 && b.w <= H + 1e-9);
+      if (!fits) return false;
+    }
+    return true;
+  }
+
+  // Cứu hộ: bộ chia khu không ra được phương án đủ mọi mẫu → dùng bộ cũ và báo rõ.
+  function rescueLegacy(input) {
+    var r = nestLegacy(input);
+    if (r.ok) r.detail = RESCUE_NOTE + " " + (r.detail || "");
+    else r.error = RESCUE_NOTE + " " + (r.error || "");
+    return r;
+  }
+
+  // Nhận nhóm khuôn cho một đầu vào đã kiểm tra; null nếu không có bộ chia khu hoặc đường bế hỏng.
+  function cutterGroupsOf(input) {
+    var zones = zonesModule();
+    try { return zones ? zones.groupCutters(input.types, coreApi) : null; } catch (cutterError) { return null; }
+  }
+
   // Bộ điều phối: lõi xếp hàng lồng chạy trước; bộ tìm cũ chạy thi đua phần tìm (rẻ).
   // Lấy phương án nhiều con hơn; bằng nhau thì giữ bố cục xếp hàng (gọn, đều, khép đúng khe).
+  // Từ hai nhóm khuôn trở lên: bộ chia khu (mỗi nhóm khuôn một khu, gom cụm, lấp đầy).
   function nest(input) {
     var began = now(), groups = null, rows = null, variants = null, curve = 0, ti, ce, budget;
-    if (!input || !input.sheet || !input.types || !input.types.length) return nestLegacy(input);
+    if (!inputUsable(input)) return nestLegacy(input);
     var gap = Number(input.gapMm), margin = Number(input.marginMm), ponClear = Number(input.ponClearMm);
-    if (!(gap >= 0) || !(margin >= 0) || !(ponClear >= 0) ||
-        !(Number(input.sheet.widthMm) - 2 * margin > 0) || !(Number(input.sheet.heightMm) - 2 * margin > 0))
-      return nestLegacy(input);
     // Nhận nhóm khuôn: các bài cùng khuôn (kể cả file đặt xoay 90/180/270) dàn chung một lần rồi gom cụm bài.
-    var zones = zonesModule(), cutters = null, cutter = null;
-    try { cutters = zones ? zones.groupCutters(input.types, coreApi) : null; } catch (cutterError) { cutters = null; }
+    var zones = zonesModule(), cutters = cutterGroupsOf(input), cutter = null, zoned = null;
+    if (cutters && cutters.length >= 2) {
+      if (!allCuttersFit(input, cutters)) return nestLegacy(input);
+      try { zoned = zones.runJob(zones.createJob(input, coreApi)); } catch (zoneError) { zoned = null; }
+      return zoned && zoned.ok ? zoned : rescueLegacy(input);
+    }
     if (cutters && cutters.length === 1) { groups = cutters[0].groups; cutter = cutters[0]; }
     else if (!cutters) { try { groups = sharedCutter(input); } catch (sharedError) { groups = null; } }
-    // Nhiều khuôn KHÁC nhau trên cùng tờ: giữ bộ tìm cũ (luân phiên cân bằng số con giữa các mẫu).
     if (!groups) return nestLegacy(input);
     for (ti = 0; ti < input.types.length; ti++) {
       ce = Number(input.types[ti].curveErrorMm);
@@ -3777,6 +3834,7 @@
   return {
     version: VERSION,
     nest: nest,
+    nestAsync: nestAsync,
     nestLegacy: nestLegacy,
     // Phần lõi mở cho bộ chia khu (dan_be_zones.js).
     _core: coreApi,

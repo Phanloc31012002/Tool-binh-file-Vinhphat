@@ -272,9 +272,8 @@ const mixed = check(
   4,
   "Distinct scaled cutters sharing one sheet",
 );
-assert.ok(
-  Math.max(...mixed.counts) - Math.min(...mixed.counts) <= 1,
-  "distinct cutter types remain balanced",
+mixed.counts.forEach((n, k) =>
+  assert.ok(n >= 1, "distinct cutter type " + (k + 1) + " must be present"),
 );
 
 // Vài nanomét nhiễu toạ độ của Illustrator không được làm một dòng quét

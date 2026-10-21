@@ -125,9 +125,10 @@
 
   // Dàn thử nhanh một khuôn trên cả vùng dùng được (không PON) rồi ghi khung bao từng con, dời về
   // góc trên-trái của bố cục. Từ đó ước lượng một khung cỡ bất kỳ chứa được bao nhiêu con.
-  function profileCutter(cutter, W, H, gap, ponClear, core) {
-    var plan = core.planCutterRect(cutter.groups, cutter.curveErrorMm, { w: W, h: H }, [], gap, ponClear, "quick");
-    var variants = core.cutterVariants(cutter.groups, cutter.curveErrorMm), boxes = [], i, s, v, x0 = Infinity, y0 = Infinity;
+  function profileCutter(cutter, W, H, gap, ponClear, core, curve) {
+    var ce = curve === undefined ? cutter.curveErrorMm : curve;
+    var plan = core.planCutterRect(cutter.groups, ce, { w: W, h: H }, [], gap, ponClear, "quick", true);
+    var variants = core.cutterVariants(cutter.groups, ce), boxes = [], i, s, v, x0 = Infinity, y0 = Infinity;
     for (i = 0; i < plan.slots.length; i++) {
       s = plan.slots[i]; v = variants[s.vi];
       boxes.push({ x0: s.x, y0: s.y, x1: s.x + v.w, y1: s.y + v.h });
@@ -148,10 +149,14 @@
   // phải/dưới đã sắp (f.xs, f.ys) để tìm kích thước nhỏ nhất đạt một số con cho trước.
   function makeEstimator(profile) {
     var boxes = profile.boxes.slice(), xs = [], ys = [], i;
+    boxes.sort(function (a, b) { return a.x1 - b.x1; });
     for (i = 0; i < boxes.length; i++) { xs.push(boxes[i].x1); ys.push(boxes[i].y1); }
     function f(w, h) {
       var n = 0, j;
-      for (j = 0; j < boxes.length; j++) if (boxes[j].x1 <= w + 1e-9 && boxes[j].y1 <= h + 1e-9) n++;
+      for (j = 0; j < boxes.length; j++) {
+        if (boxes[j].x1 > w + 1e-9) break;
+        if (boxes[j].y1 <= h + 1e-9) n++;
+      }
       return n;
     }
     f.xs = uniqueSorted(xs); f.ys = uniqueSorted(ys); f.total = boxes.length;
@@ -231,12 +236,15 @@
     if (node.leaf !== undefined) {
       m = cutters[node.leaf].members.length; target = m * N; est = ests[node.leaf];
       edges = axis === "x" ? est.xs : est.ys;
-      for (i = 0; i < edges.length; i++) {
-        if (edges[i] > limit + 1e-9) return Infinity;
-        w = axis === "x" ? edges[i] : cross; h = axis === "x" ? cross : edges[i];
-        if (est(w, h) >= target) return edges[i];
+      // Số con tăng theo mép, nên tìm nhị phân mép nhỏ nhất đủ con.
+      lo = -1; hi = edges.length;
+      while (hi - lo > 1) {
+        mid = (lo + hi) >> 1;
+        w = axis === "x" ? edges[mid] : cross; h = axis === "x" ? cross : edges[mid];
+        if (est(w, h) >= target) hi = mid; else lo = mid;
       }
-      return Infinity;
+      if (hi >= edges.length || edges[hi] > limit + 1e-9) return Infinity;
+      return edges[hi];
     }
     kids = node.kids;
     if ((node.dir === "H") === (axis === "y")) {
@@ -345,13 +353,16 @@
     var margin = Number(input.marginMm), gap = Number(input.gapMm), ponClear = Number(input.ponClearMm);
     var zg = Number(input.zoneGapMm), s = zg > 0 ? Math.max(zg, gap) : gap;
     var W = Number(input.sheet.widthMm) - 2 * margin, H = Number(input.sheet.heightMm) - 2 * margin;
-    var dots = [], variants = [], cache = {}, i, d, c, vs, k;
+    var dots = [], variants = [], cache = {}, i, d, c, vs, k, curve = 0;
+    // Một dự phòng sai số cong chung cho mọi khuôn: chốt chặn chung lấy sai số lớn nhất, nên từng khu
+    // cũng phải dàn với đúng dự phòng đó (khuôn thẳng cạnh dàn với dự phòng 0 sẽ hụt 0,0005 mm).
+    for (c = 0; c < cutters.length; c++) curve = Math.max(curve, Math.min(0.025, Number(cutters[c].curveErrorMm) || 0));
     for (i = 0; i < (input.sheet.dots || []).length; i++) {
       d = input.sheet.dots[i];
       dots.push({ x: Number(d.x) - margin, y: Number(d.y) - margin, r: Number(d.r), radius: Number(d.r) + ponClear });
     }
     for (c = 0; c < cutters.length; c++) {
-      vs = core.cutterVariants(cutters[c].groups, cutters[c].curveErrorMm);
+      vs = core.cutterVariants(cutters[c].groups, curve);
       for (k = 0; k < 4; k++) variants.push(vs[k]);
     }
     function boxOf(p) {
@@ -369,7 +380,7 @@
       }
       key = c + "|" + w + "x" + h + "|" + effort + "|" + local.map(function (q) { return q.x + "," + q.y + "," + q.r; }).join(";");
       if (!cache[key]) {
-        plan = w > 0 && h > 0 ? core.planCutterRect(cutters[c].groups, cutters[c].curveErrorMm, { w: w, h: h }, local, gap, ponClear, effort)
+        plan = w > 0 && h > 0 ? core.planCutterRect(cutters[c].groups, curve, { w: w, h: h }, local, gap, ponClear, effort, true)
           : { count: 0, slots: [] };
         cache[key] = plan.slots;
       }
@@ -382,24 +393,53 @@
       for (j = 0; j < dots.length; j++) dv.push({ x: dots[j].x, y: dots[j].y, radius: dots[j].radius });
       return core.verifyGeometry(plan, variants, W, H, dv, gap, 1, s);
     }
-    // Chốt chặn cục bộ: chỉ các mảnh `fixed` nằm gần `moving` (tiết kiệm khi dời một khu).
+    // Chốt chặn cục bộ khi dời cả một khu: các cặp trong khu không đổi, nên chỉ xét mảnh `fixed` gần
+    // khu đang dời, mảnh đang dời gần các mảnh đó, và mảnh đang dời gần chấm PON.
     function verifyNear(fixed, moving) {
-      var reach = Math.max(gap, s) + 1, subset = moving.slice(), j, k2, b, mb, near;
-      var mx0 = Infinity, my0 = Infinity, mx1 = -Infinity, my1 = -Infinity;
+      var reach = Math.max(gap, s) + 1, nearFixed = [], subset = [], j, k2, b, mb, dd, hit;
+      var mx0 = Infinity, my0 = Infinity, mx1 = -Infinity, my1 = -Infinity, mboxes = [];
       for (j = 0; j < moving.length; j++) {
-        mb = boxOf(moving[j]);
+        mb = boxOf(moving[j]); mboxes.push(mb);
         if (mb.x0 < mx0) mx0 = mb.x0; if (mb.y0 < my0) my0 = mb.y0; if (mb.x1 > mx1) mx1 = mb.x1; if (mb.y1 > my1) my1 = mb.y1;
+        if (mb.x0 < -1e-9 || mb.y0 < -1e-9 || mb.x1 > W + 1e-9 || mb.y1 > H + 1e-9) return false;
       }
       for (j = 0; j < fixed.length; j++) {
         b = boxOf(fixed[j]);
-        near = b.x1 >= mx0 - reach && b.x0 <= mx1 + reach && b.y1 >= my0 - reach && b.y0 <= my1 + reach;
-        if (near) subset.push(fixed[j]);
+        if (b.x1 >= mx0 - reach && b.x0 <= mx1 + reach && b.y1 >= my0 - reach && b.y0 <= my1 + reach) nearFixed.push(b);
       }
-      for (k2 = 0; k2 < subset.length; k2++) { /* giữ thứ tự: mảnh đang dời trước */ }
-      return verify(subset);
+      for (j = 0; j < moving.length; j++) {
+        mb = mboxes[j]; hit = false;
+        for (k2 = 0; k2 < nearFixed.length && !hit; k2++) {
+          b = nearFixed[k2];
+          if (b.x1 >= mb.x0 - reach && b.x0 <= mb.x1 + reach && b.y1 >= mb.y0 - reach && b.y0 <= mb.y1 + reach) hit = true;
+        }
+        for (k2 = 0; k2 < dots.length && !hit; k2++) {
+          dd = dots[k2];
+          if (mb.x1 >= dd.x - dd.radius - 1 && mb.x0 <= dd.x + dd.radius + 1 && mb.y1 >= dd.y - dd.radius - 1 && mb.y0 <= dd.y + dd.radius + 1) hit = true;
+        }
+        if (hit) subset.push(moving[j]);
+      }
+      for (j = 0; j < fixed.length; j++) {
+        b = boxOf(fixed[j]);
+        if (b.x1 >= mx0 - reach && b.x0 <= mx1 + reach && b.y1 >= my0 - reach && b.y0 <= my1 + reach) subset.push(fixed[j]);
+      }
+      return subset.length ? verify(subset) : true;
     }
-    return { W: W, H: H, margin: margin, gap: gap, s: s, ponClear: ponClear, dots: dots, variants: variants, cutters: cutters,
-      planLeaf: planLeaf, verify: verify, verifyNear: verifyNear, boxOf: boxOf };
+    // Kiểm tra rẻ khi dời CẢ bố cục (vị trí tương đối không đổi): trong lề và né PON của các con gần chấm.
+    function fitsSheet(pieces) {
+      var j, b, near = [], k2, dd;
+      for (j = 0; j < pieces.length; j++) {
+        b = boxOf(pieces[j]);
+        if (b.x0 < -1e-9 || b.y0 < -1e-9 || b.x1 > W + 1e-9 || b.y1 > H + 1e-9) return false;
+        for (k2 = 0; k2 < dots.length; k2++) {
+          dd = dots[k2];
+          if (b.x1 >= dd.x - dd.radius - 1 && b.x0 <= dd.x + dd.radius + 1 && b.y1 >= dd.y - dd.radius - 1 && b.y0 <= dd.y + dd.radius + 1) { near.push(pieces[j]); break; }
+        }
+      }
+      return near.length ? verify(near) : true;
+    }
+    return { W: W, H: H, margin: margin, gap: gap, s: s, ponClear: ponClear, curve: curve, dots: dots, variants: variants, cutters: cutters,
+      planLeaf: planLeaf, verify: verify, verifyNear: verifyNear, fitsSheet: fitsSheet, boxOf: boxOf };
   }
 
   function shiftPieces(pieces, dx, dy) {
@@ -493,35 +533,34 @@
   // Dàn thật một cây chia khu với kích thước khu đã ước lượng; khép các khu sát nhau.
   // Trả {pieces, counts} hoặc null khi có khuôn không được con nào.
   function realizeTree(tree, sizing, ctx, effort) {
-    var out = [], counts = [], i;
-    function realizeNode(node, rect) {
-      var lens, horizontal, cursor, end, k, len, kidRect, kidPieces, ext, delta, placed = [];
-      if (node.leaf !== undefined) {
-        kidPieces = ctx.planLeaf(node.leaf, rect, effort);
-        return kidPieces;
-      }
-      lens = sizing.extents.get(node) || []; horizontal = node.dir === "H";
-      cursor = horizontal ? rect.y : rect.x; end = horizontal ? rect.y + rect.h : rect.x + rect.w;
+    var out, counts = [], i;
+    // `fixed`: mảnh đã đặt ở các nhánh trước (để chốt chặn khi dời); trả về mảnh của riêng nút này.
+    function realizeNode(node, rect, fixed) {
+      var lens, horizontal, cursor, end, k, len, kidRect, kidPieces, ext, delta, placed = [], axis, start;
+      if (node.leaf !== undefined) return ctx.planLeaf(node.leaf, rect, effort);
+      lens = sizing.extents.get(node) || []; horizontal = node.dir === "H"; axis = horizontal ? "y" : "x";
+      cursor = horizontal ? rect.y : rect.x; end = horizontal ? rect.y + rect.h : rect.x + rect.w; start = cursor;
       for (k = 0; k < node.kids.length; k++) {
         len = k < node.kids.length - 1 ? (lens[k] || 0) : end - cursor;
         if (len > end - cursor) len = end - cursor;
-        if (len <= 0) { if (k < node.kids.length - 1) continue; else break; }
+        if (len <= 0) continue;
         kidRect = horizontal ? { x: rect.x, y: cursor, w: rect.w, h: len } : { x: cursor, y: rect.y, w: len, h: rect.h };
-        kidPieces = realizeNode(node.kids[k], kidRect);
+        kidPieces = realizeNode(node.kids[k], kidRect, fixed.concat(placed));
         if (!kidPieces.length) continue;
-        if (!placed.length) kidPieces = pullToStart(out, kidPieces, horizontal ? "y" : "x", horizontal ? rect.y : rect.x, ctx);
+        if (!placed.length) kidPieces = pullToStart(fixed, kidPieces, axis, start, ctx);
         else {
-          ext = extentOf(kidPieces, ctx, horizontal ? "y" : "x");
-          delta = approachShift(placed, kidPieces, horizontal ? "y" : "x", ctx, ext.lo - (horizontal ? rect.y : rect.x));
+          ext = extentOf(kidPieces, ctx, axis);
+          delta = approachShift(fixed.concat(placed), kidPieces, axis, ctx, ext.lo - start);
           if (delta > 0) kidPieces = horizontal ? shiftPieces(kidPieces, 0, -delta) : shiftPieces(kidPieces, -delta, 0);
         }
-        for (i = 0; i < kidPieces.length; i++) { placed.push(kidPieces[i]); out.push(kidPieces[i]); }
-        ext = extentOf(kidPieces, ctx, horizontal ? "y" : "x");
-        cursor = ext.hi + ctx.s;
+        for (i = 0; i < kidPieces.length; i++) placed.push(kidPieces[i]);
+        ext = extentOf(kidPieces, ctx, axis);
+        // Khung của con sau bắt đầu sau khoảng cách khu cộng dự phòng cong (chốt chặn đòi s + 2 × sai số cong).
+        cursor = ext.hi + ctx.s + 2 * ctx.curve + 0.002;
       }
       return placed;
     }
-    realizeNode(tree, { x: 0, y: 0, w: ctx.W, h: ctx.H });
+    out = realizeNode(tree, { x: 0, y: 0, w: ctx.W, h: ctx.H }, []);
     for (i = 0; i < ctx.cutters.length; i++) counts.push(0);
     for (i = 0; i < out.length; i++) counts[out[i].c]++;
     for (i = 0; i < counts.length; i++) if (!counts[i]) return null;
@@ -584,8 +623,161 @@
     return added;
   }
 
+  // ---------- Gán bài, canh giữa, đóng gói ----------
+
+  function describeTree(tree) {
+    var two = false, i;
+    for (i = 0; i < tree.kids.length; i++) if (tree.kids[i].leaf === undefined) two = true;
+    return two ? "2 tầng" : (tree.dir === "H" ? "dải ngang" : "dải dọc");
+  }
+
+  // Mỗi khuôn: chia các con cho các bài cùng khuôn thành cụm liền; trả slot trên tờ (đã cộng lề).
+  function assignDesigns(pieces, ctx) {
+    var slots = [], c, i, list, centres, sizes, labels, m, vi, b, cutters = ctx.cutters;
+    for (c = 0; c < cutters.length; c++) {
+      list = []; centres = [];
+      for (i = 0; i < pieces.length; i++) if (pieces[i].c === c) { list.push(pieces[i]); b = ctx.boxOf(pieces[i]); centres.push({ x: (b.x0 + b.x1) / 2, y: (b.y0 + b.y1) / 2 }); }
+      sizes = clusterSizes(list.length, cutters[c].members.length);
+      labels = assignClusters(centres, sizes);
+      for (i = 0; i < list.length; i++) {
+        m = cutters[c].members[labels[i]]; vi = (list[i].vi + m.rel) % 4;
+        slots.push({ mi: m.type, vi: vi, x: list[i].x + ctx.margin, y: list[i].y + ctx.margin, angle: vi * 90 });
+      }
+    }
+    return slots;
+  }
+
+  // Canh giữa vùng dùng được: thử đúng tâm; bị PON chặn thì giữ đúng tâm một trục, trục kia dời
+  // nhiều nhất có thể (tìm nhị phân); không được thì không dời. Trả {dx, dy, exact}.
+  function centerLayout(pieces, ctx) {
+    var x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity, i, b, dx, dy, t, lo, hi, mid;
+    if (!pieces.length) return { dx: 0, dy: 0, exact: true };
+    for (i = 0; i < pieces.length; i++) {
+      b = ctx.boxOf(pieces[i]);
+      if (b.x0 < x0) x0 = b.x0; if (b.y0 < y0) y0 = b.y0; if (b.x1 > x1) x1 = b.x1; if (b.y1 > y1) y1 = b.y1;
+    }
+    dx = ctx.W / 2 - (x0 + x1) / 2; dy = ctx.H / 2 - (y0 + y1) / 2;
+    function ok(ddx, ddy) { return ctx.fitsSheet(shiftPieces(pieces, ddx, ddy)); }
+    if (Math.abs(dx) < 1e-9 && Math.abs(dy) < 1e-9) return { dx: 0, dy: 0, exact: true };
+    if (ok(dx, dy)) return { dx: dx, dy: dy, exact: true };
+    function partial(fixX) {
+      // Trục kia dời tỉ lệ t ∈ [0, 1] lớn nhất còn qua chốt chặn.
+      if (!(fixX ? ok(dx, 0) : ok(0, dy))) return null;
+      lo = 0; hi = 1;
+      for (i = 0; i < 12; i++) { mid = (lo + hi) / 2; if (fixX ? ok(dx, dy * mid) : ok(dx * mid, dy)) lo = mid; else hi = mid; }
+      t = lo;
+      return fixX ? { dx: dx, dy: dy * t, exact: false } : { dx: dx * t, dy: dy, exact: false };
+    }
+    var byX = partial(true), byY = partial(false);
+    if (byX && byY) return Math.abs(dy - byX.dy) <= Math.abs(dx - byY.dx) ? byX : byY;
+    if (byX) return byX;
+    if (byY) return byY;
+    return { dx: 0, dy: 0, exact: false };
+  }
+
+  // ---------- Job chia khu (chạy từng bước để panel hiện tiến độ) ----------
+
+  function now() { return new Date().getTime(); }
+
+  function createJob(input, core) {
+    var cutters = groupCutters(input.types, core), ctx = makeContext(input, cutters, core), G = cutters.length;
+    var K = 4, MAX_FINAL = 3, ests = [], ranked = null, ri = 0, candidates = [], fi = 0;
+    var started = now(), phase = "profile", pi = 0, total = G + K + 1, done = 0, result = null, finished = false;
+    var TIME_LIMIT = 35000, realized = 0;
+    function better(a, b) {
+      return a.total - b.total || a.minPer - b.minPer || b.boundaries - a.boundaries || b.index - a.index;
+    }
+    function stats(out, tree, index, sizing) {
+      var minPer = Infinity, c;
+      for (c = 0; c < G; c++) minPer = Math.min(minPer, Math.floor(out.counts[c] / cutters[c].members.length));
+      return { out: out, tree: tree, sizing: sizing, total: out.pieces.length, minPer: minPer, boundaries: countBoundaries(tree), index: index };
+    }
+    function rank() {
+      var trees = enumerateTrees(cutters), list = [], i, sz;
+      for (i = 0; i < trees.length; i++) {
+        sz = sizeTree(trees[i], ctx.W, ctx.H, ests, cutters, ctx.s);
+        if (sz.minPer < 1) continue;
+        list.push({ tree: trees[i], sizing: sz, total: sz.total, minPer: sz.minPer, boundaries: sz.boundaries, index: i });
+      }
+      list.sort(function (a, b) { return better(b, a); });
+      return { trees: trees.length, ranked: list };
+    }
+    // Hoàn thiện một ứng viên: dàn lại mức đầy đủ, lấp chỗ trống, canh giữa, chốt chặn cả tờ.
+    function finalize(cand) {
+      var pieces, full, added, cen, slots, counts = [], i, countText = [], zonesInfo = [], c, x0, y0, x1, y1, b, exact, off, n, types;
+      full = now() - started < TIME_LIMIT ? realizeTree(cand.tree, cand.sizing, ctx, "full") : null;
+      pieces = (full && full.pieces.length >= cand.out.pieces.length ? full : cand.out).pieces.slice();
+      added = fillGaps(pieces, ctx);
+      cen = centerLayout(pieces, ctx);
+      pieces = shiftPieces(pieces, cen.dx, cen.dy);
+      if (!ctx.verify(pieces)) {
+        // Bản đầy đủ hỏng chốt chặn thì thử lại bản dàn nhanh đã có.
+        if (full && full !== cand.out) { pieces = cand.out.pieces.slice(); added = fillGaps(pieces, ctx); cen = centerLayout(pieces, ctx); pieces = shiftPieces(pieces, cen.dx, cen.dy); }
+        if (!ctx.verify(pieces)) return null;
+      }
+      slots = assignDesigns(pieces, ctx);
+      for (i = 0; i < input.types.length; i++) counts.push(0);
+      for (i = 0; i < slots.length; i++) counts[slots[i].mi]++;
+      for (i = 0; i < counts.length; i++) { if (!counts[i]) return null; countText.push("loại " + (i + 1) + ": " + counts[i]); }
+      x0 = Infinity; y0 = Infinity; x1 = -Infinity; y1 = -Infinity;
+      for (i = 0; i < pieces.length; i++) {
+        b = ctx.boxOf(pieces[i]);
+        if (b.x0 < x0) x0 = b.x0; if (b.y0 < y0) y0 = b.y0; if (b.x1 > x1) x1 = b.x1; if (b.y1 > y1) y1 = b.y1;
+      }
+      off = { x: (x0 + x1) / 2 - ctx.W / 2, y: (y0 + y1) / 2 - ctx.H / 2 };
+      exact = Math.abs(off.x) <= 0.001 && Math.abs(off.y) <= 0.001;
+      for (c = 0; c < G; c++) {
+        types = []; n = 0;
+        for (i = 0; i < cutters[c].members.length; i++) { types.push(cutters[c].members[i].type); n += counts[cutters[c].members[i].type]; }
+        zonesInfo.push({ cutter: c, types: types, count: n });
+      }
+      return {
+        ok: true, slots: slots, count: slots.length, counts: counts, mode: "dàn chia khu theo mẫu", zones: zonesInfo,
+        centering: { exact: exact, offsetXmm: off.x, offsetYmm: off.y },
+        detail: "Dàn chia khu theo mẫu: " + slots.length + " con (" + countText.join(", ") + "). " + G + " khu " + describeTree(cand.tree) +
+          ", " + (ctx.s > ctx.gap ? "khu cách nhau " + ctx.s.toFixed(2) + " mm" : "các khu cách nhau bằng khe") +
+          ", khe " + ctx.gap.toFixed(2) + " mm theo đường bế thật; lấp thêm " + added + " con; đã nghĩ " + ranked.trees +
+          " cách chia, dàn thật " + realized + " cách trong " + (now() - started) + " ms." +
+          (exact ? "" : " Canh tâm bị giới hạn bởi vùng né PON.")
+      };
+    }
+    function step() {
+      var out, cand;
+      if (finished) return { done: true, progress: { done: total, total: total }, result: result };
+      if (phase === "profile") {
+        ests.push(makeEstimator(profileCutter(cutters[pi], ctx.W, ctx.H, ctx.gap, ctx.ponClear, core, ctx.curve)));
+        pi++; done++;
+        if (pi >= G) { ranked = rank(); phase = "realize"; total = G + Math.min(K, ranked.ranked.length) + 1; }
+      } else if (phase === "realize") {
+        if (ri < ranked.ranked.length && realized < K && now() - started < TIME_LIMIT) {
+          cand = ranked.ranked[ri]; ri++;
+          out = realizeTree(cand.tree, cand.sizing, ctx, "quick");
+          realized++; done++;
+          if (out) candidates.push(stats(out, cand.tree, cand.index, cand.sizing));
+        } else {
+          candidates.sort(function (a, b) { return better(b, a); });
+          phase = "final"; done = total - 1;
+        }
+      } else {
+        if (fi < candidates.length && fi < MAX_FINAL) { result = finalize(candidates[fi]); fi++; }
+        if (result || fi >= candidates.length || fi >= MAX_FINAL) { finished = true; done = total; }
+      }
+      return { done: finished, progress: { done: Math.min(done, total), total: total }, result: finished ? result : null };
+    }
+    return { step: step };
+  }
+
+  function runJob(job) {
+    var r;
+    for (;;) { r = job.step(); if (r.done) return r.result; }
+  }
+
   return {
     version: VERSION,
+    createJob: createJob,
+    runJob: runJob,
+    centerLayout: centerLayout,
+    assignDesigns: assignDesigns,
     fillGaps: fillGaps,
     makeContext: makeContext,
     realizeTree: realizeTree,

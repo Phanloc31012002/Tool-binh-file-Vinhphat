@@ -212,11 +212,11 @@ run("ổn định", () => {
 // Bộ tìm cũ vẫn thi đua: chữ L 45 × 45 khe 1 mm bộ cũ được 71 con, không được ít hơn.
 run("thi đua bộ cũ", () => check("Chữ L 45 × 45 (bộ cũ thắng)", inputFor(L.elbow(), 1), 71));
 
-// Khuôn khác nhau trên cùng tờ: vẫn dùng bộ tìm cũ, luân phiên cân bằng.
+// Khuôn khác nhau trên cùng tờ: bộ chia khu (mỗi khuôn một khu, gom cụm, lấp đầy); bài nào cũng có mặt.
 run("khác khuôn", () => {
   const input = inputFor(circle(30), 2, { types: [circle(30), L.rect(40, 25)], budgetMs: 1000 });
-  const r = check("Tròn 3 cm + chữ nhật 40 × 25 chung tờ", input, 20, { mode: /silhouette/ });
-  assert.ok(Math.max(...r.counts) - Math.min(...r.counts) <= 1, "khác khuôn vẫn cân bằng số con");
+  const r = check("Tròn 3 cm + chữ nhật 40 × 25 chung tờ", input, 20, { mode: /dàn chia khu theo mẫu/ });
+  r.counts.forEach((n, k) => assert.ok(n >= 1, "bài " + (k + 1) + " phải có mặt"));
 });
 
 assert.ok(Date.now() - began < 240000, "bộ kiểm thử xếp hàng lồng chạy trong thời gian hữu hạn");

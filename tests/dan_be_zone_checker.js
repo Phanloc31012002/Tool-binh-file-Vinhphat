@@ -110,11 +110,12 @@ function checkLayout(input, result, zoneGapMm) {
   cutterGroupsOf(input).forEach((g, gi) => g.forEach((ti) => { groupOf[ti] = gi; }));
   const shapes = placedAll(input, result);
   shapes.forEach((s, i) => {
-    assert.ok(s.x0 >= m - 1e-6 && s.y0 >= m - 1e-6 && s.x1 <= W - m + 1e-6 && s.y1 <= H - m + 1e-6, "con " + i + " ra ngoài lề tờ");
+    assert.ok(s.x0 >= m - 0.001 && s.y0 >= m - 0.001 && s.x1 <= W - m + 0.001 && s.y1 <= H - m + 0.001, "con " + i + " ra ngoài lề tờ");
     for (const d of input.sheet.dots) {
       const centre = [d.x, d.y], need = d.r + input.ponClearMm;
       assert.ok(!insideEvenOdd(centre, s.contours), "con " + i + " trùm lên chấm PON");
-      assert.ok(boundaryDist(centre, s.edges) >= need - 1e-6, "con " + i + " chạm vùng né PON (" + boundaryDist(centre, s.edges).toFixed(3) + " < " + need + ")");
+      // Dung sai 0,001 mm như các bộ đo độc lập hiện có (sai số số học khi quy đổi).
+      assert.ok(boundaryDist(centre, s.edges) >= need - 0.001, "con " + i + " chạm vùng né PON (" + boundaryDist(centre, s.edges).toFixed(4) + " < " + need + ")");
     }
   });
   for (let i = 0; i < shapes.length; i++) for (let j = i + 1; j < shapes.length; j++) {
@@ -122,7 +123,7 @@ function checkLayout(input, result, zoneGapMm) {
     const need = groupOf[a.mi] === groupOf[b.mi] ? gap : zoneGap;
     if (a.x0 > b.x1 + need || b.x0 > a.x1 + need || a.y0 > b.y1 + need || b.y0 > a.y1 + need) continue;
     const dist = outlineDist(a, b);
-    assert.ok(dist >= need - 1e-6, "con " + i + " và " + j + " cách " + dist.toFixed(4) + " mm, cần " + need + " mm");
+    assert.ok(dist >= need - 0.001, "con " + i + " và " + j + " cách " + dist.toFixed(4) + " mm, cần " + need + " mm");
     if (need <= 1e-9) assert.ok(!overlaps(a, b), "con " + i + " và " + j + " chồng lên nhau");
   }
 }
