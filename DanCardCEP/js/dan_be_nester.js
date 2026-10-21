@@ -16,7 +16,7 @@
 })(typeof window !== "undefined" ? window : this, function () {
   "use strict";
 
-  var VERSION = 10;
+  var VERSION = 11;
 
   function now() { return new Date().getTime(); }
   function abs(v) { return v < 0 ? -v : v; }
@@ -1882,16 +1882,21 @@
 
   // Kiểm tra liên tục, độc lập trên các path khuôn bế đã flatten. Các hàng raster
   // chọn vị trí đặt, nhưng không thể là trọng tài duy nhất cho một khe vật lý 1 mm.
-  function verifyGeometry(plan, variants, rw, rh, dots, gap, step) {
+  // Tham số zoneGap (tuỳ chọn, mm): hai con có trường `zone` khác nhau phải cách nhau ≥ zoneGap
+  // (khoảng cách giữa hai khu của bộ chia khu); cùng khu hoặc không ghi zone thì chỉ cần khe.
+  function verifyGeometry(plan, variants, rw, rh, dots, gap, step, zoneGap) {
     var mapped = [], i, j, s, v, groups, edges, gi, ci, pi, p, q;
     var tolerance = 0.001, curveError = 0;
     for (i = 0; i < variants.length; i++)
       curveError = Math.max(curveError,variants[i].curveErrorMm || 0);
+    var zoneGapMm = Number(zoneGap) > gap ? Number(zoneGap) : gap;
     // Đường cubic đã flatten lệch khỏi khuôn bế thật không quá sai số đã khai báo.
     // Chừa cả hai sai số trước khi khép một tiếp xúc; bù thêm
     // dung sai khoảng cách số học để nó không ăn vào giới hạn hình học đó.
-    if (curveError) gap += 2 * curveError + tolerance;
+    if (curveError) { gap += 2 * curveError + tolerance; zoneGapMm += 2 * curveError + tolerance; }
     var physicalGap = Math.max(0, gap - tolerance), gapSq = sq(physicalGap);
+    var zonePhysical = Math.max(0, zoneGapMm - tolerance), zoneSq = sq(zonePhysical), maxGap = Math.max(gap, zoneGapMm);
+    var pg, pgSq, pgPhysical;
     // Đĩa bao chỉ dùng để NHẬN nhanh cặp chắc chắn không va nhau. Cặp sát
     // đường bế thật vẫn phải qua phép đo cạnh đầy đủ, không thay khuôn bằng tròn.
     var outerRadii = [];
@@ -1904,7 +1909,7 @@
         }
       outerRadii.push(Math.sqrt(radiusSqMax));
     }
-    var index = spatialIndex(Math.max(8, gap * 2));
+    var index = spatialIndex(Math.max(8, maxGap * 2));
     for (i = 0; i < plan.length; i++) {
       s = plan[i]; v = variants[s.v]; groups = copyGroups(v.groups); edges = [];
       for (gi = 0; gi < groups.length; gi++) for (ci = 0; ci < groups[gi].length; ci++) {
@@ -1919,7 +1924,7 @@
         }
       }
       var shape = {groups:groups, edges:edges, bounds:boundsOfGroups(groups),
-        outerRadius:outerRadii[s.v], cx:s.x*step+v.w/2, cy:s.y*step+v.h/2};
+        outerRadius:outerRadii[s.v], cx:s.x*step+v.w/2, cy:s.y*step+v.h/2, zone:s.zone};
       for (var di = 0; di < dots.length; di++) {
         var centre = [dots[di].x * step, dots[di].y * step], radiusSq = sq(Math.max(0, dots[di].radius * step + curveError - tolerance));
         if (insideGroups(centre, groups)) return false;
@@ -1927,32 +1932,36 @@
           if (pointSegmentDistanceSq(centre, edges[ei].a, edges[ei].b) < radiusSq) return false;
       }
       var bb = shape.bounds;
-      var near = spatialNear(index, {x0:bb.x0-gap,x1:bb.x1+gap,y0:bb.y0-gap,y1:bb.y1+gap});
+      var near = spatialNear(index, {x0:bb.x0-maxGap,x1:bb.x1+maxGap,y0:bb.y0-maxGap,y1:bb.y1+maxGap});
       for (j = 0; j < near.length; j++) {
         var other = mapped[near[j]], ob = other.bounds;
-        if (bb.x0 >= ob.x1 + gap || ob.x0 >= bb.x1 + gap || bb.y0 >= ob.y1 + gap || ob.y0 >= bb.y1 + gap) continue;
+        // Khác khu (có ghi zone ở cả hai con) thì đòi khoảng cách khu; còn lại đòi khe.
+        if (shape.zone !== undefined && other.zone !== undefined && shape.zone !== other.zone) {
+          pg = zoneGapMm; pgSq = zoneSq; pgPhysical = zonePhysical;
+        } else { pg = gap; pgSq = gapSq; pgPhysical = physicalGap; }
+        if (bb.x0 >= ob.x1 + pg || ob.x0 >= bb.x1 + pg || bb.y0 >= ob.y1 + pg || ob.y0 >= bb.y1 + pg) continue;
         if (sq(shape.cx-other.cx)+sq(shape.cy-other.cy) >=
-          sq(shape.outerRadius+other.outerRadius+physicalGap)+1e-10) continue;
+          sq(shape.outerRadius+other.outerRadius+pgPhysical)+1e-10) continue;
         // Cubic chia mịn có thể có hàng nghìn cạnh. Lập chỉ mục mỗi đường bao
         // lân cận một lần thay vì so từng cạnh với mọi cạnh khác.
         if (!other.edgeIndex && other.edges.length > 160) {
-          other.edgeIndex = spatialIndex(Math.max(1,gap*2));
+          other.edgeIndex = spatialIndex(Math.max(1,maxGap*2));
           for (var oi = 0; oi < other.edges.length; oi++)
             spatialAdd(other.edgeIndex,oi,other.edges[oi]);
         }
         for (var ea = 0; ea < edges.length; ea++) {
           var e = edges[ea];
           var edgeNear = other.edgeIndex ? spatialNear(other.edgeIndex,
-            {x0:e.x0-gap,x1:e.x1+gap,y0:e.y0-gap,y1:e.y1+gap}) : null;
+            {x0:e.x0-pg,x1:e.x1+pg,y0:e.y0-pg,y1:e.y1+pg}) : null;
           for (var eb = 0; eb < (edgeNear ? edgeNear.length : other.edges.length); eb++) {
           var f = other.edges[edgeNear ? edgeNear[eb] : eb];
-          if (e.x0 >= f.x1 + gap || f.x0 >= e.x1 + gap || e.y0 >= f.y1 + gap || f.y0 >= e.y1 + gap) continue;
+          if (e.x0 >= f.x1 + pg || f.x0 >= e.x1 + pg || e.y0 >= f.y1 + pg || f.y0 >= e.y1 + pg) continue;
           if (segmentsCross(e.a, e.b, f.a, f.b) ||
-              pointSegmentDistanceSq(e.a, f.a, f.b) < gapSq || pointSegmentDistanceSq(e.b, f.a, f.b) < gapSq ||
-              pointSegmentDistanceSq(f.a, e.a, e.b) < gapSq || pointSegmentDistanceSq(f.b, e.a, e.b) < gapSq) return false;
+              pointSegmentDistanceSq(e.a, f.a, f.b) < pgSq || pointSegmentDistanceSq(e.b, f.a, f.b) < pgSq ||
+              pointSegmentDistanceSq(f.a, e.a, e.b) < pgSq || pointSegmentDistanceSq(f.b, e.a, e.b) < pgSq) return false;
           }
         }
-        if (gap > tolerance) {
+        if (pg > tolerance) {
           // Khe vật lý dương đã loại sẵn mọi biên dùng chung/trùng nhau
           // ở lượt đo khoảng cách đoạn thẳng. Giữ phép kiểm tra bao chứa
           // ít tốn kém của nó cho hàng nghìn khuôn bế rất nhỏ.
@@ -3477,7 +3486,7 @@
     }
 
     // input: như nest(); groups = khuôn dùng chung. Trả về slots trong toạ độ tờ (mm, y lên).
-    function plan(input, groups, curveError, budgetMs, deadlineAt) {
+    function plan(input, groups, curveError, budgetMs, deadlineAt, effort) {
       var began = now(), gap = Number(input.gapMm), margin = Number(input.marginMm), ponClear = Number(input.ponClearMm);
       var W = Number(input.sheet.widthMm) - 2 * margin, H = Number(input.sheet.heightMm) - 2 * margin;
       var ce = Math.min(0.025, Math.max(0, Number(curveError) || 0)), span = 0, gi, ci, pi, p;
@@ -3493,7 +3502,8 @@
       if (!(s0.w > 0 && s0.h > 0)) return null;
       // Ước lượng số con để chọn mức tìm kiếm (khuôn tí hon hàng nghìn con: tìm gọn hơn).
       var est = (W * H) / Math.max(1e-6, (s0.w + gap) * (s0.h + gap));
-      var opts = est > 2500 ? { pairSamples: 0, templates: 3, phases: 4, compose: false, tune: 0, evaluate: 6, refine: 1, fill: 0, fillMs: 0 } :
+      // Mức "quick" (bộ chia khu dàn thử nhiều khu): tìm gọn như khuôn tí hon, bất kể cỡ khuôn.
+      var opts = est > 2500 || effort === "quick" ? { pairSamples: 0, templates: 3, phases: 4, compose: false, tune: 0, evaluate: 6, refine: 1, fill: 0, fillMs: 0 } :
         est > 500 ? { pairSamples: 16, templates: 5, phases: 12, compose: false, tune: 1, evaluate: 12, refine: 2, fill: 20, fillMs: 250 } :
           { pairSamples: 40, templates: 8, phases: 24, compose: true, tune: 4, evaluate: 30, refine: 3, fill: 40, fillMs: 400 };
       // Khối lượng tìm đã giới hạn cố định theo cỡ bài (kết quả lặp lại được); hạn giờ chỉ là chốt an toàn.
@@ -3623,6 +3633,41 @@
     };
   }
 
+  // Dàn MỘT khuôn trong một khung chữ nhật (mm, gốc ở góc trên-trái khung, không lề) cho bộ chia khu.
+  // dots: chấm PON toạ độ trong khung, {x, y, r}. Trả {count, slots:[{vi, x, y}]} với vi theo hướng của `groups`;
+  // chỉ trả phương án đã qua chốt chặn độc lập; không có thì {count: 0, slots: []}.
+  // effort "full": hai lượt hướng chuẩn như nest(); "quick": một lượt, mức tìm gọn.
+  function planCutterRect(groups, curveErrorMm, rect, dots, gapMm, ponClearMm, effort) {
+    var none = { count: 0, slots: [] }, w = Number(rect && rect.w), h = Number(rect && rect.h);
+    if (!(w > 0) || !(h > 0)) return none;
+    var norm = normalizeGroups(groups);
+    if (!norm) return none;
+    var curve = Math.min(0.025, Math.max(0, Number(curveErrorMm) || 0)), fake = {
+      sheet: { widthMm: w, heightMm: h, dots: dots || [] }, marginMm: 0, gapMm: gapMm, ponClearMm: ponClearMm, budgetMs: 3000
+    };
+    var variants = cutterVariants(norm, curve), quick = effort === "quick", began = now();
+    var turn = canonicalTurn(norm), runs = quick ? [turn] : [turn, (turn + 2) % 4], plans = [], ri, si, one;
+    for (ri = 0; ri < runs.length; ri++) {
+      try {
+        one = RowNest.plan(fake, runs[ri] ? rotateGroups(norm, runs[ri] * 90) : norm, curve, 3000,
+          began + 20000 * (ri + 1) / runs.length, quick ? "quick" : "full");
+      } catch (planError) { one = null; }
+      if (!one || !one.count) continue;
+      for (si = 0; si < one.slots.length; si++) one.slots[si].vi = (one.slots[si].vi + runs[ri]) % 4;
+      one.turn = runs[ri];
+      plans.push(one);
+    }
+    plans.sort(function (a, b) { return b.count - a.count || a.neat - b.neat || a.turn - b.turn; });
+    for (ri = 0; ri < plans.length; ri++) {
+      if (!verifyRowSlots(fake, variants, plans[ri].slots)) continue;
+      var slots = [];
+      for (si = 0; si < plans[ri].slots.length; si++)
+        slots.push({ vi: plans[ri].slots[si].vi, x: plans[ri].slots[si].x, y: plans[ri].slots[si].y });
+      return { count: slots.length, slots: slots };
+    }
+    return none;
+  }
+
   // Bộ điều phối: lõi xếp hàng lồng chạy trước; bộ tìm cũ chạy thi đua phần tìm (rẻ).
   // Lấy phương án nhiều con hơn; bằng nhau thì giữ bố cục xếp hàng (gọn, đều, khép đúng khe).
   function nest(input) {
@@ -3676,6 +3721,12 @@
     version: VERSION,
     nest: nest,
     nestLegacy: nestLegacy,
+    // Phần lõi mở cho bộ chia khu (dan_be_zones.js).
+    _core: {
+      planCutterRect: planCutterRect, verifyGeometry: verifyGeometry, cutterVariants: cutterVariants,
+      canonicalTurn: canonicalTurn, rotateGroups: rotateGroups, normalizeGroups: normalizeGroups,
+      sameGroups: sameGroups, boundsOfGroups: boundsOfGroups, nestLegacy: nestLegacy
+    },
     // Chỉ mở ra cho dữ liệu mẫu test hồi quy chạy bằng Node; panel thì dùng nest().
     _test: {
       buildVariant: buildVariant, circleLike: circleLike, verifyPlan: verifyPlan,
