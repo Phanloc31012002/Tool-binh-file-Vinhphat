@@ -1,9 +1,9 @@
 {
     "product":  "com.locdev.dancard",
-    "version":  "2.17.1",
-    "title":  "Dàn bế decal xếp hàng lồng theo biên dạng thật",
-    "description":  "Dàn bế decal dùng lõi mới \"xếp hàng lồng\": tự tìm cách lồng khuôn theo đường bế thật cho mọi hình (tròn, tim, sao, giọt nước, mũ cong, con vật…), không cần chọn kiểu dàn hay cài sẵn cho từng loại khuôn.\nDàn được nhiều con hơn: thử 44 dạng khuôn × khe 1 và 2 mm được 4.692 con so với 4.390 của bản cũ (+6,9%), không ca nào ít hơn; khuôn tròn 2,5 cm được 174 con, 3 cm 118 con, 4 cm 67 con.\nTự dịch từng hàng và dịch cả cụm qua trái/phải để né PON, rồi canh giữa tờ; khép đúng khe theo đường bế thật, không co giãn hay sửa khuôn.\nCùng số con thì chọn bố cục gọn, đều hàng; khuôn trong file nguồn đặt xoay hướng nào cũng ra cùng một kết quả.\nBộ dàn cũ vẫn chạy song song và chỉ được chọn khi nhiều con hơn; mọi phương án đều qua kiểm tra khe, lề và PON trước khi vẽ.\nCập nhật xong cần đóng hẳn Illustrator rồi mở lại.",
-    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.17.1.zip",
-    "sha256":  "9BECB01B9F514EB0C02B379C0E4890E160C5587C99FB89F13362D531E5E9BF47",
-    "publishedUtc":  "2026-10-21T10:38:08.1439980Z"
+    "version":  "2.17.2",
+    "title":  "Võ sĩ \"1 cú\" mới cho tester Tân",
+    "description":  "Thay hình tester Tân bằng nhân vật võ sĩ \"1 cú\" do tool tự vẽ (2D, không dùng 3D): tóc xanh than vuốt ngược, áo hoodie tím khoá vàng, băng quấn tay, quần sọc hồng, giày trắng đế cam.\nChuyển động theo khung xương, cập nhật từng khung hình: lướt vào có tàn ảnh và vệt gió, trượt dừng tung bụi, nhún nhẹ trong thế thủ.\nGồng tụ lực: nắm đấm và mắt sáng dần, hạt sáng hút vào tay, người rung nhẹ trước khi bung đòn.\nCú đấm thẳng đúng tư thế: hông dồn tới, vai xoay, tay duỗi thẳng, tay kia che cằm, gót chân sau xoay lên; khựng hình lúc trúng rồi chữ \"Tân 1 cú\" nổ, nứt kính, bay mảnh và tụ lại như trước.\nHiệu ứng canvas vẫn vẽ 30 hình/giây để nhẹ máy; không đổi chức năng dàn.",
+    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.17.2.zip",
+    "sha256":  "9A08D7236E2CF9CB5B563AE4EA2A8742929589FBCA9A02531DF8AA679D12585E",
+    "publishedUtc":  "2026-10-21T11:00:33.6235110Z"
 }

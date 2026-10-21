@@ -2,6 +2,16 @@
 
 _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
+## v2.17.2 — Võ sĩ "1 cú" mới cho tester Tân
+
+- Thay hình tester Tân bằng nhân vật võ sĩ "1 cú" do tool tự vẽ (2D, không dùng 3D): tóc xanh than vuốt ngược, áo hoodie tím khoá vàng, băng quấn tay, quần sọc hồng, giày trắng đế cam.
+- Chuyển động theo khung xương, cập nhật từng khung hình: lướt vào có tàn ảnh và vệt gió, trượt dừng tung bụi, nhún nhẹ trong thế thủ.
+- Gồng tụ lực: nắm đấm và mắt sáng dần, hạt sáng hút vào tay, người rung nhẹ trước khi bung đòn.
+- Cú đấm thẳng đúng tư thế: hông dồn tới, vai xoay, tay duỗi thẳng, tay kia che cằm, gót chân sau xoay lên; khựng hình lúc trúng rồi chữ "Tân 1 cú" nổ, nứt kính, bay mảnh và tụ lại như trước.
+- Hiệu ứng canvas vẫn vẽ 30 hình/giây để nhẹ máy; không đổi chức năng dàn.
+
+---
+
 ## v2.17.1 — Dàn bế decal xếp hàng lồng theo biên dạng thật
 
 - Dàn bế decal dùng lõi mới "xếp hàng lồng": tự tìm cách lồng khuôn theo đường bế thật cho mọi hình (tròn, tim, sao, giọt nước, mũ cong, con vật…), không cần chọn kiểu dàn hay cài sẵn cho từng loại khuôn.

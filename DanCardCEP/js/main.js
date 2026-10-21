@@ -351,28 +351,136 @@
     '<svg class="tester-bolt bolt-16" viewBox="0 0 24 78"><defs><linearGradient id="tester-electric-gradient-16" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#0d7cc0"></stop><stop offset="52%" stop-color="#3e58b3"></stop><stop offset="100%" stop-color="#7a2d9d"></stop></linearGradient></defs><polyline style="stroke:url(#tester-electric-gradient-16)" class="bolt-halo" points="12,1 11,12 14,24 17,36 7,49 10,61 12,76"></polyline><polyline style="stroke:url(#tester-electric-gradient-16)" class="bolt-mid" points="12,1 11,12 14,24 17,36 7,49 10,61 12,76"></polyline><polyline style="stroke:#ffffff" class="bolt-core" points="12,1 11,12 14,24 17,36 7,49 10,61 12,76"></polyline><polyline style="stroke:url(#tester-electric-gradient-16)" class="bolt-halo" points="17,36 21,41 22,49"></polyline><polyline style="stroke:url(#tester-electric-gradient-16)" class="bolt-mid" points="17,36 21,41 22,49"></polyline><polyline style="stroke:#ffffff" class="bolt-core" points="17,36 21,41 22,49"></polyline></svg>' +
     '<svg class="tester-bolt bolt-17" viewBox="0 0 24 78"><defs><linearGradient id="tester-electric-gradient-17" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#0d7cc0"></stop><stop offset="52%" stop-color="#3e58b3"></stop><stop offset="100%" stop-color="#7a2d9d"></stop></linearGradient></defs><polyline style="stroke:url(#tester-electric-gradient-17)" class="bolt-halo" points="12,1 16,12 6,24 9,36 12,49 15,61 12,76"></polyline><polyline style="stroke:url(#tester-electric-gradient-17)" class="bolt-mid" points="12,1 16,12 6,24 9,36 12,49 15,61 12,76"></polyline><polyline style="stroke:#ffffff" class="bolt-core" points="12,1 16,12 6,24 9,36 12,49 15,61 12,76"></polyline><polyline style="stroke:url(#tester-electric-gradient-17)" class="bolt-halo" points="12,49 7,56 2,66"></polyline><polyline style="stroke:url(#tester-electric-gradient-17)" class="bolt-mid" points="12,49 7,56 2,66"></polyline><polyline style="stroke:#ffffff" class="bolt-core" points="12,49 7,56 2,66"></polyline></svg>' +
     "</span>";
+  // ===== VÕ SĨ "1 CÚ" — nhân vật riêng của tool cho tester Tân (vẽ 2D, không 3D) =====
+  // Hình dựng theo khung xương: mỗi đoạn tay/chân là một nhóm <g> vẽ dọc trục +y từ khớp,
+  // JS chỉ đổi transform từng khung hình. Toạ độ khung: gốc ở mặt đất dưới hông, +x là hướng
+  // nhìn/hướng đấm; nhóm ngoài cùng lật gương để nhân vật quay mặt về phía chữ (bên trái).
+  function vsLimb(len, w0, w1) {
+    var a = (w0 / 2).toFixed(2),
+      b = (w1 / 2).toFixed(2),
+      L = len.toFixed(2);
+    return (
+      "M-" + a + ",0A" + a + "," + a + " 0 0 1 " + a + ",0L" + b + "," + L +
+      "A" + b + "," + b + " 0 0 1 -" + b + "," + L + "Z"
+    );
+  }
+  function buildVoSiSvg() {
+    var OL = ' stroke="#1d1642" stroke-width="0.7" stroke-linejoin="round"';
+    function arm(cls, skinG, sleeveG, wrap, fist, crease) {
+      return (
+        '<g class="' + cls + '-u">' +
+        '<path d="' + vsLimb(11.5, 5.8, 4.6) + '" fill="url(#' + skinG + ')"' + OL + "/>" +
+        '<path d="M-3.9,-1.4A3.9,3.9 0 0 1 3.9,-1.4L3.4,6.2Q0,7.5 -3.4,6.2Z" fill="url(#' + sleeveG + ')"' + OL + "/>" +
+        '<path d="M-3.4,5Q0,6.3 3.4,5" stroke="#1d1642" stroke-width="0.45" fill="none" opacity="0.6"/>' +
+        "</g>" +
+        '<g class="' + cls + '-f">' +
+        '<path d="' + vsLimb(10.5, 5.0, 4.1) + '" fill="url(#' + skinG + ')"' + OL + "/>" +
+        '<rect x="-2.35" y="6.2" width="4.7" height="4.6" rx="0.9" fill="' + wrap + '"' + OL + "/>" +
+        '<path d="M-2.2,7.4L2.2,9.2M-2.2,9.2L2.2,7.4" stroke="' + crease + '" stroke-width="0.4" fill="none"/>' +
+        '<rect x="-3.2" y="9.6" width="6.4" height="5.8" rx="1.9" fill="' + fist + '"' + OL + "/>" +
+        '<path d="M-2.4,13.6L2.4,13.6M-0.8,10.8L-0.8,12.9M0.85,10.8L0.85,12.9M2.2,10.4Q3,11.6 2.3,12.6" stroke="' + crease +
+        '" stroke-width="0.45" fill="none"/>' +
+        "</g>"
+      );
+    }
+    function leg(cls, pantsG, stripe, cuff, shoe) {
+      return (
+        '<g class="' + cls + '-t">' +
+        '<path d="' + vsLimb(15.5, 8.0, 6.0) + '" fill="url(#' + pantsG + ')"' + OL + "/>" +
+        '<rect x="-0.5" y="1" width="1" height="13.6" fill="' + stripe + '"/>' +
+        "</g>" +
+        '<g class="' + cls + '-s">' +
+        '<path d="' + vsLimb(15, 6.0, 4.6) + '" fill="url(#' + pantsG + ')"' + OL + "/>" +
+        '<rect x="-0.45" y="0" width="0.9" height="12.2" fill="' + stripe + '"/>' +
+        '<rect x="-2.7" y="12.2" width="5.4" height="2.6" rx="0.8" fill="' + cuff + '"' + OL + "/>" +
+        "</g>" +
+        '<g class="' + cls + '-f">' +
+        '<path d="M3.1,-0.2C3.2,-1.9 2,-3 0.3,-3.1L-3.4,-4.7L-6.1,-4.3C-7.1,-3.6 -7.2,-1.7 -6.9,-0.2Z" fill="' +
+        shoe + '"' + OL + "/>" +
+        '<path d="M-7.1,-0.45L3.3,-0.45L3.2,0.6L-7.1,0.6Z" fill="#ff8a3d"' + OL + "/>" +
+        '<path d="M-1,-3.1L0.5,-2.1M-2.3,-3.7L-0.8,-2.6" stroke="#9aa0b5" stroke-width="0.4" fill="none"/>' +
+        "</g>"
+      );
+    }
+    function cel(id, shade, base) {
+      return (
+        '<linearGradient id="' + id + '" x1="0" y1="0" x2="1" y2="0">' +
+        '<stop offset="0" stop-color="' + shade + '"/><stop offset="0.36" stop-color="' + shade + '"/>' +
+        '<stop offset="0.36" stop-color="' + base + '"/><stop offset="1" stop-color="' + base + '"/></linearGradient>'
+      );
+    }
+    var ghost = '<use class="vs-ghost" xlink:href="#vsRig" opacity="0" style="display:none"/>';
+    return (
+      '<svg viewBox="-40 -70 80 76" width="100%" height="100%" focusable="false">' +
+      "<defs>" +
+      '<radialGradient id="vsGlowG"><stop offset="0" stop-color="#ffffff"/>' +
+      '<stop offset="0.28" stop-color="#ffe08a"/><stop offset="0.6" stop-color="#ff5aa8" stop-opacity="0.7"/>' +
+      '<stop offset="1" stop-color="#8a5cff" stop-opacity="0"/></radialGradient>' +
+      '<linearGradient id="vsSmearG" x1="0" y1="0" x2="1" y2="0">' +
+      '<stop offset="0" stop-color="#8a5cff" stop-opacity="0"/><stop offset="0.6" stop-color="#d45cff" stop-opacity="0.42"/>' +
+      '<stop offset="1" stop-color="#ffffff" stop-opacity="0.95"/></linearGradient>' +
+      cel("vsSkinN", "#dda07d", "#f4c6a0") + cel("vsSkinF", "#b9805f", "#cf9874") +
+      cel("vsSleeveN", "#4535c4", "#6150ea") + cel("vsSleeveF", "#2c2280", "#3a2e9e") +
+      cel("vsPantsN", "#1f2130", "#2e3246") + cel("vsPantsF", "#17181f", "#21232f") +
+      '<linearGradient id="vsHoodG" x1="0" y1="0" x2="0" y2="1">' +
+      '<stop offset="0" stop-color="#7464f6"/><stop offset="1" stop-color="#4433c6"/></linearGradient>' +
+      "</defs>" +
+      '<g transform="scale(-1,1)">' +
+      '<g class="vs-ghosts">' + ghost + ghost + ghost + "</g>" +
+      '<g id="vsRig" class="vs-rig" opacity="0">' +
+      '<ellipse class="vs-shadow" cx="0" cy="0.4" rx="12" ry="1.7" fill="#05030d" opacity="0.32"/>' +
+      // tay xa (tay trước, tay thủ) và chân xa vẽ sau lưng, tông tối hơn
+      arm("vs-fa", "vsSkinF", "vsSleeveF", "#cfcabd", "#d9d4c9", "#9d97ad") +
+      leg("vs-fl", "vsPantsF", "#b23a68", "#14151d", "#d6d5cf") +
+      '<g class="vs-hips"><path d="M-5.6,-2L5.4,-2L5.7,2.6C5.5,4.8 3.4,5.9 0.5,5.9C-2.7,5.9 -5.5,5 -5.9,2.7Z" fill="#262838"' + OL + "/></g>" +
+      leg("vs-nl", "vsPantsN", "#ff4f8b", "#1b1d2b", "#f7f6f1") +
+      // thân: áo hoodie tím, khoá kéo vàng, mũ áo sau gáy
+      '<g class="vs-torso">' +
+      '<rect x="-2" y="-21.8" width="4" height="4.4" rx="1.4" fill="#e3ab84"' + OL + "/>" +
+      '<path d="M-1.4,-18.6C-3.4,-21.8 -7.6,-21.4 -8,-17.8C-8.2,-15.6 -6.8,-13.8 -5,-14Z" fill="#33279c"' + OL + "/>" +
+      '<path d="M5,2.6C5.6,-1 5.6,-4.5 6.2,-8C6.9,-11.5 6.6,-14 5.2,-16C4.2,-17.4 3.4,-18.1 2.4,-18.5L-2.4,-18.8' +
+      'C-4.8,-18 -6.6,-16.6 -6.6,-13.6C-6.6,-9.5 -5.6,-5 -5.2,-1C-5.1,0.6 -5,1.8 -5,2.6Q0,3.8 5,2.6Z" fill="url(#vsHoodG)"' + OL + "/>" +
+      '<path d="M-2.4,-18.6C-4.6,-17.8 -6.3,-16.4 -6.3,-13.6C-6.3,-9.5 -5.3,-5 -4.9,-1C-4.8,0.6 -4.8,1.8 -4.8,2.6' +
+      'L-2.6,3C-2.9,-2 -3.6,-7 -3.6,-12C-3.6,-15 -3,-17.2 -2.4,-18.6Z" fill="#3626a8" opacity="0.9"/>' +
+      '<path d="M3.2,-15.4C4.8,-14.2 5.6,-12.4 5.6,-10.4" stroke="#9d90ff" stroke-width="0.6" fill="none" opacity="0.8"/>' +
+      '<path d="M-5,1.6Q0,2.8 5.1,1.6L5,2.6Q0,3.8 -5,2.6Z" fill="#2c2190"/>' +
+      '<path d="M2.6,-3.6Q4,-4.3 5.4,-5.7M1.4,-6.9Q3.2,-7.7 5.9,-9.5" stroke="#2c2190" stroke-width="0.5" fill="none"/>' +
+      '<path d="M0.4,-0.6Q3,-1.2 5,-3.2" stroke="#2c2190" stroke-width="0.55" fill="none"/>' +
+      '<path d="M4.5,2.1C5.1,-1.6 5.2,-4.8 5.7,-8C6.3,-11.4 5.9,-13.9 4.7,-15.7C3.9,-16.9 3.1,-17.6 2.2,-18.1" stroke="#ffc94a" stroke-width="0.6" fill="none"/>' +
+      '<path d="M0.5,-18.7L2.6,-18.3L1.3,-16.5Z" fill="#17131f"/>' +
+      "</g>" +
+      // đầu: mặt nghiêng 3/4, mắt sắc, tóc xanh than vuốt ngược
+      '<g class="vs-head">' +
+      '<path d="M-5.2,-1.5C-5.4,-6.5 -1.5,-7.6 1.5,-6.8C4.6,-6 5.6,-3 5.3,0.2C5.1,2.4 4.6,4.2 3.6,5.4' +
+      'C2.6,6.4 0.8,6.3 -0.6,5.4C-2.8,4 -5,2.2 -5.2,-1.5Z" fill="#f2c29b"' + OL + "/>" +
+      '<path d="M-1.8,-0.6C-3.2,-0.8 -3.4,1.6 -1.9,2Z" fill="#e3a57f"' + OL + "/>" +
+      '<path d="M1.3,-1.1L4.4,-1.6L4.1,-0.2C3.3,0.35 2.1,0.3 1.5,-0.25Z" fill="#1b1530"/>' +
+      '<circle cx="3" cy="-0.6" r="0.62" fill="#7a5cff"/>' +
+      '<circle cx="3.3" cy="-0.95" r="0.32" fill="#ffffff"/>' +
+      '<circle class="vs-eye-glow" cx="3" cy="-0.6" r="1.6" fill="#ff7ad9" opacity="0"/>' +
+      '<path d="M5.25,0.6L5.6,1.5L5.05,1.65" stroke="#c98d6b" stroke-width="0.4" fill="none"/>' +
+      '<path class="vs-mouth-c" d="M3,3.5L4.4,3.3" stroke="#7a3b2e" stroke-width="0.45" fill="none"/>' +
+      '<path class="vs-mouth-o" d="M2.8,3L4.6,2.8L4.3,4.6Q3.4,5 2.9,4.2Z" fill="#4a1620" opacity="0"/>' +
+      '<path d="M5.2,-3.2L3.6,-1.9L3.4,-3.3L1.9,-2L1.6,-3.9C0.2,-3.6 -1,-2.6 -1.6,-1.2L-2.6,0.9L-3.6,-0.4' +
+      'L-5.6,1.9L-5.3,-0.9L-8.4,-0.6L-6,-3.2L-8.9,-4.6L-5.6,-5.8L-7.4,-8.6L-3.6,-7.4L-3.4,-10L-0.6,-7.6' +
+      'L1.6,-9L2,-6.9C4.2,-6.6 5.6,-5.2 5.2,-3.2Z" fill="#1c2142" stroke="#0e1024" stroke-width="0.7" stroke-linejoin="round"/>' +
+      '<path d="M-4.8,-6L-1.6,-7L0.8,-6.6L-1.2,-6.1Z" fill="#4c55c8" opacity="0.85"/>' +
+      '<path d="M1,-3.1L4.7,-2.3L4.6,-1.85L1.1,-2.55Z" fill="#1c2142"/>' +
+      "</g>" +
+      '<polygon class="vs-smear" points="0,0 0,0 0,0" fill="url(#vsSmearG)" opacity="0"/>' +
+      // tay gần (tay sau, tay đấm chính) vẽ trên cùng
+      arm("vs-na", "vsSkinN", "vsSleeveN", "#f7f4ec", "#faf7f0", "#b5afc6") +
+      '<circle class="vs-glow" cx="0" cy="0" r="5" fill="url(#vsGlowG)" opacity="0"/>' +
+      "</g>" +
+      "</g>" +
+      "</svg>"
+    );
+  }
   var TESTER_DEFAULT =
     '<span class="tan-battle">' +
     '<canvas class="battle-fx" aria-hidden="true"></canvas>' +
-    '<span class="saitama" aria-hidden="true">' +
-    '<svg viewBox="0 0 60 80" width="100%" height="100%">' +
-    '<path class="s-cape" d="M22 26 C10 34 6 52 12 66 C18 58 24 56 30 56 L28 30 Z" fill="#f4f6f7"/>' +
-    '<rect x="26" y="54" width="6" height="20" rx="3" fill="#e2564b"/>' +
-    '<rect x="34" y="54" width="6" height="20" rx="3" fill="#c9463c"/>' +
-    '<path class="s-torso" d="M24 30 q9 -5 18 0 l-2 26 q-7 4 -14 0 Z" fill="#f4d03f"/>' +
-    '<rect x="24" y="50" width="18" height="4" rx="1.5" fill="#8a6d1e"/>' +
-    '<rect x="31" y="22" width="4" height="6" fill="#f6c9a0"/>' +
-    '<circle cx="33" cy="16" r="9" fill="#f6c9a0"/>' +
-    '<circle cx="30" cy="16" r="1.2" fill="#20303a"/>' +
-    '<circle cx="37" cy="16" r="1.2" fill="#20303a"/>' +
-    '<path d="M29 20 q4 2 8 0" stroke="#c98d63" stroke-width="1" fill="none" stroke-linecap="round"/>' +
-    '<rect x="22" y="32" width="5" height="12" rx="2.5" fill="#f4d03f" transform="rotate(24 24 34)"/>' +
-    '<g class="s-arm-g">' +
-    '<rect x="40" y="33" width="16" height="5" rx="2.5" fill="#f4d03f"/>' +
-    '<circle cx="57" cy="35" r="5" fill="#e2564b"/>' +
-    '<circle cx="57" cy="35" r="5" fill="none" stroke="#b83d34" stroke-width="1"/>' +
-    "</g>" +
-    "</svg>" +
+    '<span class="vo-si" aria-hidden="true">' +
+    buildVoSiSvg() +
     "</span>" +
     '<span class="tan-word">' +
     '<span class="shatter-unit unit-tan">' +
@@ -502,25 +610,28 @@
     testerLightningLastIndex = -1;
     scheduleRandomTesterLightning(testerLightningGeneration);
   }
-  // ===== SAITAMA đấm chữ "Tân 1 cú" — engine (canvas fire+nổ, đi/gồng/đấm) =====
-  var saiRAF = null,
-    saiGen = 0;
-  function stopSaitamaBattle() {
-    saiGen++;
-    if (saiRAF !== null) {
-      window.cancelAnimationFrame(saiRAF);
-      saiRAF = null;
+  // ===== VÕ SĨ "1 CÚ" đấm chữ "Tân 1 cú" — engine =====
+  // Nhân vật cập nhật mỗi khung hình (mượt theo màn hình); hiệu ứng canvas (tụ lực, bụi, nổ, kính vỡ,
+  // mảnh chữ) vẽ 30 hình/giây để nhẹ máy. Một chu kỳ 10 giây: lướt vào -> thủ thế -> gồng tụ lực
+  // -> lấy đà -> đấm thẳng (hông dẫn, vai xoay, tay duỗi) -> khựng hình khi trúng -> thu tay -> lùi ra.
+  var tanRAF = null,
+    tanGen = 0;
+  function stopTanBattle() {
+    tanGen++;
+    if (tanRAF !== null) {
+      window.cancelAnimationFrame(tanRAF);
+      tanRAF = null;
     }
   }
-  function startSaitamaBattle() {
+  function startTanBattle() {
     if (!testerName) return;
     var root = testerName.querySelector(".tan-battle");
     if (!root) return;
     var cv = root.querySelector(".battle-fx");
-    var sai = root.querySelector(".saitama");
+    var fighter = root.querySelector(".vo-si");
     var word = root.querySelector(".tan-word");
     var units = root.querySelectorAll(".shatter-unit");
-    if (!cv || !cv.getContext || !sai || !word || !units.length) return;
+    if (!cv || !cv.getContext || !fighter || !word || !units.length) return;
     var ctx = cv.getContext("2d");
     // Khung kính vỡ nhỏ trong panel: 1.25x vẫn nét, nhưng giảm mạnh số pixel phải blend.
     var DPR = Math.min(window.devicePixelRatio || 1, 1.25);
@@ -534,12 +645,12 @@
       });
     }
 
-    var gen = saiGen,
+    var gen = tanGen,
       CYCLE = 10000,
       start = 0;
-    var lastSaiDraw = 0,
-      SAI_FRAME_MS = 1000 / 30,
-      saiIdle = false;
+    var lastFxDraw = 0,
+      FX_FRAME_MS = 1000 / 30,
+      fxIdle = false;
     var W = 0,
       H = 0,
       target = { x: 0, y: 0 };
@@ -774,18 +885,453 @@
       }
     }
 
+
+    // ---- Khung xương võ sĩ: tham chiếu các nhóm SVG ----
+    function part(selector) {
+      return fighter.querySelector(selector);
+    }
+    var RIG = part(".vs-rig");
+    var P = {
+      nau: part(".vs-na-u"),
+      naf: part(".vs-na-f"),
+      fau: part(".vs-fa-u"),
+      faf: part(".vs-fa-f"),
+      nlt: part(".vs-nl-t"),
+      nls: part(".vs-nl-s"),
+      nlf: part(".vs-nl-f"),
+      flt: part(".vs-fl-t"),
+      fls: part(".vs-fl-s"),
+      flf: part(".vs-fl-f"),
+      torso: part(".vs-torso"),
+      hips: part(".vs-hips"),
+      eyeGlow: part(".vs-eye-glow"),
+      head: part(".vs-head"),
+      shadow: part(".vs-shadow"),
+      glow: part(".vs-glow"),
+      smear: part(".vs-smear"),
+      mouthC: part(".vs-mouth-c"),
+      mouthO: part(".vs-mouth-o"),
+      ghosts: fighter.querySelectorAll(".vs-ghost"),
+    };
+    if (!RIG || !P.nau || !P.naf || !P.torso || !P.head || !P.nlf || !P.flf) return;
+
+    var DEG = Math.PI / 180;
+    var L_UA = 11.5, // cánh tay trên
+      L_FA = 10.5, // cẳng tay
+      L_TH = 15.5, // đùi
+      L_SH = 15; // cẳng chân
+    var OFF_X = -112; // vị trí ngoài khung (phía sau lưng nhân vật)
+
+    // Các tư thế khoá (đơn vị khung xương; y âm là lên trên). Toạ độ nắm đấm tính theo hông,
+    // toạ độ mũi bàn chân tính tuyệt đối để chân đứng yên trên mặt đất khi hông dồn lực.
+    // Thế thủ: tay sau che cằm, tay trước đưa ra đo khoảng cách, gót chân sau kiễng nhẹ.
+    var STANCE = { x: 0, y: -28.8, lean: 5, twist: 0.15, head: 3, nfx: 5.4, nfy: -19.4,
+      ffx: 12.6, ffy: -21.6, nbx: -9, nh: 10, nby: 0, fbx: 11, fh: 0, fby: 0, mouth: 0, glow: 0 };
+    // Lướt: hạ thấp, đổ người tới trước; bàn chân trượt theo người.
+    var DASH = { x: 0, y: -26.6, lean: 13, twist: 0.1, head: -6, nfx: 7, nfy: -19.2,
+      ffx: 12.6, ffy: -19.8, nbx: -12.5, nh: 22, nby: 0, fbx: 9.5, fh: 0, fby: -1.2, mouth: 0, glow: 0 };
+    // Gồng: dồn trọng tâm về chân sau, vai đấm kéo ra sau, nắm đấm thu sát vai.
+    var COIL = { x: -2.4, y: -27.2, lean: -3, twist: -0.35, head: 3, nfx: -0.6, nfy: -18.6,
+      ffx: 14.2, ffy: -20.4, nbx: -9.4, nh: 0, nby: 0, fbx: 11.2, fh: 0, fby: 0, mouth: 0, glow: 0.75 };
+    // Lấy đà: xoắn thêm một nhịp ngắn trước khi bung.
+    var LOAD = { x: -3.3, y: -26.5, lean: -6, twist: -0.55, head: 4, nfx: -2.2, nfy: -18,
+      ffx: 15, ffy: -20, nbx: -9.4, nh: 0, nby: 0, fbx: 11.2, fh: 0, fby: 0, mouth: 0, glow: 1 };
+    // Trúng đích: hông dồn tới, vai xoay, tay đấm duỗi thẳng, tay kia thu về che cằm, gót sau xoay lên.
+    var HIT = { x: 6.5, y: -27.4, lean: 18, twist: 1, head: 6, nfx: 33, nfy: -15.2,
+      ffx: 3.2, ffy: -23.4, nbx: -8, nh: 40, nby: 0, fbx: 13.4, fh: 0, fby: 0, mouth: 1, glow: 1 };
+    // Dư lực: giữ tay một nhịp, giật nhẹ về.
+    var FOLLOW = { x: 5.4, y: -27.9, lean: 14, twist: 0.82, head: 5, nfx: 28.4, nfy: -15.8,
+      ffx: 3.8, ffy: -23, nbx: -8, nh: 30, nby: 0, fbx: 13.4, fh: 0, fby: 0, mouth: 0, glow: 0 };
+    var KEYS = ["x", "y", "lean", "twist", "head", "nfx", "nfy", "ffx", "ffy", "nbx", "nh", "nby",
+      "fbx", "fh", "fby", "mouth", "glow"];
+    function mixPose(a, b, k) {
+      var o = {}, i, key;
+      for (i = 0; i < KEYS.length; i++) {
+        key = KEYS[i];
+        o[key] = a[key] + (b[key] - a[key]) * k;
+      }
+      return o;
+    }
+    function copyPose(a) {
+      return mixPose(a, a, 0);
+    }
+    function clamp(v, a, b) {
+      return v < a ? a : v > b ? b : v;
+    }
+    function easeOut(p) {
+      return 1 - Math.pow(1 - p, 3);
+    }
+    function eOutQuint(u) {
+      return 1 - Math.pow(1 - u, 5);
+    }
+    function eInOutCubic(u) {
+      return u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2;
+    }
+    function eInOutSine(u) {
+      return -(Math.cos(Math.PI * u) - 1) / 2;
+    }
+    function eOutBack(u) {
+      var c1 = 1.5;
+      return 1 + (c1 + 1) * Math.pow(u - 1, 3) + c1 * Math.pow(u - 1, 2);
+    }
+    function phase(t, a, b) {
+      return clamp((t - a) / (b - a), 0, 1);
+    }
+
+    // mốc (ms) — giữ mốc nổ T_PUNCH và nhịp mảnh chữ như trước
+    var T_DASH0 = 1300,
+      T_DASH1 = 1700; // lướt vào
+    var T_SET1 = 2250; // trượt dừng, vào thế thủ
+    var T_COIL0 = 2400,
+      T_COIL1 = 3300; // gồng tụ lực
+    var T_LOAD1 = 3470; // lấy đà
+    var T_PUNCH = 3600; // nắm đấm chạm chữ -> nổ
+    var T_FREEZE = 3680; // khựng hình khi trúng
+    var T_FOLLOW1 = 4250,
+      T_GUARD1 = 4620; // thu tay về thế thủ
+    var T_OUT0 = 4900,
+      T_OUT1 = 5320; // lùi nhanh ra
+    var T_SCATTER = 3600,
+      T_SCATTER_END = 4400; // mảnh bay ra
+    var T_BACK0 = 5400,
+      T_BACK1 = 7000; // mảnh bay về
+
+    function bounce(t, amp) {
+      return -Math.abs(Math.sin(t * 0.0075)) * amp; // nhún ~2,4 nhịp/giây
+    }
+    function tremble(p, a) {
+      p.x += (Math.random() - 0.5) * a;
+      p.y += (Math.random() - 0.5) * a;
+      p.nfx += (Math.random() - 0.5) * a * 1.4;
+      p.nfy += (Math.random() - 0.5) * a * 1.4;
+      p.ffx += (Math.random() - 0.5) * a;
+      p.ffy += (Math.random() - 0.5) * a;
+    }
+    function dashX(t) {
+      return OFF_X + (2.8 - OFF_X) * eOutQuint(phase(t, T_DASH0, T_DASH1));
+    }
+    function outX(t) {
+      return OFF_X * eInOutCubic(phase(t, T_OUT0, T_OUT1));
+    }
+    function poseAt(t) {
+      var p, u, uh, ut, ua, k;
+      if (t < T_DASH0 || t >= T_OUT1) return null;
+      if (t < T_DASH1) {
+        u = phase(t, T_DASH0, T_DASH1);
+        p = copyPose(DASH);
+        p.x = dashX(t);
+        p.nbx = p.x + DASH.nbx;
+        p.fbx = p.x + DASH.fbx;
+        p.fby = DASH.fby * (1 - u);
+        return p;
+      }
+      if (t < T_SET1) {
+        u = phase(t, T_DASH1, T_SET1);
+        var from = copyPose(DASH);
+        from.x = 2.8;
+        from.nbx = 2.8 + DASH.nbx;
+        from.fbx = 2.8 + DASH.fbx;
+        from.fby = 0;
+        p = mixPose(from, STANCE, eOutBack(u));
+        p.y += bounce(t, 0.9 * u);
+        return p;
+      }
+      if (t < T_COIL0) {
+        p = copyPose(STANCE);
+        p.y += bounce(t, 0.9);
+        return p;
+      }
+      if (t < T_COIL1) {
+        u = phase(t, T_COIL0, T_COIL1);
+        p = mixPose(STANCE, COIL, eInOutSine(u));
+        p.y += bounce(t, 0.9 * (1 - u));
+        tremble(p, 0.1 + 0.4 * u);
+        return p;
+      }
+      if (t < T_LOAD1) {
+        p = mixPose(COIL, LOAD, eInOutCubic(phase(t, T_COIL1, T_LOAD1)));
+        tremble(p, 0.5);
+        return p;
+      }
+      if (t < T_PUNCH) {
+        // Chuỗi lực: hông bung trước, vai xoay theo, nắm đấm tới sau cùng và nhanh dần tới lúc chạm.
+        u = phase(t, T_LOAD1, T_PUNCH);
+        uh = easeOut(clamp(u * 1.45, 0, 1));
+        ut = eInOutCubic(clamp(u * 1.25 - 0.05, 0, 1));
+        ua = clamp((u - 0.12) / 0.88, 0, 1);
+        ua = ua * ua;
+        p = mixPose(LOAD, HIT, ut);
+        p.x = LOAD.x + (HIT.x - LOAD.x) * uh;
+        p.y = LOAD.y + (HIT.y - LOAD.y) * uh;
+        p.nbx = LOAD.nbx + (HIT.nbx - LOAD.nbx) * uh;
+        p.nh = LOAD.nh + (HIT.nh - LOAD.nh) * uh;
+        p.nfx = LOAD.nfx + (HIT.nfx - LOAD.nfx) * ua;
+        p.nfy = LOAD.nfy + (HIT.nfy - LOAD.nfy) * ua;
+        p.fby = -1.3 * Math.sin(Math.PI * ut);
+        p.mouth = u > 0.55 ? 1 : 0;
+        return p;
+      }
+      if (t < T_FREEZE) {
+        p = copyPose(HIT); // khựng hình lúc trúng
+        tremble(p, 0.3);
+        return p;
+      }
+      if (t < T_FOLLOW1) {
+        u = phase(t, T_FREEZE, T_FOLLOW1);
+        p = mixPose(HIT, FOLLOW, easeOut(u));
+        p.mouth = u < 0.4 ? 1 : 0;
+        return p;
+      }
+      if (t < T_GUARD1) {
+        u = phase(t, T_FOLLOW1, T_GUARD1);
+        p = mixPose(FOLLOW, STANCE, eOutBack(u));
+        p.fby = -1 * Math.sin(Math.PI * clamp(u * 1.3, 0, 1));
+        return p;
+      }
+      if (t < T_OUT0) {
+        p = copyPose(STANCE);
+        p.y += bounce(t, 0.9);
+        return p;
+      }
+      // Lùi nhanh: bật khỏi mặt đất, ngả người ra sau, giữ thế thủ.
+      u = phase(t, T_OUT0, T_OUT1);
+      k = Math.sin(Math.PI * u);
+      p = copyPose(STANCE);
+      p.x = outX(t);
+      p.y += -2.2 * k;
+      p.lean = STANCE.lean - 10 * k;
+      p.nbx = p.x + STANCE.nbx;
+      p.fbx = p.x + STANCE.fbx;
+      p.nby = -1.6 * k;
+      p.fby = -2.4 * k;
+      return p;
+    }
+    function fadeAt(t) {
+      if (t < T_DASH0 || t >= T_OUT1) return 0;
+      if (t < T_DASH0 + 90) return (t - T_DASH0) / 90;
+      if (t > T_OUT1 - 160) return (T_OUT1 - t) / 160;
+      return 1;
+    }
+
+    // IK hai đoạn: khớp gốc (ax, ay) -> điểm cuối (bx, by). "low": khuỷu tay chúc xuống,
+    // "front": đầu gối hướng về phía trước. Ngoài tầm với thì duỗi thẳng về phía điểm cuối.
+    function ik(ax, ay, bx, by, l1, l2, mode) {
+      var dx = bx - ax,
+        dy = by - ay,
+        d = Math.sqrt(dx * dx + dy * dy) || 0.0001;
+      var dMax = l1 + l2 - 0.02,
+        dMin = Math.abs(l1 - l2) + 0.02;
+      var dc = clamp(d, dMin, dMax);
+      dx = (dx / d) * dc;
+      dy = (dy / d) * dc;
+      var base = Math.atan2(dy, dx);
+      var A = Math.acos(clamp((l1 * l1 + dc * dc - l2 * l2) / (2 * l1 * dc), -1, 1));
+      var e1x = ax + l1 * Math.cos(base + A),
+        e1y = ay + l1 * Math.sin(base + A);
+      var e2x = ax + l1 * Math.cos(base - A),
+        e2y = ay + l1 * Math.sin(base - A);
+      var pickFirst = mode === "low" ? e1y >= e2y : e1x >= e2x;
+      return {
+        ex: pickFirst ? e1x : e2x,
+        ey: pickFirst ? e1y : e2y,
+        tx: ax + dx,
+        ty: ay + dy,
+      };
+    }
+    function f2(v) {
+      return v.toFixed(2);
+    }
+    function setT(el, value) {
+      if (el) el.setAttribute("transform", value);
+    }
+    // Đoạn chi vẽ dọc +y từ khớp: xoay để trục +y trùng hướng khớp -> khớp kế tiếp.
+    function placeSeg(el, ax, ay, bx, by) {
+      var th = Math.atan2(-(bx - ax), by - ay) / DEG;
+      setT(el, "translate(" + f2(ax) + "," + f2(ay) + ") rotate(" + f2(th) + ")");
+    }
+    function ankleOf(bx, by, heelDeg) {
+      var r = heelDeg * DEG,
+        c = Math.cos(r),
+        s = Math.sin(r);
+      return [bx - 3.8 * c + 3.2 * s, by - 3.8 * s - 3.2 * c];
+    }
+    var rig = { fist: [0, 0], feet: [[0, 0], [0, 0]], x: 0, visible: false };
+    var LOAD_WRIST = null;
+    function applyPose(p, t) {
+      var lr = p.lean * DEG,
+        c = Math.cos(lr),
+        s = Math.sin(lr);
+      function tp(lx, ly) {
+        return [p.x + lx * c - ly * s, p.y + lx * s + ly * c];
+      }
+      var shN = tp(1 + p.twist * 3.2, -16.6),
+        shF = tp(-1.2 - p.twist * 2, -16.9),
+        hc = tp(0.5, -25.6);
+      var aN = ik(shN[0], shN[1], p.x + p.nfx, p.y + p.nfy, L_UA, L_FA, "low");
+      var aF = ik(shF[0], shF[1], p.x + p.ffx, p.y + p.ffy, L_UA, L_FA, "low");
+      var ankN = ankleOf(p.nbx, p.nby, p.nh),
+        ankF = ankleOf(p.fbx, p.fby, p.fh);
+      var hipN = [p.x + 1, p.y + 0.6],
+        hipF = [p.x - 1, p.y + 0.6];
+      var lN = ik(hipN[0], hipN[1], ankN[0], ankN[1], L_TH, L_SH, "front");
+      var lF = ik(hipF[0], hipF[1], ankF[0], ankF[1], L_TH, L_SH, "front");
+
+      placeSeg(P.fau, shF[0], shF[1], aF.ex, aF.ey);
+      placeSeg(P.faf, aF.ex, aF.ey, aF.tx, aF.ty);
+      placeSeg(P.flt, hipF[0], hipF[1], lF.ex, lF.ey);
+      placeSeg(P.fls, lF.ex, lF.ey, lF.tx, lF.ty);
+      setT(P.flf, "translate(" + f2(p.fbx) + "," + f2(p.fby) + ") rotate(" + f2(p.fh) + ")");
+      placeSeg(P.nlt, hipN[0], hipN[1], lN.ex, lN.ey);
+      placeSeg(P.nls, lN.ex, lN.ey, lN.tx, lN.ty);
+      setT(P.nlf, "translate(" + f2(p.nbx) + "," + f2(p.nby) + ") rotate(" + f2(p.nh) + ")");
+      setT(P.hips, "translate(" + f2(p.x) + "," + f2(p.y) + ") rotate(" + f2(p.lean * 0.35) + ")");
+      setT(P.torso, "translate(" + f2(p.x) + "," + f2(p.y) + ") rotate(" + f2(p.lean) + ")");
+      setT(P.head, "translate(" + f2(hc[0]) + "," + f2(hc[1]) + ") rotate(" + f2(p.lean * 0.5 + p.head) + ") scale(0.92)");
+      if (P.eyeGlow) P.eyeGlow.setAttribute("opacity", f2(p.glow * 0.85));
+      placeSeg(P.nau, shN[0], shN[1], aN.ex, aN.ey);
+      placeSeg(P.naf, aN.ex, aN.ey, aN.tx, aN.ty);
+
+      // tâm nắm đấm nằm trước cổ tay 2,4 đơn vị theo hướng cẳng tay
+      var fdx = aN.tx - aN.ex,
+        fdy = aN.ty - aN.ey,
+        fl = Math.sqrt(fdx * fdx + fdy * fdy) || 1;
+      var fistX = aN.tx + (fdx / fl) * 2.4,
+        fistY = aN.ty + (fdy / fl) * 2.4;
+      if (t >= T_COIL1 && t < T_LOAD1 + 20) LOAD_WRIST = [aN.tx, aN.ty];
+
+      // quầng tụ lực ở nắm đấm
+      var glow = p.glow * (0.82 + Math.random() * 0.18);
+      if (P.glow) {
+        P.glow.setAttribute("opacity", glow > 0.01 ? f2(glow) : "0");
+        setT(P.glow, "translate(" + f2(fistX) + "," + f2(fistY) + ") scale(" + f2(0.55 + p.glow * 0.85) + ")");
+      }
+      // vệt gió của cú đấm: từ chỗ thu tay tới nắm đấm, đậm nhất lúc tay lao nhanh
+      if (P.smear) {
+        var sm = 0;
+        if (t >= T_LOAD1 + 30 && t < T_PUNCH + 70 && LOAD_WRIST) {
+          sm = t < T_PUNCH ? phase(t, T_LOAD1 + 30, T_PUNCH) : 1 - phase(t, T_PUNCH, T_PUNCH + 70);
+        }
+        if (sm > 0.02) {
+          var nx = -fdy / fl,
+            ny = fdx / fl;
+          P.smear.setAttribute(
+            "points",
+            f2(LOAD_WRIST[0]) + "," + f2(LOAD_WRIST[1]) + " " +
+              f2(fistX + nx * 2.8) + "," + f2(fistY + ny * 2.8) + " " +
+              f2(fistX - nx * 2.8) + "," + f2(fistY - ny * 2.8),
+          );
+          P.smear.setAttribute("opacity", f2(sm * 0.9));
+        } else P.smear.setAttribute("opacity", "0");
+      }
+      if (P.mouthC && P.mouthO) {
+        P.mouthO.setAttribute("opacity", p.mouth > 0.5 ? "1" : "0");
+        P.mouthC.setAttribute("opacity", p.mouth > 0.5 ? "0" : "1");
+      }
+      if (P.shadow) {
+        P.shadow.setAttribute("cx", f2(p.x + 1));
+        P.shadow.setAttribute("rx", f2(10 + Math.abs(p.fbx - p.nbx) * 0.18));
+        P.shadow.setAttribute("opacity", f2(0.32 * clamp(1 + (p.nby + p.fby) * 0.12, 0.4, 1)));
+      }
+
+      // bóng mờ khi lướt (tàn ảnh) nằm phía sau hướng di chuyển
+      var ghostOn = (t >= T_DASH0 && t < T_DASH1 + 60) || (t >= T_OUT0 && t < T_OUT1);
+      for (var gi = 0; gi < P.ghosts.length; gi++) {
+        var g = P.ghosts[gi];
+        if (!ghostOn) {
+          if (g.style.display !== "none") g.style.display = "none";
+          continue;
+        }
+        var lag = (gi + 1) * 34;
+        var px = t < T_OUT0 ? dashX(Math.max(T_DASH0, t - lag)) : outX(Math.max(T_OUT0, t - lag));
+        var gap = px - p.x;
+        var alpha = clamp(Math.abs(gap) / 14, 0, 1) * [0.34, 0.2, 0.1][gi];
+        g.style.display = alpha > 0.01 ? "" : "none";
+        g.setAttribute("opacity", f2(alpha));
+        setT(g, "translate(" + f2(gap) + ",0)");
+      }
+      RIG.setAttribute("opacity", f2(fadeAt(t)));
+
+      rig.fist = [fistX, fistY];
+      rig.feet = [[p.nbx - 2, p.nby], [p.fbx - 2, p.fby]];
+      rig.x = p.x;
+      rig.visible = true;
+    }
+    function hideFighter() {
+      RIG.setAttribute("opacity", "0");
+      for (var gi = 0; gi < P.ghosts.length; gi++) P.ghosts[gi].style.display = "none";
+      if (P.glow) P.glow.setAttribute("opacity", "0");
+      if (P.smear) P.smear.setAttribute("opacity", "0");
+      rig.visible = false;
+    }
+    // Toạ độ khung xương -> toạ độ canvas (nhóm SVG đã lật gương: +x khung là sang trái màn hình).
+    function rigToCanvas(x, y) {
+      var S = (fighter.clientWidth || 60) / 80;
+      return {
+        x: fighter.offsetLeft + (40 - x) * S - cv.offsetLeft,
+        y: fighter.offsetTop + (y + 70) * S - cv.offsetTop,
+      };
+    }
+
+    // ---- hiệu ứng riêng của võ sĩ (canvas) ----
+    var motes = [],
+      streaks = [],
+      dust = [],
+      impact = 0,
+      impactAt = { x: 0, y: 0 },
+      events = {};
+    function addMote() {
+      if (motes.length >= 26 || !rig.visible) return;
+      var f = rigToCanvas(rig.fist[0], rig.fist[1]);
+      var a = Math.random() * Math.PI * 2,
+        r = 14 + Math.random() * 16;
+      motes.push({
+        x: f.x + Math.cos(a) * r,
+        y: f.y + Math.sin(a) * r,
+        life: 1,
+        hue: Math.random() < 0.65 ? 270 + Math.random() * 50 : 36 + Math.random() * 14,
+        size: 0.9 + Math.random() * 1.3,
+      });
+    }
+    function addStreaks(dir) {
+      if (!rig.visible || streaks.length > 18) return;
+      var body = rigToCanvas(rig.x, -30);
+      for (var i = 0; i < 2; i++)
+        streaks.push({
+          x: body.x + dir * (10 + Math.random() * 22),
+          y: body.y + (Math.random() - 0.5) * 34,
+          len: 10 + Math.random() * 18,
+          dir: dir,
+          life: 1,
+        });
+    }
+    function addDust(rx, ry, n, push) {
+      var c = rigToCanvas(rx, ry);
+      for (var i = 0; i < n; i++)
+        dust.push({
+          x: c.x + (Math.random() - 0.5) * 6,
+          y: c.y - Math.random() * 2,
+          vx: (Math.random() - 0.5) * 0.9 + push,
+          vy: -0.25 - Math.random() * 0.45,
+          r: 1.6 + Math.random() * 2.2,
+          life: 1,
+        });
+    }
+
     var punched = false;
     function reset() {
       punched = false;
       sparks.length = flames.length = smoke.length = 0;
+      motes.length = streaks.length = dust.length = 0;
+      events = {};
+      impact = 0;
+      LOAD_WRIST = null;
       flash = 0;
       shake = 0;
       crackPaths = [];
       crackChips = [];
       shockWaves = [];
       word.style.transform = "none";
-      sai.className = "saitama";
-      sai.style.transform = "scaleX(-1) translateX(-70px)";
+      hideFighter();
       for (var u = 0; u < U.length; u++) {
         U[u].base.style.opacity = "1";
         U[u].base.style.filter = "none";
@@ -799,26 +1345,6 @@
     }
     reset();
 
-    // mốc (ms)
-    var T_IN = 2200; // đi vào tới cạnh chữ
-    var T_WIND = 2400; // bắt đầu gồng (fire)
-    var T_PUNCH = 3600; // đấm -> nổ
-    var T_SCATTER = 3600,
-      T_SCATTER_END = 4400; // mảnh bay ra
-    var T_HOLD = 5200; // mảnh lơ lửng
-    var T_BACK0 = 5400,
-      T_BACK1 = 7000; // mảnh bay về
-    var T_OUT0 = 4200,
-      T_OUT1 = 6200; // saitama lùi ra
-    var SAI_STOP = 0; // vị trí đứng cạnh chữ (px transform)
-    var SAI_HIDE = -70;
-
-    function clamp(v, a, b) {
-      return v < a ? a : v > b ? b : v;
-    }
-    function easeOut(p) {
-      return 1 - Math.pow(1 - p, 3);
-    }
     function traceGlassPath(points, amount, closePath) {
       var last = points.length - 1,
         whole,
@@ -887,56 +1413,61 @@
       }
     }
 
+
     function loop(now) {
-      if (gen !== saiGen) return;
+      if (gen !== tanGen) return;
       if (!start) {
         start = now;
-        lastSaiDraw = now - SAI_FRAME_MS;
+        lastFxDraw = now - FX_FRAME_MS;
       }
       var t = (now - start) % CYCLE;
-      // Khi cảnh đã xong, chỉ chờ chu kỳ mới thay vì liên tục vẽ canvas rỗng.
-      if (t >= T_BACK1 + 100) {
-        if (!saiIdle) {
+      if (punched && t < T_DASH0) reset();
+      // Võ sĩ: cập nhật từng khung hình cho chuyển động mượt.
+      var pose = poseAt(t);
+      if (pose) applyPose(pose, t);
+      else if (rig.visible) hideFighter();
+      // Hiệu ứng canvas: nghỉ hẳn khi cảnh đã xong, chờ chu kỳ mới.
+      if (t < T_DASH0 || t >= T_BACK1 + 100) {
+        if (!fxIdle) {
           ctx.clearRect(0, 0, W, H);
-          saiIdle = true;
+          fxIdle = true;
         }
-        saiRAF = window.requestAnimationFrame(loop);
+        tanRAF = window.requestAnimationFrame(loop);
         return;
       }
-      saiIdle = false;
-      if (now - lastSaiDraw >= SAI_FRAME_MS) {
-        lastSaiDraw = now;
-        if (t < 200 && punched) reset();
+      fxIdle = false;
+      if (now - lastFxDraw >= FX_FRAME_MS) {
+        lastFxDraw = now;
         measure();
         draw(t);
       }
-      saiRAF = window.requestAnimationFrame(loop);
+      tanRAF = window.requestAnimationFrame(loop);
     }
 
     function draw(t) {
       ctx.clearRect(0, 0, W, H);
 
-      // ---- Saitama đi vào / lùi ra ----
-      var sx;
-      if (t < T_IN) sx = SAI_HIDE + easeOut(t / T_IN) * (SAI_STOP - SAI_HIDE);
-      else if (t < T_OUT0) sx = SAI_STOP;
-      else if (t < T_OUT1) {
-        var q = (t - T_OUT0) / (T_OUT1 - T_OUT0);
-        sx = SAI_STOP + q * q * (SAI_HIDE - SAI_STOP);
-      } else sx = SAI_HIDE;
-      sai.style.transform = "scaleX(-1) translateX(" + sx.toFixed(1) + "px)";
+      // ---- lướt vào / lùi ra: vệt gió + bụi khi trượt dừng ----
+      if (t >= T_DASH0 && t < T_DASH1 - 60) addStreaks(1);
+      if (t >= T_OUT0 + 40 && t < T_OUT1 - 80) addStreaks(-1);
+      if (!events.skid && t >= T_DASH1 - 40) {
+        events.skid = true;
+        addDust(rig.feet[0][0], 0, 6, 0.7);
+        addDust(rig.feet[1][0], 0, 5, 0.9);
+      }
+      if (!events.pivot && t >= T_PUNCH - 70) {
+        events.pivot = true;
+        addDust(rig.feet[0][0], 0, 4, 0.5);
+      }
+      if (!events.hop && t >= T_OUT0) {
+        events.hop = true;
+        addDust(rig.feet[1][0], 0, 5, -0.8);
+      }
 
-      // ---- pose: gồng (wind+fire) -> đấm (punch+nổ) ----
-      var cls = "saitama";
-      if (t >= T_WIND && t < T_PUNCH) cls = "saitama wind";
-      else if (t >= T_PUNCH && t < T_PUNCH + 260) cls = "saitama punch";
-      if (sai.className !== cls) sai.className = cls;
-
-      // lửa gồng: quanh nắm đấm của saitama (bên phải cụm chữ)
-      if (t >= T_WIND && t < T_PUNCH) {
-        var fx = target.x + word.offsetWidth * 0.5 + 4;
-        var fy = target.y + 2;
-        if (flames.length < 14 && Math.random() < 0.55) addFlame(fx, fy, false);
+      // ---- gồng: hạt sáng hút vào nắm đấm ----
+      if (t >= T_COIL0 && t < T_PUNCH - 40) {
+        addMote();
+        if (t >= T_COIL1) addMote();
       }
 
       // ---- đấm trúng -> nổ + mạng kính vỡ + giật mạnh ----
@@ -946,6 +1477,8 @@
         makeGlassCracks(target.x, target.y);
         flash = 1.3;
         shake = 1.4;
+        impact = 1;
+        impactAt = rigToCanvas(rig.fist[0], rig.fist[1]);
       }
 
       // ---- giật + nhấn mạnh cụm chữ khi trúng ----
@@ -1222,19 +1755,93 @@
         ctx.fill();
       }
       ctx.globalCompositeOperation = "source-over";
+
+      // ---- VÕ SĨ: chớp sáng ở nắm đấm lúc chạm (tia trắng toả ra) ----
+      if (impact > 0) {
+        ctx.globalCompositeOperation = "lighter";
+        ctx.strokeStyle = "rgba(255,255,255," + impact * 0.9 + ")";
+        ctx.lineWidth = 1.4;
+        ctx.lineCap = "round";
+        for (var ia = 0; ia < 10; ia++) {
+          var ang = (ia / 10) * Math.PI * 2 + 0.3;
+          var r0 = 4 + (1 - impact) * 10,
+            r1 = r0 + 6 + impact * 9;
+          ctx.beginPath();
+          ctx.moveTo(impactAt.x + Math.cos(ang) * r0, impactAt.y + Math.sin(ang) * r0);
+          ctx.lineTo(impactAt.x + Math.cos(ang) * r1, impactAt.y + Math.sin(ang) * r1);
+          ctx.stroke();
+        }
+        ctx.globalCompositeOperation = "source-over";
+        impact -= 0.2;
+        if (impact < 0) impact = 0;
+      }
+      // ---- hạt tụ lực bay vào nắm đấm ----
+      if (motes.length) {
+        var fc = rigToCanvas(rig.fist[0], rig.fist[1]);
+        ctx.globalCompositeOperation = "lighter";
+        for (var mi = motes.length - 1; mi >= 0; mi--) {
+          var mo = motes[mi];
+          mo.x += (fc.x - mo.x) * 0.2;
+          mo.y += (fc.y - mo.y) * 0.2;
+          mo.life -= 0.07;
+          var md = Math.abs(fc.x - mo.x) + Math.abs(fc.y - mo.y);
+          if (mo.life <= 0 || md < 1.5 || t >= T_PUNCH) {
+            motes.splice(mi, 1);
+            continue;
+          }
+          ctx.beginPath();
+          ctx.arc(mo.x, mo.y, mo.size, 0, 7);
+          ctx.fillStyle = "hsla(" + mo.hue + ",100%,72%," + Math.min(1, mo.life * 1.3) + ")";
+          ctx.fill();
+        }
+        ctx.globalCompositeOperation = "source-over";
+      }
+      // ---- vệt gió khi lướt ----
+      for (var si = streaks.length - 1; si >= 0; si--) {
+        var st = streaks[si];
+        st.life -= 0.16;
+        if (st.life <= 0) {
+          streaks.splice(si, 1);
+          continue;
+        }
+        st.x += st.dir * 2.4;
+        ctx.strokeStyle = "rgba(214,200,255," + st.life * 0.55 + ")";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(st.x, st.y);
+        ctx.lineTo(st.x + st.dir * st.len, st.y);
+        ctx.stroke();
+      }
+      // ---- bụi dưới chân ----
+      for (var di = dust.length - 1; di >= 0; di--) {
+        var du = dust[di];
+        du.x += du.vx;
+        du.y += du.vy;
+        du.vy += 0.02;
+        du.r += 0.22;
+        du.life -= 0.045;
+        if (du.life <= 0) {
+          dust.splice(di, 1);
+          continue;
+        }
+        ctx.beginPath();
+        ctx.arc(du.x, du.y, du.r, 0, 7);
+        ctx.fillStyle = "rgba(196,184,168," + du.life * 0.3 + ")";
+        ctx.fill();
+      }
     }
 
-    saiRAF = window.requestAnimationFrame(loop);
+    tanRAF = window.requestAnimationFrame(loop);
   }
 
   function updateTester(tabKey) {
     if (!testerName) return;
     stopTesterLightning();
-    stopSaitamaBattle();
+    stopTanBattle();
     testerName.innerHTML = tabKey === "offset" ? TESTER_OFFSET : TESTER_DEFAULT;
     if (tabKey !== "offset") {
       startTesterLightning();
-      startSaitamaBattle();
+      startTanBattle();
     }
   }
   updateTester("danfile");

@@ -983,7 +983,7 @@ body {
   }
 }
 
-/* ============ SAITAMA đấm chữ "Tân 1 cú" (tester mặc định) ============ */
+/* ============ VÕ SĨ "1 CÚ" đấm chữ "Tân 1 cú" (tester mặc định) ============ */
 .tan-battle {
   position: relative;
   display: inline-block;
@@ -1000,62 +1000,23 @@ body {
   z-index: 3;
   pointer-events: none;
 }
-/* Saitama: JS set transform để đi vào / gồng / đấm */
-.tan-battle .saitama {
+/* Võ sĩ: hình SVG theo khung xương, JS đổi tư thế từng khung hình (lướt vào, gồng, đấm, lùi ra).
+   Khung 80 × 76 đơn vị = 60 × 57 px; nắm đấm duỗi thẳng chạm phần cuối chữ "1 cú". */
+.tan-battle .vo-si {
   position: absolute;
   left: 100%;
-  bottom: -6px;
-  width: 30px;
-  height: 40px;
+  bottom: -9px;
+  width: 60px;
+  height: 57px;
+  margin-left: -13px;
   z-index: 4;
-  margin-left: 10px;
-  transform: scaleX(-1) translateX(-70px);
-  transform-origin: center bottom;
-  will-change: transform;
+  pointer-events: none;
 }
-.tan-battle .saitama svg {
+.tan-battle .vo-si svg {
   display: block;
   width: 100%;
   height: 100%;
   overflow: visible;
-}
-/* áo choàng bay */
-.tan-battle .saitama .s-cape {
-  transform-origin: 26px 28px;
-  animation: cape-flap 0.9s ease-in-out infinite;
-}
-@keyframes cape-flap {
-  0%,
-  100% {
-    transform: rotate(4deg) skewX(3deg);
-  }
-  50% {
-    transform: rotate(-5deg) skewX(-5deg);
-  }
-}
-/* tay đấm: JS thêm class wind/punch lên .saitama (đã scaleX(-1) nên đấm sang trái vào chữ) */
-.tan-battle .saitama .s-arm-g {
-  transform-box: view-box;
-  transform-origin: 40px 35px;
-  transition: transform 0.12s cubic-bezier(0.5, -0.4, 0.3, 1.5);
-}
-.tan-battle .saitama.wind .s-arm-g {
-  transform: translateX(-10px) scaleX(0.5) rotate(-8deg);
-}
-.tan-battle .saitama.punch .s-arm-g {
-  transform: translateX(7px) scaleX(1.35);
-}
-.tan-battle .saitama.wind {
-  animation: sai-gong 0.09s linear infinite;
-}
-@keyframes sai-gong {
-  0%,
-  100% {
-    margin-left: 10px;
-  }
-  50% {
-    margin-left: 11.4px;
-  }
 }
 
 /* cụm chữ + mảnh vỡ (Tân và 1 cú) */
