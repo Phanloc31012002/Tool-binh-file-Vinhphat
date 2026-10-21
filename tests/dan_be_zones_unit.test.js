@@ -123,6 +123,65 @@ run("ước lượng và cây chia khu", () => {
   assert.equal(none.minPer, 0);
 });
 
+const fx = require("./dan_be_zone_fixtures");
+const checker = require("./dan_be_zone_checker");
+
+// Mảnh của bộ chia khu (toạ độ vùng dùng được, hướng theo khuôn đại diện) → slot trên tờ.
+function toSlots(pieces, input, cutters) {
+  return pieces.map((p) => {
+    const m = cutters[p.c].members[0], vi = (p.vi + m.rel) % 4;
+    return { mi: m.type, vi, x: p.x + input.marginMm, y: p.y + input.marginMm, angle: vi * 90 };
+  });
+}
+function toResult(out, input, cutters) {
+  const slots = toSlots(out.pieces, input, cutters), counts = input.types.map(() => 0);
+  slots.forEach((s) => counts[s.mi]++);
+  return { ok: true, slots, counts, count: slots.length };
+}
+
+run("dàn thật cây chia khu, khép khu", () => {
+  // Tim trên, sao dưới, khe 2, khu cách 5; PON 4 góc và giữa 4 cạnh.
+  const input = fx.standardInput([L.heart(), L.star(5, 26, 11)], { zoneGapMm: 5, midEdgeDots: true });
+  const cutters = Z.groupCutters(input.types, core), ctx = Z.makeContext(input, cutters, core);
+  assert.equal(ctx.W, 322); assert.equal(ctx.H, 346); assert.equal(ctx.s, 5); assert.equal(ctx.gap, 2);
+  assert.equal(ctx.dots.length, 8);
+  const ests = cutters.map((c) => Z.makeEstimator(Z.profileCutter(c, ctx.W, ctx.H, ctx.gap, input.ponClearMm, core)));
+  const tree = { dir: "H", kids: [{ leaf: 0 }, { leaf: 1 }] };
+  const sizing = Z.sizeTree(tree, ctx.W, ctx.H, ests, cutters, ctx.s);
+  const out = Z.realizeTree(tree, sizing, ctx, "quick");
+  assert.ok(out && out.counts[0] > 0 && out.counts[1] > 0, "hai khu đều có con");
+  assert.equal(out.pieces.length, out.counts[0] + out.counts[1]);
+  assert.equal(ctx.verify(out.pieces), true, "chốt chặn của lõi đạt");
+  checker.checkLayout(input, toResult(out, input, cutters), 5);
+  checker.assertSeparable(input, toResult(out, input, cutters));
+  assert.ok(out.counts[0] >= 0.8 * sizing.counts[0] && out.counts[1] >= 0.8 * sizing.counts[1],
+    "dàn thật gần ước lượng: " + out.counts + " so với " + sizing.counts);
+  // Chạy lại y hệt.
+  const again = Z.realizeTree(tree, sizing, ctx, "quick");
+  assert.deepEqual(again.pieces, out.pieces);
+
+  // Khép khu giữa tờ (xa mọi chấm PON): hàng tim (khuôn 0) ở trên, hàng sao (khuôn 1) dư thêm 5 mm phía dưới.
+  const row = (c, y, vi) => [0, 1, 2].map((i) => ({ c, vi, x: 100 + i * (ctx.variants[c * 4 + vi].w + 10), y }));
+  const bottomOf = (pieces) => Math.max(...pieces.map((p) => p.y + ctx.variants[p.c * 4 + p.vi].h));
+  const shifted = (pieces, dx, dy) => pieces.map((p) => ({ c: p.c, vi: p.vi, x: p.x + dx, y: p.y + dy }));
+  const prev = row(0, 100, 0), next = row(1, bottomOf(prev) + ctx.s + 5, 0);
+  const d = Z.approachShift(prev, next, "y", ctx);
+  assert.ok(d >= 4.99, "dời được ít nhất phần dư 5 mm, được " + d);
+  const dist = checker.minDistance(input, toSlots(prev, input, cutters), toSlots(shifted(next, 0, -d), input, cutters));
+  assert.ok(dist >= ctx.s - 1e-6 && dist <= ctx.s + 0.1, "khép sát đúng khoảng cách khu: " + dist);
+  assert.equal(ctx.verify(prev.concat(shifted(next, 0, -d))), true);
+  // Đã sát rồi thì không dời thêm.
+  assert.ok(Z.approachShift(prev, shifted(next, 0, -d), "y", ctx) < 0.06);
+  // Trục x: sao bên phải tim.
+  const col = (c, x, vi) => [0, 1, 2].map((i) => ({ c, vi, x, y: 100 + i * (ctx.variants[c * 4 + vi].h + 10) }));
+  const rightOf = (pieces) => Math.max(...pieces.map((p) => p.x + ctx.variants[p.c * 4 + p.vi].w));
+  const left = col(0, 60, 0), right = col(1, rightOf(left) + ctx.s + 7, 0);
+  const dx = Z.approachShift(left, right, "x", ctx);
+  assert.ok(dx >= 6.99 && dx <= 7 + 2, "dời theo x ít nhất 7 mm, được " + dx);
+  const distX = checker.minDistance(input, toSlots(left, input, cutters), toSlots(shifted(right, -dx, 0), input, cutters));
+  assert.ok(distX >= ctx.s - 1e-6 && distX <= ctx.s + 0.1, "khép theo x đúng khoảng cách khu: " + distX);
+});
+
 assert.ok(Date.now() - began < 120000, "bộ test khối chia khu chạy trong thời gian hữu hạn");
 assert.deepEqual(failures, [], failures.join("\n"));
 console.log("Khối chia khu: mọi ca đạt trong " + (Date.now() - began) + " ms.");
