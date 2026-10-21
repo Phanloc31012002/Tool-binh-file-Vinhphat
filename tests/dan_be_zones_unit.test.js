@@ -182,6 +182,35 @@ run("dàn thật cây chia khu, khép khu", () => {
   assert.ok(distX >= ctx.s - 1e-6 && distX <= ctx.s + 0.1, "khép theo x đúng khoảng cách khu: " + distX);
 });
 
+run("lấp chỗ trống bằng lưới của khu", () => {
+  // Một khu tròn 30 dàn trên cả tờ; bỏ 3 con ở giữa rồi lấp lại.
+  const circle = require("./dan_be_circle_fixture");
+  const input = fx.standardInput([{ groups: circle.curveFor(30), curveErrorMm: 0.00025 }, L.heart()], { zoneGapMm: 5 });
+  const cutters = Z.groupCutters(input.types, core), ctx = Z.makeContext(input, cutters, core);
+  const full = ctx.planLeaf(0, { x: 0, y: 0, w: ctx.W, h: 200 }, "quick");
+  assert.ok(full.length >= 40, "khu tròn 30 cao 200 mm có ≥ 40 con, được " + full.length);
+  const cx = ctx.W / 2, cy = 100;
+  const byDist = full.slice().sort((a, b) => Math.hypot(a.x + 15 - cx, a.y + 15 - cy) - Math.hypot(b.x + 15 - cx, b.y + 15 - cy));
+  const removed = byDist.slice(0, 3), pieces = full.filter((p) => removed.indexOf(p) < 0);
+  // Thêm vài con tim phía dưới (khu khác) để chắc lấp chỗ trống không dùng khuôn khác và không lấn khu.
+  const hearts = ctx.planLeaf(1, { x: 0, y: 215, w: ctx.W, h: ctx.H - 215 }, "quick");
+  assert.ok(hearts.length > 0);
+  const all = pieces.concat(hearts), before = all.length;
+  assert.equal(ctx.verify(all), true);
+  const added = Z.fillGaps(all, ctx);
+  assert.ok(added >= 3, "lấp lại ít nhất 3 con, được " + added);
+  assert.equal(all.length, before + added);
+  assert.equal(ctx.verify(all), true, "sau khi lấp vẫn qua chốt chặn");
+  const slots = toSlots(all, input, cutters), counts = input.types.map(() => 0);
+  slots.forEach((q) => counts[q.mi]++);
+  checker.checkLayout(input, { ok: true, slots, counts, count: slots.length }, 5);
+  checker.assertSeparable(input, { ok: true, slots, counts, count: slots.length });
+  assert.equal(all.filter((p) => p.c === 1).length, hearts.length, "chỉ lấp bằng khuôn của chính khu");
+  const snapshot = JSON.stringify(all);
+  assert.equal(Z.fillGaps(all, ctx), 0, "gọi lần hai không thêm được nữa");
+  assert.equal(JSON.stringify(all), snapshot);
+});
+
 assert.ok(Date.now() - began < 120000, "bộ test khối chia khu chạy trong thời gian hữu hạn");
 assert.deepEqual(failures, [], failures.join("\n"));
 console.log("Khối chia khu: mọi ca đạt trong " + (Date.now() - began) + " ms.");

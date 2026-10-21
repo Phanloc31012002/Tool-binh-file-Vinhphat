@@ -528,8 +528,65 @@
     return { pieces: out, counts: counts };
   }
 
+  // ---------- Lấp chỗ trống ----------
+
+  // Thử thêm con vào các kẽ còn trống bằng chính "lưới" của khu: các vectơ dời giữa hai con kề nhau
+  // của cùng khuôn. Con mới chỉ đặt cạnh con cùng khuôn, cách khu khác ≥ s, né PON, trong lề.
+  // Sửa `pieces` tại chỗ, trả số con thêm được. Tổng ứng viên thử tối đa 2000.
+  function fillGaps(pieces, ctx) {
+    var added = 0, tried = 0, c, byCutter = {}, list, i, j, a, b, ba, bb, vecs, seen, key, dx, dy, limit, order, p, k, cand, cb, near, q, qb, reach;
+    var LIMIT = 2000;
+    for (i = 0; i < pieces.length; i++) {
+      c = pieces[i].c;
+      if (!byCutter[c]) byCutter[c] = [];
+      byCutter[c].push(pieces[i]);
+    }
+    for (c in byCutter) if (Object.prototype.hasOwnProperty.call(byCutter, c)) {
+      list = byCutter[c]; vecs = []; seen = {};
+      for (i = 0; i < list.length; i++) {
+        a = list[i]; ba = ctx.boxOf(a);
+        for (j = 0; j < list.length; j++) {
+          if (i === j) continue;
+          b = list[j]; bb = ctx.boxOf(b);
+          limit = ctx.gap + 0.5 * Math.min(bb.x1 - bb.x0, bb.y1 - bb.y0);
+          if (Math.max(ba.x0, bb.x0) - Math.min(ba.x1, bb.x1) > limit || Math.max(ba.y0, bb.y0) - Math.min(ba.y1, bb.y1) > limit) continue;
+          dx = b.x - a.x; dy = b.y - a.y;
+          key = a.vi + ">" + b.vi + ":" + round3(dx) + "," + round3(dy);
+          if (seen[key]) continue;
+          seen[key] = true; vecs.push({ from: a.vi, to: b.vi, dx: dx, dy: dy });
+        }
+      }
+      if (!vecs.length) continue;
+      order = list.slice().sort(function (u, v) { return u.y - v.y || u.x - v.x; });
+      for (i = 0; i < order.length && tried < LIMIT; i++) {
+        p = order[i];
+        for (k = 0; k < vecs.length && tried < LIMIT; k++) {
+          if (vecs[k].from !== p.vi) continue;
+          cand = { c: p.c, vi: vecs[k].to, x: p.x + vecs[k].dx, y: p.y + vecs[k].dy };
+          cb = ctx.boxOf(cand);
+          if (cb.x0 < -1e-9 || cb.y0 < -1e-9 || cb.x1 > ctx.W + 1e-9 || cb.y1 > ctx.H + 1e-9) continue;
+          // Trùng chỗ một con đã có thì bỏ (khung bao chồng gần hết).
+          near = []; reach = Math.max(ctx.gap, ctx.s) + 1;
+          var dup = false;
+          for (j = 0; j < pieces.length; j++) {
+            q = pieces[j]; qb = ctx.boxOf(q);
+            if (qb.x1 < cb.x0 - reach || qb.x0 > cb.x1 + reach || qb.y1 < cb.y0 - reach || qb.y0 > cb.y1 + reach) continue;
+            if (q.c === cand.c && q.vi === cand.vi && Math.abs(q.x - cand.x) < 1e-6 && Math.abs(q.y - cand.y) < 1e-6) { dup = true; break; }
+            near.push(q);
+          }
+          if (dup) continue;
+          tried++;
+          if (!ctx.verify([cand].concat(near))) continue;
+          pieces.push(cand); order.push(cand); added++;
+        }
+      }
+    }
+    return added;
+  }
+
   return {
     version: VERSION,
+    fillGaps: fillGaps,
     makeContext: makeContext,
     realizeTree: realizeTree,
     approachShift: approachShift,
