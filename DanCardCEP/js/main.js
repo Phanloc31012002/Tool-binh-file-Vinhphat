@@ -2255,6 +2255,27 @@
   }
 
   // ---- Dàn bế decal/tag: tự tạo PON, dàn biên thật của bài + khuôn ----
+  // Chia khu cách nhau (Dàn bế): khối tuỳ chọn chỉ hiện khi tick "Dàn nhiều mẫu vào một tờ";
+  // ô khoảng cách chỉ hiện khi tick thêm "Chia khu cách nhau". Nằm ngoài khối click Dàn bế.
+  function syncBeZoneOptions() {
+    var multi = document.getElementById("beMultiPerArtboard");
+    var split = document.getElementById("beZoneSplit");
+    var opt = document.getElementById("beZoneOpt");
+    var field = document.getElementById("beZoneGapField");
+    if (!multi || !split || !opt || !field) return;
+    if (multi.checked) opt.classList.remove("hidden");
+    else opt.classList.add("hidden");
+    if (multi.checked && split.checked) field.classList.remove("hidden");
+    else field.classList.add("hidden");
+  }
+  (function () {
+    var multi = document.getElementById("beMultiPerArtboard");
+    var split = document.getElementById("beZoneSplit");
+    if (multi) multi.addEventListener("change", syncBeZoneOptions);
+    if (split) split.addEventListener("change", syncBeZoneOptions);
+    syncBeZoneOptions();
+  })();
+
   var btnDanBe = document.getElementById("btnDanBe");
   var outDanBe = document.getElementById("outDanBe");
   if (btnDanBe && outDanBe) {
@@ -2281,6 +2302,19 @@
       var beMulti = !!(beMultiEl && beMultiEl.checked);
       var beTwoEl = document.getElementById("beTwoSided");
       var beTwo = !!(beTwoEl && beTwoEl.checked);
+      // Chia khu cách nhau: chỉ đọc ô mm khi gộp một tờ VÀ tick; không tick thì các khu cách nhau bằng khe.
+      var beZoneSplitEl = document.getElementById("beZoneSplit");
+      var beZoneGapEl = document.getElementById("beZoneGap");
+      var beZoneSplit = beMulti && !!(beZoneSplitEl && beZoneSplitEl.checked);
+      var beZoneGap = null;
+      if (beZoneSplit) {
+        var zoneText = String(beZoneGapEl ? beZoneGapEl.value : "").replace(",", ".").trim();
+        beZoneGap = zoneText === "" ? NaN : Number(zoneText);
+        if (!isFinite(beZoneGap) || beZoneGap < 0 || beZoneGap > 50) {
+          show(outDanBe, "ERR: Khoảng cách khu phải là số từ 0 đến 50 mm.");
+          return;
+        }
+      }
       show(outDanBe, "Đang đo khuôn và tạo PON theo khổ giấy nhập…");
       btnDanBe.disabled = true;
       cs.evalScript(
@@ -2341,6 +2375,7 @@
           }
           var separate = !beMulti && payload.types.length > 1;
           var planCount = separate ? payload.types.length : 1;
+          if (!separate && beZoneSplit) payload.zoneGapMm = beZoneGap;
           var plans = [],
             planIndex = 0,
             totalCount = 0,
@@ -2382,39 +2417,8 @@
             );
           }
 
-          function searchPlan() {
-            var result;
-            try {
-              var input = payload,
-                cacheKey = null;
-              if (separate) {
-                input = {};
-                for (var key in payload) {
-                  if (Object.prototype.hasOwnProperty.call(payload, key))
-                    input[key] = payload[key];
-                }
-                input.types = [payload.types[planIndex]];
-                // Chỉ dùng lại khi đường bao khuôn giống hệt nhau trên cùng khổ tờ.
-                // Sao chép trước khi gán lại mi; không bao giờ sửa phương án dàn cục bộ đã cache.
-                cacheKey = JSON.stringify(input.types[0].groups);
-              }
-              result =
-                cacheKey && cachedPlans[cacheKey]
-                  ? cachedPlans[cacheKey]
-                  : window.DanBeNester.nest(input);
-              if (cacheKey && result && result.ok)
-                cachedPlans[cacheKey] = result;
-            } catch (nestError) {
-              btnDanBe.disabled = false;
-              show(
-                outDanBe,
-                "ERR: " +
-                  (nestError && nestError.message
-                    ? nestError.message
-                    : nestError),
-              );
-              return;
-            }
+          // Nhận kết quả tìm (đồng bộ hoặc qua nestAsync) rồi xếp vào danh sách phương án.
+          function acceptPlan(result) {
             if (!result || !result.ok) {
               btnDanBe.disabled = false;
               show(
@@ -2449,6 +2453,68 @@
             planIndex++;
             if (planIndex < planCount) queuePlan();
             else renderPlans();
+          }
+
+          function searchPlan() {
+            var result;
+            // Gộp một tờ: chạy từng bước qua nestAsync để panel hiện "Đang suy nghĩ…" trong lúc chia khu.
+            if (!separate && typeof window.DanBeNester.nestAsync === "function") {
+              try {
+                window.DanBeNester.nestAsync(
+                  payload,
+                  function (progress) {
+                    if (progress && progress.total)
+                      show(
+                        outDanBe,
+                        "Đang suy nghĩ… phương án " + progress.done + "/" + progress.total,
+                      );
+                  },
+                  acceptPlan,
+                );
+              } catch (asyncError) {
+                btnDanBe.disabled = false;
+                show(
+                  outDanBe,
+                  "ERR: " +
+                    (asyncError && asyncError.message
+                      ? asyncError.message
+                      : asyncError),
+                );
+              }
+              return;
+            }
+            try {
+              var input = payload,
+                cacheKey = null;
+              if (separate) {
+                input = {};
+                for (var key in payload) {
+                  if (Object.prototype.hasOwnProperty.call(payload, key))
+                    input[key] = payload[key];
+                }
+                input.types = [payload.types[planIndex]];
+                // Chỉ dùng lại khi đường bao khuôn giống hệt nhau trên cùng khổ tờ.
+                // Sao chép trước khi gán lại mi; không bao giờ sửa phương án dàn cục bộ đã cache.
+                cacheKey = JSON.stringify(input.types[0].groups);
+              }
+              result =
+                cacheKey && cachedPlans[cacheKey]
+                  ? cachedPlans[cacheKey]
+                  : window.DanBeNester.nest(input);
+              if (cacheKey && result && result.ok)
+                cachedPlans[cacheKey] = result;
+            } catch (nestError) {
+              btnDanBe.disabled = false;
+              show(
+                outDanBe,
+                "ERR: " +
+                  (nestError && nestError.message
+                    ? nestError.message
+                    : nestError),
+              );
+              return;
+            }
+            acceptPlan(result);
           }
 
           function queuePlan() {

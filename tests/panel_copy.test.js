@@ -4,15 +4,15 @@ const fs = require("fs");
 const path = require("path");
 
 // Mốc số lượng từ lấy theo v2.15.4. Các snapshot control/điều hướng đã gồm
-// việc dời ghi chú theo yêu cầu (v2.15.17), ô tên file CTL/script đóng gói (v2.16.1) và script bộ chia khu
-// dan_be_zones.js nạp trước lõi dàn bế (v2.18.0). Không phụ thuộc vào extension đã cài hay đường dẫn
-// người dùng Windows khi chạy trong CI.
+// việc dời ghi chú theo yêu cầu (v2.15.17), ô tên file CTL/script đóng gói (v2.16.1), script bộ chia khu
+// dan_be_zones.js cùng tick "Chia khu cách nhau" + ô "Khoảng cách khu (mm)" của Dàn bế (v2.18.0).
+// Không phụ thuộc vào extension đã cài hay đường dẫn người dùng Windows khi chạy trong CI.
 const baseline = {
   controlHash:
-    "040d716917d80dd5a8d46254d9680cd8ea67f5d33b325c1222534031b2aa618d",
+    "ab71070ef955ef170d77a358f8a0f96fb0d673a9353f0404d1e83a3605c78ddd",
   navigationHash:
     "d4487d9056941ac67e4b8d77215a663f0be6ad08d8a8f23a4d47da4e7561c3cc",
-  controlCount: 119,
+  controlCount: 121,
   staticHintWords: 1293,
 };
 

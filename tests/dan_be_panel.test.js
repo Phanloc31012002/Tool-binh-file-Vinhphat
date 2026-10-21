@@ -55,6 +55,11 @@ function panel(options = {}) {
     beMultiPerArtboard: { checked: options.multi === true },
     beTwoSided: { checked: options.twoSided === true },
   };
+  // Hai điều khiển chia khu (v2.18.0); thiếu node thì panel phải coi như không tick.
+  if (!options.noZoneNodes) {
+    nodes.beZoneSplit = { checked: options.zoneSplit === true };
+    nodes.beZoneGap = { value: options.zoneGap === undefined ? "5" : options.zoneGap };
+  }
   const context = vm.createContext({
     document: { getElementById: (id) => nodes[id] || null },
     cs: {
@@ -103,6 +108,13 @@ function panel(options = {}) {
   });
   if (!options.missingNester) {
     context.window.DanBeNester = {
+      nestAsync: options.nestAsync
+        ? function (payload, onProgress, onDone) {
+            nestCalls.push(clone(payload));
+            context.asyncCalls = (context.asyncCalls || 0) + 1;
+            options.nestAsync(payload, onProgress, onDone);
+          }
+        : undefined,
       nest(payload) {
         assert.strictEqual(
           expressions.length,
@@ -695,6 +707,133 @@ for (const multi of [false, true]) {
   assert(p.statuses.some((s) => /hai mặt|cặp trước\/sau/.test(s)));
   assert.strictEqual(p.nodes.btnDanBe.disabled, false);
 }
+// Chia khu cách nhau (v2.18.0): chỉ khi gộp một tờ VÀ tick mới đọc ô mm và đưa zoneGapMm vào payload.
+{
+  const p = panel({ multi: true, zoneSplit: true, zoneGap: "5" });
+  p.click();
+  p.prepare("OKJSON:" + JSON.stringify(multiPayload));
+  p.tick();
+  assert.deepStrictEqual(p.nestCalls, [{ ...multiPayload, zoneGapMm: 5 }], "zoneGapMm được thêm vào payload gộp");
+}
+{
+  const p = panel({ multi: true, zoneSplit: true, zoneGap: "7,5" });
+  p.click();
+  p.prepare("OKJSON:" + JSON.stringify(multiPayload));
+  p.tick();
+  assert.strictEqual(p.nestCalls[0].zoneGapMm, 7.5, "dấu phẩy thập phân được chấp nhận");
+}
+for (const bad of ["abc", "-1", "51", ""]) {
+  const p = panel({ multi: true, zoneSplit: true, zoneGap: bad });
+  p.click();
+  assert.strictEqual(p.statuses.at(-1), "ERR: Khoảng cách khu phải là số từ 0 đến 50 mm.", "ô mm sai: " + JSON.stringify(bad));
+  assert.strictEqual(p.expressions.length, 0, "không gọi Illustrator khi ô mm sai");
+  assert.strictEqual(p.nodes.btnDanBe.disabled, false);
+}
+{
+  const p = panel({ multi: true, zoneSplit: false, zoneGap: "abc" });
+  p.click();
+  p.prepare("OKJSON:" + JSON.stringify(multiPayload));
+  p.tick();
+  assert.deepStrictEqual(p.nestCalls, [multiPayload], "không tick thì không đọc ô mm, payload giữ nguyên");
+  assert(!("zoneGapMm" in p.nestCalls[0]));
+}
+{
+  const p = panel({ multi: false, zoneSplit: true, zoneGap: "abc" });
+  p.click();
+  p.prepare("OKJSON:" + JSON.stringify(multiPayload));
+  for (let i = 0; i < 3; i++) p.tick();
+  assert(p.nestCalls.every((c) => !("zoneGapMm" in c)), "mỗi mẫu một tờ: không dùng chia khu");
+  assert.strictEqual(p.expressions.length, 2);
+}
+{
+  const p = panel({ multi: true, noZoneNodes: true });
+  p.click();
+  p.prepare("OKJSON:" + JSON.stringify(multiPayload));
+  p.tick();
+  assert.deepStrictEqual(p.nestCalls, [multiPayload], "thiếu điều khiển chia khu thì như không tick");
+}
+// Tiến độ suy nghĩ qua nestAsync ở chế độ gộp một tờ; chế độ mỗi mẫu một tờ vẫn dùng nest().
+{
+  const result = { ok: true, count: 1, slots: [{ mi: 2, vi: 1, x: 7, y: 8, angle: 90 }], detail: "d", mode: "dàn chia khu theo mẫu" };
+  const p = panel({
+    multi: true,
+    nestAsync(payload, onProgress, onDone) {
+      onProgress({ done: 1, total: 3 });
+      onProgress({ done: 3, total: 3 });
+      onDone(result);
+    },
+  });
+  p.click();
+  p.prepare("OKJSON:" + JSON.stringify(multiPayload));
+  p.tick();
+  assert.strictEqual(p.context.asyncCalls, 1, "gộp một tờ dùng nestAsync");
+  assert(p.statuses.includes("Đang suy nghĩ… phương án 1/3"), "hiện tiến độ: " + JSON.stringify(p.statuses));
+  assert(p.statuses.includes("Đang suy nghĩ… phương án 3/3"));
+  p.render("OK:[[COUNT:1]] Dàn chung.");
+  assert.deepStrictEqual(JSON.parse(p.context.renderArguments[1]), result.slots);
+  assert.strictEqual(p.nodes.btnDanBe.disabled, false);
+}
+{
+  const p = panel({ multi: true, nestAsync(payload, onProgress, onDone) { onDone({ ok: false, error: "Không xếp được." }); } });
+  p.click();
+  p.prepare("OKJSON:" + JSON.stringify(multiPayload));
+  p.tick();
+  assert.match(p.statuses.at(-1), /^ERR: Không xếp được\./);
+  assert.strictEqual(p.nodes.btnDanBe.disabled, false);
+  assert.strictEqual(p.expressions.length, 1);
+}
+{
+  const p = panel({ multi: false, nestAsync() { throw new Error("không được gọi"); } });
+  p.click();
+  p.prepare("OKJSON:" + JSON.stringify(multiPayload));
+  for (let i = 0; i < 3; i++) p.tick();
+  assert.strictEqual(p.context.asyncCalls || 0, 0, "mỗi mẫu một tờ không dùng nestAsync");
+  assert.strictEqual(p.expressions.length, 2);
+}
+// Kiểm tra tĩnh index.html: hai điều khiển mới, tiếng Việt, mặc định tắt, ẩn cho tới khi tick gộp một tờ.
+{
+  const zoneOpt = html.match(/<div id="beZoneOpt"[^>]*>[\s\S]*?<\/div>/);
+  assert(zoneOpt, "có khối beZoneOpt");
+  assert.match(zoneOpt[0], /class="field hidden"/);
+  const split = html.match(/<input[^>]*id="beZoneSplit"[^>]*>/);
+  assert(split && /type="checkbox"/.test(split[0]) && !/checked/.test(split[0]), "tick chia khu mặc định tắt");
+  assert(/Chia khu cách nhau/.test(zoneOpt[0]));
+  const field = html.match(/<label id="beZoneGapField"[^>]*>/);
+  assert(field && /hidden/.test(field[0]), "ô mm ẩn cho tới khi tick");
+  const gap = html.match(/<input[^>]*id="beZoneGap"[^>]*>/);
+  assert(gap && /value="5"/.test(gap[0]) && /inputmode="decimal"/.test(gap[0]));
+  assert(/Khoảng cách khu \(mm\)/.test(zoneOpt[0]));
+  assert(/Không tick: các khu cách nhau bằng khe thường\./.test(zoneOpt[0]));
+  const multiAt = html.indexOf('id="beMultiPerArtboard"'), zoneAt = html.indexOf('id="beZoneOpt"'), btnAt = html.indexOf('id="btnDanBe"');
+  assert(multiAt < zoneAt && zoneAt < btnAt, "khối chia khu nằm ngay dưới tick gộp một tờ");
+}
+
+// Ẩn/hiện khối chia khu theo hai tick (chạy đúng đoạn code thật nằm ngoài khối click).
+{
+  const sync = between("  function syncBeZoneOptions()", '  var btnDanBe = document.getElementById("btnDanBe");');
+  const classes = (initial) => ({ list: new Set(initial), classList: {
+    add(c) { classes_of(this).add(c); }, remove(c) { classes_of(this).delete(c); } } });
+  function classes_of(cl) { return cl.owner.list; }
+  function node(hidden) { const n = { list: new Set(hidden ? ["field", "hidden"] : ["field"]) }; n.classList = { add: (c) => n.list.add(c), remove: (c) => n.list.delete(c) }; return n; }
+  const listeners = {};
+  const dom = {
+    beMultiPerArtboard: { checked: false, addEventListener(type, fn) { assert.strictEqual(type, "change"); listeners.multi = fn; } },
+    beZoneSplit: { checked: false, addEventListener(type, fn) { assert.strictEqual(type, "change"); listeners.split = fn; } },
+    beZoneOpt: node(true),
+    beZoneGapField: node(true),
+  };
+  const ctx = vm.createContext({ document: { getElementById: (id) => dom[id] || null } });
+  vm.runInContext(sync, ctx, { filename: "production-main-zone-sync.js" });
+  assert(dom.beZoneOpt.list.has("hidden") && dom.beZoneGapField.list.has("hidden"), "mặc định ẩn cả hai");
+  dom.beMultiPerArtboard.checked = true; listeners.multi();
+  assert(!dom.beZoneOpt.list.has("hidden") && dom.beZoneGapField.list.has("hidden"), "tick gộp: hiện tick chia khu, ô mm còn ẩn");
+  dom.beZoneSplit.checked = true; listeners.split();
+  assert(!dom.beZoneGapField.list.has("hidden"), "tick chia khu: hiện ô mm");
+  dom.beMultiPerArtboard.checked = false; listeners.multi();
+  assert(dom.beZoneOpt.list.has("hidden") && dom.beZoneGapField.list.has("hidden"), "bỏ tick gộp: ẩn cả hai dù vẫn tick chia khu");
+  void classes;
+}
+
 console.log(
-  "Production Dàn bế panel: version loading, editable inputs, single/duplex and separate/mixed sheets, exact-contour reuse, model remapping and failure recovery passed.",
+  "Production Dàn bế panel: version loading, editable inputs, single/duplex and separate/mixed sheets, exact-contour reuse, model remapping, zone split controls, async progress and failure recovery passed.",
 );
