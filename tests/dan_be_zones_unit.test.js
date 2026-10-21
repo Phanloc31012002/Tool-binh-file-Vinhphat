@@ -53,6 +53,33 @@ run("chia cụm bài", () => {
   assert.deepEqual(two.slice().sort(), [0, 1]);
 });
 
+const { assertClusterTidy } = require("./dan_be_cluster_check");
+
+run("cùng khuôn: gom cụm bài", () => {
+  const curve = L.heart().curveErrorMm;
+  const inputFor = (list) => f.input(list[0], { types: list.map((g) => ({ groups: g, curveErrorMm: curve })) });
+  const one = nester.nest(inputFor([heart]));
+  const three = nester.nest(inputFor([heart, heart, turned]));
+  assert.equal(three.ok, true, three.error);
+  const key = (s) => s.x.toFixed(6) + "," + s.y.toFixed(6);
+  assert.deepEqual(three.slots.map(key).sort(), one.slots.map(key).sort(), "vị trí y như dàn một mẫu");
+  assert.equal(three.count, one.count);
+  assert.ok(Math.max(...three.counts) - Math.min(...three.counts) <= 1, "chênh tối đa 1 con");
+  assert.match(three.mode, /gom cụm các bài cùng khuôn/);
+  const observed = [0, 0, 0];
+  three.slots.forEach((s) => { assert.equal(s.angle, s.vi * 90); observed[s.mi]++; });
+  assert.deepEqual(three.counts, observed);
+  [0, 1, 2].forEach((k) => assertClusterTidy(inputFor([heart, heart, turned]), three, k));
+  // Bài 3 đặt xoay 90° trong file: góc xoay trả về phải bù lại để con bế đúng hướng khuôn.
+  const inputThree = inputFor([heart, heart, turned]);
+  three.slots.forEach((s) => {
+    const placed = core.normalizeGroups(core.rotateGroups(inputThree.types[s.mi].groups, s.angle));
+    const ref = one.slots.find((o) => key(o) === key(s));
+    const refPlaced = core.normalizeGroups(core.rotateGroups(heart, ref.angle));
+    assert.ok(core.sameGroups(placed, refPlaced), "con của bài " + s.mi + " đặt đúng hướng khuôn tại vị trí đó");
+  });
+});
+
 assert.ok(Date.now() - began < 120000, "bộ test khối chia khu chạy trong thời gian hữu hạn");
 assert.deepEqual(failures, [], failures.join("\n"));
 console.log("Khối chia khu: mọi ca đạt trong " + (Date.now() - began) + " ms.");

@@ -106,7 +106,10 @@
       ox = sorted(idx, "x"); oy = sorted(idx, "y");
       gx = cutGap(ox, nL, "x"); gy = cutGap(oy, nL, "y");
       if ((gx > 1e-9) !== (gy > 1e-9)) order = gx > 1e-9 ? ox : oy;
-      else order = x1 - x0 >= y1 - y0 ? ox : oy;
+      else if (gx > 1e-9) order = x1 - x0 >= y1 - y0 ? ox : oy;
+      // Không trục nào cắt sạch: chia theo thứ tự đọc (hết hàng này tới hàng khác), mép lởm chởm
+      // chỉ nằm ở cuối hàng như người dàn tay vẫn làm.
+      else order = oy;
       rec(order.slice(0, nL), left);
       rec(order.slice(nL), right);
     }

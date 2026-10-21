@@ -1,6 +1,7 @@
 "use strict";
 const assert = require("node:assert/strict");
 const nester = require("../DanCardCEP/js/dan_be_nester");
+const { assertClusterTidy } = require("./dan_be_cluster_check");
 const { cap } = require("./dan_be_cap_fixture");
 
 // Biên dạng tổng quát, không phải bộ nhận dạng riêng từng sản phẩm. Chúng mô phỏng các khuôn bế
@@ -364,8 +365,9 @@ assert.ok(
   Math.max(...mixed.counts) - Math.min(...mixed.counts) <= 1,
   "equivalent cutter types remain balanced",
 );
-mixed.slots.forEach((s, i) => {
-  assert.equal(s.mi, i % 3, "same cutter slots are assigned cyclically");
+// Mỗi bài một cụm liền, không lẫn (gom cụm thay cho xoay vòng).
+[0, 1, 2].forEach((k) => assertClusterTidy(inputFor([triangle, shiftedTriangle, restartedTriangle], 2), mixed, k));
+mixed.slots.forEach((s) => {
   assert.equal(
     s.vi,
     s.angle / 90,

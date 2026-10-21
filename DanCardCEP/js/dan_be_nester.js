@@ -3606,14 +3606,61 @@
       Number(input.sheet.heightMm) - 2 * margin, dots, Number(input.gapMm), 1);
   }
 
-  function formatRows(input, rows, variants, began) {
-    var n = input.types.length, slots = [], counts = [], i, s, v, countText = [];
+  // Bộ chia khu (dan_be_zones.js) được nạp trước file này trong panel; trong Node thì require.
+  function zonesModule() {
+    if (typeof window !== "undefined" && window.DanBeZones) return window.DanBeZones;
+    if (typeof require === "function") { try { return require("./dan_be_zones.js"); } catch (requireError) { return null; } }
+    return null;
+  }
+
+  // Nhiều bài dùng chung một khuôn: gán bài cho các vị trí (toạ độ/hướng theo khuôn đại diện) sao cho
+  // mỗi bài là một cụm liền, chênh tối đa 1 con. Trả {slots, counts}; slot có mi/vi/angle theo bài thật.
+  function assignDesigns(input, cutter, repSlots, variants) {
+    var zones = zonesModule(), n = input.types.length, members = cutter.members, centres = [], i, s, v, labels, sizes;
+    var slots = [], counts = [], m;
+    for (i = 0; i < n; i++) counts.push(0);
+    for (i = 0; i < repSlots.length; i++) {
+      s = repSlots[i]; v = variants[s.vi];
+      centres.push({ x: s.x + v.w / 2, y: s.y + v.h / 2 });
+    }
+    sizes = zones.clusterSizes(repSlots.length, members.length);
+    labels = zones.assignClusters(centres, sizes);
+    for (i = 0; i < repSlots.length; i++) {
+      s = repSlots[i]; m = members[labels[i]];
+      v = (s.vi + m.rel) % 4;
+      slots.push({ mi: m.type, vi: v, x: s.x, y: s.y, angle: v * 90 });
+      counts[m.type]++;
+    }
+    return { slots: slots, counts: counts };
+  }
+
+  // Kết quả bộ tìm cũ cho các bài cùng khuôn: đưa hướng về khuôn đại diện rồi gán lại thành cụm.
+  function regroupLegacy(input, cutter, finished, variants) {
+    var rel = [], i, m, rep = [], s, out, key;
+    for (i = 0; i < cutter.members.length; i++) { m = cutter.members[i]; rel[m.type] = m.rel; }
+    for (i = 0; i < finished.slots.length; i++) {
+      s = finished.slots[i];
+      rep.push({ vi: (s.vi - (rel[s.mi] || 0) + 4) % 4, x: s.x, y: s.y });
+    }
+    out = assignDesigns(input, cutter, rep, variants);
+    var result = {};
+    for (key in finished) if (Object.prototype.hasOwnProperty.call(finished, key)) result[key] = finished[key];
+    result.slots = out.slots; result.counts = out.counts;
+    result.mode = String(finished.mode || "") + " + gom cụm các bài cùng khuôn";
+    return result;
+  }
+
+  function formatRows(input, rows, variants, began, cutter) {
+    var n = input.types.length, slots = [], counts = [], i, s, v, countText = [], assigned;
     var x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
     for (i = 0; i < n; i++) counts.push(0);
+    if (cutter) {
+      assigned = assignDesigns(input, cutter, rows.slots, variants);
+      slots = assigned.slots; counts = assigned.counts;
+    }
     for (i = 0; i < rows.slots.length; i++) {
       s = rows.slots[i]; v = variants[s.vi];
-      slots.push({ mi: i % n, vi: s.vi, x: s.x, y: s.y, angle: s.vi * 90 });
-      counts[i % n]++;
+      if (!cutter) { slots.push({ mi: i % n, vi: s.vi, x: s.x, y: s.y, angle: s.vi * 90 }); counts[i % n]++; }
       x0 = Math.min(x0, s.x); y0 = Math.min(y0, s.y); x1 = Math.max(x1, s.x + v.w); y1 = Math.max(y1, s.y + v.h);
     }
     var offX = slots.length ? (x0 + x1 - Number(input.sheet.widthMm)) / 2 : 0;
@@ -3622,7 +3669,7 @@
     for (i = 0; i < counts.length; i++) countText.push("loại " + (i + 1) + ": " + counts[i]);
     return {
       ok: true, slots: slots, count: slots.length, counts: counts,
-      mode: "xếp hàng lồng theo biên dạng thật" + (n > 1 ? " + luân phiên các bài cùng khuôn" : ""),
+      mode: "xếp hàng lồng theo biên dạng thật" + (n > 1 ? (cutter ? " + gom cụm các bài cùng khuôn" : " + luân phiên các bài cùng khuôn") : ""),
       centering: { exact: exact, offsetXmm: offX, offsetYmm: offY },
       detail: "Dàn xếp hàng lồng: " + slots.length + " con (" + countText.join(", ") + "). " +
         "Khép đúng khe " + Number(input.gapMm).toFixed(2) + " mm theo đường bế thật; đã thử hàng thẳng, so le, " +
@@ -3668,6 +3715,12 @@
     return none;
   }
 
+  var coreApi = {
+    planCutterRect: planCutterRect, verifyGeometry: verifyGeometry, cutterVariants: cutterVariants,
+    canonicalTurn: canonicalTurn, rotateGroups: rotateGroups, normalizeGroups: normalizeGroups,
+    sameGroups: sameGroups, boundsOfGroups: boundsOfGroups, nestLegacy: nestLegacy
+  };
+
   // Bộ điều phối: lõi xếp hàng lồng chạy trước; bộ tìm cũ chạy thi đua phần tìm (rẻ).
   // Lấy phương án nhiều con hơn; bằng nhau thì giữ bố cục xếp hàng (gọn, đều, khép đúng khe).
   function nest(input) {
@@ -3677,7 +3730,11 @@
     if (!(gap >= 0) || !(margin >= 0) || !(ponClear >= 0) ||
         !(Number(input.sheet.widthMm) - 2 * margin > 0) || !(Number(input.sheet.heightMm) - 2 * margin > 0))
       return nestLegacy(input);
-    try { groups = sharedCutter(input); } catch (cutterError) { groups = null; }
+    // Nhận nhóm khuôn: các bài cùng khuôn (kể cả file đặt xoay 90/180/270) dàn chung một lần rồi gom cụm bài.
+    var zones = zonesModule(), cutters = null, cutter = null;
+    try { cutters = zones ? zones.groupCutters(input.types, coreApi) : null; } catch (cutterError) { cutters = null; }
+    if (cutters && cutters.length === 1) { groups = cutters[0].groups; cutter = cutters[0]; }
+    else if (!cutters) { try { groups = sharedCutter(input); } catch (sharedError) { groups = null; } }
     // Nhiều khuôn KHÁC nhau trên cùng tờ: giữ bộ tìm cũ (luân phiên cân bằng số con giữa các mẫu).
     if (!groups) return nestLegacy(input);
     for (ti = 0; ti < input.types.length; ti++) {
@@ -3709,12 +3766,12 @@
     for (key in input) if (Object.prototype.hasOwnProperty.call(input, key)) legacyInput[key] = input[key];
     legacyInput.budgetMs = Math.max(250, budget - (now() - began));
     var legacy = nestLegacy(legacyInput, 0, true);
-    if (!legacy.ok) return rows ? formatRows(input, rows, variants, began) : legacy;
+    if (!legacy.ok) return rows ? formatRows(input, rows, variants, began, cutter) : legacy;
     if (!rows || legacy.count > rows.count) {
       var finished = legacy.finish();
-      if (finished.ok || !rows) return finished;
+      if (finished.ok || !rows) return finished.ok && cutter && input.types.length > 1 ? regroupLegacy(input, cutter, finished, variants) : finished;
     }
-    return formatRows(input, rows, variants, began);
+    return formatRows(input, rows, variants, began, cutter);
   }
 
   return {
@@ -3722,11 +3779,7 @@
     nest: nest,
     nestLegacy: nestLegacy,
     // Phần lõi mở cho bộ chia khu (dan_be_zones.js).
-    _core: {
-      planCutterRect: planCutterRect, verifyGeometry: verifyGeometry, cutterVariants: cutterVariants,
-      canonicalTurn: canonicalTurn, rotateGroups: rotateGroups, normalizeGroups: normalizeGroups,
-      sameGroups: sameGroups, boundsOfGroups: boundsOfGroups, nestLegacy: nestLegacy
-    },
+    _core: coreApi,
     // Chỉ mở ra cho dữ liệu mẫu test hồi quy chạy bằng Node; panel thì dùng nest().
     _test: {
       buildVariant: buildVariant, circleLike: circleLike, verifyPlan: verifyPlan,

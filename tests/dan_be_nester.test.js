@@ -1,6 +1,7 @@
 "use strict";
 const assert = require("node:assert/strict");
 const nester = require("../DanCardCEP/js/dan_be_nester");
+const { assertClusterTidy } = require("./dan_be_cluster_check");
 const f = require("./dan_be_fixtures");
 
 function check(name, groups, minimum, overrides) {
@@ -104,9 +105,9 @@ function balancedDesigns(name, groups, minimum, types) {
     Math.max(...result.counts) - Math.min(...result.counts) <= 1,
     name + ": equal alternation",
   );
-  result.slots.forEach((slot, i) =>
-    assert.equal(slot.mi, i % types, name + ": cyclic artwork slot"),
-  );
+  // Mỗi bài một cụm liền, không lẫn (gom cụm thay cho xoay vòng).
+  const input = f.input(groups, { types: sameCutterDesigns(groups, types) });
+  for (let k = 0; k < types; k++) assertClusterTidy(input, result, k);
 }
 balancedDesigns("3 circle designs sharing one cutter", f.circle(25), 42, 3);
 balancedDesigns("2 spoon designs sharing one cutter", f.spoon(), 10, 2);

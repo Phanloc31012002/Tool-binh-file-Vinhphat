@@ -189,13 +189,16 @@ run("canh giữa", () => {
 run("tờ dọc", () => check("Bầu dục 60 × 40 trên tờ 120 × 400", inputFor(L.ellipse(60, 40), 2,
   { sheet: sheet(120, 400) }), 14));
 
-// Nhiều bài cùng khuôn: dàn một lần, chia vòng tròn theo thứ tự đọc, chênh tối đa 1.
+const { assertClusterTidy } = require("./dan_be_cluster_check");
+
+// Nhiều bài cùng khuôn: dàn một lần, gom mỗi bài thành một cụm liền, chênh tối đa 1.
 run("bài cùng khuôn", () => {
   const base = L.heart();
   const moved = { groups: base.groups.map((g) => g.map((c) => c.map((p) => [p[0] + 40, p[1] - 12]).reverse())), curveErrorMm: base.curveErrorMm };
   const input = inputFor(base, 1, { types: [base, moved, base] });
-  const r = check("3 bài dùng chung khuôn tim", input, 52, { mode: /luân phiên các bài cùng khuôn/ });
-  r.slots.forEach((s, i) => assert.equal(s.mi, i % 3, "chia bài xoay vòng"));
+  const r = check("3 bài dùng chung khuôn tim", input, 52, { mode: /gom cụm các bài cùng khuôn/ });
+  // Mỗi bài một cụm liền (kề nhau: khung bao cách ≤ khe + nửa cạnh dài), không lẫn vào bao lồi cụm khác.
+  [0, 1, 2].forEach((k) => assertClusterTidy(input, r, k));
   assert.ok(Math.max(...r.counts) - Math.min(...r.counts) <= 1);
 });
 
