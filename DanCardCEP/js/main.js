@@ -2083,7 +2083,7 @@
         .replace(/\\/g, "/");
       var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
       return (
-        "if (typeof dcClipToSize !== 'function' || typeof dcClipToSizeVersion === 'undefined' || dcClipToSizeVersion < 8 || typeof dcClipCard926Version === 'undefined' || dcClipCard926Version < 2) { $.evalFile(" +
+        "if (typeof dcClipTheoTransform !== 'function' || typeof dcClipToSizeVersion === 'undefined' || dcClipToSizeVersion < 9) { $.evalFile(" +
         jsStr(jsxPath) +
         "); } "
       );
@@ -4259,62 +4259,40 @@
       });
   }
 
-  // ---- Clip theo KT (nút Clip cạnh Raster) ----
+  // ---- Clip theo khung Transform (nút Clip cạnh Raster) ----
+  //  Bấm là clip ngay, không hỏi kích thước: mỗi object đang chọn được bọc bằng mask
+  //  đúng khung Transform của nó. Kết quả hiện trong bảng nhỏ dưới header; OK thì tự ẩn,
+  //  lỗi thì để nguyên cho tới lần bấm sau.
   var btnClip = document.getElementById("btnClip");
   var clipPopover = document.getElementById("clipPopover");
-  var clipOk = document.getElementById("clipOk");
-  var clipCancel = document.getElementById("clipCancel");
   var clipMsg = document.getElementById("clipMsg");
+  var clipHideTimer = null;
   if (btnClip && clipPopover) {
-    ["clipW", "clipH"].forEach(attachSelectFirst);
     btnClip.addEventListener("click", function () {
       if (resizePopover) resizePopover.classList.add("hidden");
-      clipPopover.classList.toggle("hidden");
-      if (!clipPopover.classList.contains("hidden")) {
-        if (clipMsg) clipMsg.textContent = "";
-        var w = document.getElementById("clipW");
-        if (w) {
-          w.focus();
-          w.select();
+      if (clipHideTimer) clearTimeout(clipHideTimer);
+      clipPopover.classList.remove("hidden");
+      if (clipMsg) clipMsg.textContent = "Đang clip theo khung Transform…";
+      btnClip.disabled = true;
+      var expr =
+        "(function(){try{" +
+        loadClipJsx() +
+        "return dcClipTheoTransform();}catch(e){return 'ERR: ' + e.toString();}})()";
+      evalJsx(expr, function (res) {
+        btnClip.disabled = false;
+        if (!clipMsg) return;
+        if (res && res.indexOf("OK:") === 0) {
+          clipMsg.textContent = res.substring(3).replace(/^\s+/, "");
+          clipHideTimer = setTimeout(function () {
+            clipPopover.classList.add("hidden");
+          }, 2500);
+        } else if (res && res.indexOf("ERR:") === 0) {
+          clipMsg.textContent = res.substring(4).replace(/^\s+/, "");
+        } else {
+          clipMsg.textContent = "Lỗi gọi ExtendScript.";
         }
-      }
+      });
     });
-    if (clipCancel)
-      clipCancel.addEventListener("click", function () {
-        clipPopover.classList.add("hidden");
-      });
-    if (clipOk)
-      clipOk.addEventListener("click", function () {
-        var wv = document.getElementById("clipW").value || "";
-        var hv = document.getElementById("clipH").value || "";
-        var uv = document.getElementById("clipUnit").value || "cm";
-        if (clipMsg) clipMsg.textContent = "Đang clip…";
-        clipOk.disabled = true;
-        var expr =
-          "(function(){try{" +
-          loadClipJsx() +
-          "return dcClipToSize(" +
-          jsStr(wv) +
-          ", " +
-          jsStr(hv) +
-          ", " +
-          jsStr(uv) +
-          ");}catch(e){return 'ERR: ' + e.toString();}})()";
-        evalJsx(expr, function (res) {
-          clipOk.disabled = false;
-          if (!clipMsg) return;
-          if (res && res.indexOf("OK:") === 0) {
-            clipMsg.textContent = res.substring(3).replace(/^\s+/, "");
-            setTimeout(function () {
-              clipPopover.classList.add("hidden");
-            }, 900);
-          } else if (res && res.indexOf("ERR:") === 0) {
-            clipMsg.textContent = res.substring(4).replace(/^\s+/, "");
-          } else {
-            clipMsg.textContent = "Lỗi gọi ExtendScript.";
-          }
-        });
-      });
   }
 
   // ---- Dàn Catalogue ----
@@ -4699,25 +4677,6 @@
   var asPreview = document.getElementById("asPreview");
   var btnPickFolder = document.getElementById("btnPickFolder");
   var asHopTheoThuTu = document.getElementById("asHopTheoThuTu");
-
-  // ---- Clip nhanh 9.2×5.6 (trong tab Auto Save) ----
-  var btnClipCard = document.getElementById("btnClipCard");
-  var outClipCard = document.getElementById("outClipCard");
-  if (btnClipCard) {
-    btnClipCard.addEventListener("click", function () {
-      if (outClipCard) outClipCard.textContent = "Đang clip 9.2×5.6…";
-      btnClipCard.disabled = true;
-      evalJsx(loadClipJsx() + "dcClipCard926()", function (res) {
-        btnClipCard.disabled = false;
-        if (!outClipCard) return;
-        if (res && res.indexOf("OK:") === 0)
-          outClipCard.textContent = res.substring(3).replace(/^\s+/, "");
-        else if (res && res.indexOf("ERR:") === 0)
-          outClipCard.textContent = res.substring(4).replace(/^\s+/, "");
-        else outClipCard.textContent = "Lỗi gọi ExtendScript.";
-      });
-    });
-  }
 
   function asPad0(n, width) {
     var s = String(n);

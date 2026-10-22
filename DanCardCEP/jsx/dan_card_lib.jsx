@@ -28189,13 +28189,18 @@ function _dcAutoSavePDFCore(
     } catch (e) {}
     return null;
   }
-  // Khung con = khung Transform (clip → khung clip, group → khung group); dự phòng cách cũ.
+  // Khung con = khung Transform (clip → khung clip, group → khung group), LUÔN LUÔN —
+  // anh Lộc 22/10: "auto save cũng sẽ save pdf của transform". Transform không đo được
+  // mới dự phòng khung clip / visibleBounds như cũ.
   function frameOf(item) {
-    return dcDoKhung(item, function (it) {
-      var c = clipRectOf(it);
-      if (c) return c;
-      return bndOf(it);
-    });
+    var khung = null;
+    try {
+      khung = dcKhungThanhPham(item);
+    } catch (khungError) {}
+    if (khung) return khung;
+    var c = clipRectOf(item);
+    if (c) return c;
+    return bndOf(item);
   }
 
   function exportCard(card, filePath) {
@@ -28435,24 +28440,21 @@ function dcPickFolder() {
 }
 
 // ============================================================
-//  dcClipToSize — Clip từng object đang chọn thành khung KT nhập,
-//  CANH GIỮA (tâm) mỗi object.
-//  Tác giả: LỘC (Code dạo) — thêm cho DanCard
+//  dcClipTheoTransform — Clip từng object đang chọn đúng bằng khung
+//  Transform của nó (anh Lộc 22/10: "clip đã clip được transform rồi thì
+//  bỏ chỗ nhập kích thước đi").
 //
-//  Dùng: bấm Raster (nút có sẵn) để biến object thành hình trước,
-//  rồi bấm Clip -> nhập Rộng x Cao -> mỗi object bị cắt thành đúng
-//  khung KT đó (phần thừa ẩn đi, phần thiếu để trống).
-//
-//  Tham số:
-//    wCm, hCm : Rộng, Cao (đơn vị theo unit; mặc định "cm")
-//    unit     : "cm" | "mm" | "in" | "pt"  (mặc định "cm")
+//  Mỗi object chưa clip được bọc bằng một mask chữ nhật = dcKhungThanhPham
+//  (group → khung group, hình → khung hình); phần nét/hiệu ứng tràn ngoài
+//  khung bị cắt. Object đã có clip giữ nguyên (khung đã chuẩn). Luôn đo theo
+//  Transform, không phụ thuộc tick ở header — đó chính là mục đích của nút.
 //  Trả về "OK: ..." hoặc "ERR: ...".
 // ============================================================
-var dcClipToSizeVersion = 8;
+var dcClipToSizeVersion = 9;
 
-function dcClipToSize(wCm, hCm, unit) {
+function dcClipTheoTransform() {
   try {
-    return _dcClipToCardStyleCore(wCm, hCm, unit);
+    return _dcClipTheoTransformCore();
   } catch (e) {
     return (
       "ERR: " + (typeof dcMoTaLoi === "function" ? dcMoTaLoi(e) : e.toString())
@@ -28460,143 +28462,15 @@ function dcClipToSize(wCm, hCm, unit) {
   }
 }
 
-// Clip rời dùng nguyên tắc của Dàn Card: từng object được đo theo vùng nhìn
-// thấy thật, sau đó tạo một mask chữ nhật đúng tâm. Không dò hay nâng lên group
-// cha, vì thao tác đó dễ chọn nhầm ảnh/mask con khi file có cấu trúc phức tạp.
-function _dcClipToCardStyleCore(wText, hText, unit) {
+function _dcClipTheoTransformCore() {
   if (app.documents.length === 0) return "ERR: Chưa mở tài liệu nào.";
   var doc = app.activeDocument;
-  unit =
-    unit === undefined || unit === null || String(unit) === ""
-      ? "cm"
-      : String(unit);
-  // "in" là từ dành riêng trong ExtendScript nên làm key của object phải có dấu nháy.
-  // prettier-ignore
-  var perUnit = { cm: 28.34645669, mm: 2.834645669, "in": 72, pt: 1 };
-  var unitSize = perUnit[unit];
-  if (!unitSize) return "ERR: Đơn vị không hợp lệ: " + unit;
-
-  var W = parseFloat(String(wText).replace(",", ".")) * unitSize;
-  var H = parseFloat(String(hText).replace(",", ".")) * unitSize;
-  if (!isFinite(W) || !isFinite(H) || W <= 0 || H <= 0)
-    return "ERR: Kích thước Rộng x Cao phải lớn hơn 0.";
-
   var selection = doc.selection;
   if (!selection || selection.length === 0)
     return "ERR: Hãy chọn ít nhất 1 object để clip.";
 
-  // Sao chép nguyên cách Dàn Card đo phần đang nhìn thấy, bao gồm giao của
-  // nội dung với clip mask; mask trống, guide và object ẩn không làm lệch tâm.
-  function isVisibleLeaf(item) {
-    try {
-      if (item.hidden === true) return false;
-      if (item.guides === true) return false;
-    } catch (e) {}
-    try {
-      if (item.typename === "PathItem")
-        return item.filled === true || item.stroked === true;
-      if (item.typename === "CompoundPathItem") {
-        if (item.pathItems.length > 0) {
-          var p0 = item.pathItems[0];
-          return p0.filled === true || p0.stroked === true;
-        }
-        return false;
-      }
-    } catch (e2) {}
-    return true;
-  }
-
-  function visibleUnion(item, acc) {
-    function merge(bounds) {
-      if (!bounds) return;
-      if (!acc.val) {
-        acc.val = bounds.slice(0);
-        return;
-      }
-      var current = acc.val;
-      if (bounds[0] < current[0]) current[0] = bounds[0];
-      if (bounds[1] > current[1]) current[1] = bounds[1];
-      if (bounds[2] > current[2]) current[2] = bounds[2];
-      if (bounds[3] < current[3]) current[3] = bounds[3];
-    }
-    // Khung để clip = khung Transform của object (tâm clip đặt theo khung đó).
-    if (dcDoTheoKhungTransform) {
-      var khungTransform = dcKhungThanhPham(item);
-      if (khungTransform) {
-        merge(khungTransform);
-        return;
-      }
-    }
-    var type = "";
-    try {
-      type = item.typename;
-    } catch (invalidItemError) {
-      return;
-    }
-    if (type === "GroupItem") {
-      var clipped = false;
-      try {
-        clipped = item.clipped === true;
-      } catch (clippedError) {}
-      var children;
-      try {
-        children = item.pageItems;
-      } catch (childrenError) {
-        children = [];
-      }
-      if (clipped) {
-        var maskBounds = null;
-        var i;
-        for (i = 0; i < children.length; i++) {
-          try {
-            if (children[i].clipping === true) {
-              maskBounds = children[i].geometricBounds;
-              break;
-            }
-          } catch (maskError) {}
-        }
-        var inside = { val: null };
-        for (i = 0; i < children.length; i++) {
-          var isMask = false;
-          try {
-            isMask = children[i].clipping === true;
-          } catch (innerMaskError) {}
-          if (!isMask) visibleUnion(children[i], inside);
-        }
-        var visible = inside.val;
-        if (visible && maskBounds) {
-          var left = Math.max(visible[0], maskBounds[0]);
-          var top = Math.min(visible[1], maskBounds[1]);
-          var right = Math.min(visible[2], maskBounds[2]);
-          var bottom = Math.max(visible[3], maskBounds[3]);
-          merge(
-            right > left && top > bottom
-              ? [left, top, right, bottom]
-              : maskBounds,
-          );
-        } else if (visible) {
-          merge(visible);
-        } else if (maskBounds) {
-          merge(maskBounds);
-        }
-        return;
-      }
-      for (var childIndex = 0; childIndex < children.length; childIndex++)
-        visibleUnion(children[childIndex], acc);
-      return;
-    }
-    if (!isVisibleLeaf(item)) return;
-    try {
-      merge(item.visibleBounds);
-    } catch (visibleBoundsError) {
-      try {
-        merge(item.geometricBounds);
-      } catch (geometricBoundsError) {}
-    }
-  }
-
-  // Đây là đúng thao tác cuối của autoClip trong Dàn Card: clip group đã có
-  // thì giữ nguyên khung đã chuẩn; object thường được cắt bằng mask cùng tâm.
+  // Thao tác cuối giống autoClip của Dàn Card: expand appearance để khung mới
+  // là khung thật, không còn hiệu ứng treo bên ngoài.
   function expandAppearanceLikeDanCard(item) {
     try {
       app.selection = null;
@@ -28613,36 +28487,56 @@ function _dcClipToCardStyleCore(wText, hText, unit) {
     return item;
   }
 
+  function khungCua(item) {
+    var khung = null;
+    try {
+      khung = dcKhungThanhPham(item);
+    } catch (khungError) {}
+    if (!khung) {
+      try {
+        khung = item.visibleBounds;
+      } catch (visibleError) {
+        try {
+          khung = item.geometricBounds;
+        } catch (geometricError) {}
+      }
+    }
+    if (
+      !khung ||
+      khung.length !== 4 ||
+      khung[2] - khung[0] <= 0.001 ||
+      khung[1] - khung[3] <= 0.001
+    )
+      throw new Error("không đo được khung Transform của object.");
+    return [khung[0], khung[1], khung[2], khung[3]];
+  }
+
   var keptClipCount = 0; // clip group sẵn có: giữ nguyên, không tính là "đã clip"
-  function clipLikeDanCard(item) {
+  var sizes = []; // [{text, count}] theo thứ tự gặp
+  function ghiKho(khung) {
+    var text = dcKhungText(khung);
+    for (var s = 0; s < sizes.length; s++) {
+      if (sizes[s].text === text) {
+        sizes[s].count++;
+        return;
+      }
+    }
+    sizes.push({ text: text, count: 1 });
+  }
+  function clipTheoKhung(item) {
     try {
       if (item.typename === "GroupItem" && item.clipped === true) {
         keptClipCount++;
-        return expandAppearanceLikeDanCard(item);
+        return item;
       }
     } catch (alreadyClipError) {}
-
-    var acc = { val: null };
-    visibleUnion(item, acc);
-    var bounds = acc.val;
-    if (!bounds) {
-      try {
-        bounds = item.visibleBounds;
-      } catch (visibleFallbackError) {
-        bounds = item.geometricBounds;
-      }
-    }
-    if (!bounds || bounds[2] <= bounds[0] || bounds[1] <= bounds[3])
-      throw new Error("không đo được vùng hiển thị của object.");
-
-    var centerX = (bounds[0] + bounds[2]) / 2;
-    var centerY = (bounds[1] + bounds[3]) / 2;
+    var khung = khungCua(item);
     var layer = item.layer;
     var mask = layer.pathItems.rectangle(
-      centerY + H / 2,
-      centerX - W / 2,
-      W,
-      H,
+      khung[1],
+      khung[0],
+      khung[2] - khung[0],
+      khung[1] - khung[3],
     );
     mask.filled = false;
     mask.stroked = false;
@@ -28651,6 +28545,7 @@ function _dcClipToCardStyleCore(wText, hText, unit) {
     item.move(group, ElementPlacement.PLACEATEND);
     mask.clipping = true;
     group.clipped = true;
+    ghiKho(khung);
     return expandAppearanceLikeDanCard(group);
   }
 
@@ -28660,7 +28555,7 @@ function _dcClipToCardStyleCore(wText, hText, unit) {
   var errors = [];
   for (i = 0; i < snapshot.length; i++) {
     try {
-      results.push(clipLikeDanCard(snapshot[i]));
+      results.push(clipTheoKhung(snapshot[i]));
     } catch (clipError) {
       errors.push("Object " + (i + 1) + ": " + clipError);
     }
@@ -28672,18 +28567,21 @@ function _dcClipToCardStyleCore(wText, hText, unit) {
   } catch (selectionError) {}
 
   var clippedCount = results.length - keptClipCount;
+  var khoText = "";
+  if (sizes.length === 1) khoText = ": " + sizes[0].text;
+  else if (sizes.length > 1) {
+    var parts = [];
+    for (var k = 0; k < sizes.length; k++)
+      parts.push(sizes[k].text + " (" + sizes[k].count + " object)");
+    khoText = ": " + parts.join(", ");
+  }
   var message =
     "Đã clip " +
     clippedCount +
     "/" +
     snapshot.length +
-    " object thành " +
-    wText +
-    " x " +
-    hText +
-    " " +
-    unit +
-    " theo logic Dàn Card" +
+    " object theo khung Transform" +
+    khoText +
     (keptClipCount
       ? "; " + keptClipCount + " object đã có clip, giữ nguyên."
       : ".");
@@ -28691,360 +28589,6 @@ function _dcClipToCardStyleCore(wText, hText, unit) {
     return (
       (results.length ? "OK: " : "ERR: ") + message + "\n" + errors.join("\n")
     );
-  return "OK: " + message;
-}
-
-function _dcClipToSizeCore(wCm, hCm, unit) {
-  if (app.documents.length === 0) return "ERR: Chưa mở tài liệu nào.";
-  var doc = app.activeDocument;
-  unit =
-    unit === undefined || unit === null || String(unit) === ""
-      ? "cm"
-      : String(unit);
-  // prettier-ignore
-  var perUnit = { cm: 28.34645669, mm: 2.834645669, "in": 72, pt: 1 };
-  var unitSize = perUnit[unit];
-  if (!unitSize) return "ERR: Đơn vị không hợp lệ: " + unit;
-
-  var W = parseFloat(String(wCm).replace(",", ".")) * unitSize;
-  var H = parseFloat(String(hCm).replace(",", ".")) * unitSize;
-  if (!isFinite(W) || !isFinite(H) || W <= 0 || H <= 0)
-    return "ERR: Kích thước Rộng x Cao phải lớn hơn 0.";
-
-  var selection = doc.selection;
-  if (!selection || selection.length === 0)
-    return "ERR: Hãy chọn ít nhất 1 object để clip.";
-
-  function copyBounds(bounds) {
-    if (!bounds || bounds.length < 4) return null;
-    var result = [
-      Number(bounds[0]),
-      Number(bounds[1]),
-      Number(bounds[2]),
-      Number(bounds[3]),
-    ];
-    return result[2] > result[0] && result[1] > result[3] ? result : null;
-  }
-
-  function visibleBounds(item) {
-    try {
-      var visible = copyBounds(item.visibleBounds);
-      if (visible) return visible;
-    } catch (visibleError) {}
-    try {
-      return copyBounds(item.geometricBounds);
-    } catch (geometricError) {
-      return null;
-    }
-  }
-
-  function geometricBounds(item) {
-    try {
-      return copyBounds(item.geometricBounds);
-    } catch (geometricError) {
-      return null;
-    }
-  }
-
-  function centerOf(bounds) {
-    return { x: (bounds[0] + bounds[2]) / 2, y: (bounds[1] + bounds[3]) / 2 };
-  }
-
-  function itemType(item) {
-    try {
-      return item.typename;
-    } catch (typeError) {
-      return "";
-    }
-  }
-
-  function directChildren(group) {
-    var result = [];
-    try {
-      var all = group.pageItems;
-      for (var i = 0; i < all.length; i++) {
-        try {
-          if (all[i].parent === group) result.push(all[i]);
-        } catch (parentError) {}
-      }
-    } catch (childrenError) {}
-    return result;
-  }
-
-  function isBackgroundFrameCandidate(item) {
-    var type = itemType(item);
-    return (
-      type === "PlacedItem" ||
-      type === "RasterItem" ||
-      type === "PathItem" ||
-      type === "CompoundPathItem"
-    );
-  }
-
-  function frameMatchesSize(bounds) {
-    if (!bounds) return false;
-    var tolerance = Math.max(1.5, Math.min(W, H) * 0.006);
-    return (
-      Math.abs(bounds[2] - bounds[0] - W) <= tolerance &&
-      Math.abs(bounds[1] - bounds[3] - H) <= tolerance
-    );
-  }
-
-  function scanBackgroundFrames(node, result) {
-    if (!node) return;
-    var type = itemType(node);
-    if (isBackgroundFrameCandidate(node)) {
-      var bounds = geometricBounds(node);
-      if (frameMatchesSize(bounds)) result.push({ item: node, bounds: bounds });
-      return;
-    }
-    if (type !== "GroupItem") return;
-    var children = directChildren(node);
-    for (var i = 0; i < children.length; i++)
-      scanBackgroundFrames(children[i], result);
-  }
-
-  function clippingBounds(item) {
-    try {
-      if (item.clipping === true) return geometricBounds(item);
-    } catch (clipError) {}
-    if (itemType(item) === "CompoundPathItem") {
-      try {
-        var paths = item.pathItems;
-        for (var i = 0; i < paths.length; i++) {
-          if (paths[i].clipping === true) return geometricBounds(item);
-        }
-      } catch (compoundError) {}
-    }
-    return null;
-  }
-
-  // Trang đã được clip từ trước là mốc tham chiếu đáng tin nhất: clipping path
-  // trực tiếp của nó chính là khung trang đã được duyệt, kể cả khi W x H mới thay đổi.
-  function findScopeByExistingClip(item) {
-    var scope = item;
-    var depth = 0;
-    while (scope && depth < 12) {
-      if (itemType(scope) === "GroupItem") {
-        var isClipped = false;
-        try {
-          isClipped = scope.clipped === true;
-        } catch (clippedError) {}
-        if (isClipped) {
-          var children = directChildren(scope);
-          for (var i = 0; i < children.length; i++) {
-            var bounds = clippingBounds(children[i]);
-            if (bounds)
-              return {
-                scope: scope,
-                clip: { item: children[i], bounds: bounds },
-              };
-          }
-        }
-      }
-      try {
-        scope = scope.parent;
-      } catch (parentError) {
-        break;
-      }
-      if (itemType(scope) === "Layer" || itemType(scope) === "Document") break;
-      depth++;
-    }
-    return null;
-  }
-
-  function scopeLooksLikeOnePage(scope, frame) {
-    var scopeBounds = visibleBounds(scope);
-    if (!scopeBounds) return false;
-    var scopeCenter = centerOf(scopeBounds);
-    var frameCenter = centerOf(frame);
-    var frameWidth = frame[2] - frame[0];
-    var frameHeight = frame[1] - frame[3];
-    return (
-      Math.abs(scopeCenter.x - frameCenter.x) <= frameWidth * 0.3 &&
-      Math.abs(scopeCenter.y - frameCenter.y) <= frameHeight * 0.3 &&
-      scopeBounds[2] - scopeBounds[0] <= frameWidth * 1.8 &&
-      scopeBounds[1] - scopeBounds[3] <= frameHeight * 1.8
-    );
-  }
-
-  // Kích thước nhập vào dùng để chọn ra ảnh nền. Group gần nhất chứa đúng
-  // một nền cỡ bằng trang sẽ thành phạm vi clip, thay vì một object con có
-  // hiệu ứng nở rộng hay một mask ảnh không liên quan.
-  function findScopeByBackground(item) {
-    var scope = item;
-    var depth = 0;
-    while (scope && depth < 12) {
-      if (itemType(scope) === "GroupItem") {
-        var matches = [];
-        scanBackgroundFrames(scope, matches);
-        if (
-          matches.length === 1 &&
-          scopeLooksLikeOnePage(scope, matches[0].bounds)
-        )
-          return { scope: scope, background: matches[0] };
-        if (matches.length > 1) {
-          var scopeBounds = visibleBounds(scope);
-          var scopeCenter = scopeBounds ? centerOf(scopeBounds) : null;
-          var best = null;
-          var bestDistance = 1e20;
-          for (var i = 0; i < matches.length; i++) {
-            var candidateCenter = centerOf(matches[i].bounds);
-            var distance = scopeCenter
-              ? Math.abs(scopeCenter.x - candidateCenter.x) +
-                Math.abs(scopeCenter.y - candidateCenter.y)
-              : 0;
-            if (distance < bestDistance) {
-              bestDistance = distance;
-              best = matches[i];
-            }
-          }
-          if (best && scopeLooksLikeOnePage(scope, best.bounds))
-            return { scope: scope, background: best };
-        }
-      }
-      try {
-        scope = scope.parent;
-      } catch (parentError) {
-        break;
-      }
-      if (itemType(scope) === "Layer" || itemType(scope) === "Document") break;
-      depth++;
-    }
-    return null;
-  }
-
-  function clipOne(scope, anchor) {
-    var reference = anchor
-      ? anchor.bounds
-      : geometricBounds(scope) || visibleBounds(scope);
-    if (!reference) throw new Error("Không đo được object.");
-    var center = centerOf(reference);
-    var parent = scope.parent;
-    var layer = scope.layer;
-    var wrapper = parent.groupItems.add();
-    try {
-      wrapper.move(scope, ElementPlacement.PLACEBEFORE);
-    } catch (orderError) {}
-
-    var mask = layer.pathItems.rectangle(
-      center.y + H / 2,
-      center.x - W / 2,
-      W,
-      H,
-    );
-    mask.filled = false;
-    mask.stroked = false;
-    mask.move(wrapper, ElementPlacement.PLACEATBEGINNING);
-    scope.move(wrapper, ElementPlacement.PLACEATEND);
-    mask.clipping = true;
-    wrapper.clipped = true;
-    return wrapper;
-  }
-
-  var snapshot = [];
-  for (var i = 0; i < selection.length; i++) snapshot.push(selection[i]);
-
-  // Nhiều object con được chọn có thể cùng thuộc một group trang. Chỉ clip nó một lần.
-  // Một object bị lỗi khi dò parent/clip không được phép làm dừng toàn bộ lệnh:
-  // dùng object đã chọn làm fallback, các object khác vẫn tiếp tục được clip.
-  var jobs = [];
-  var scanWarnings = [];
-  for (i = 0; i < snapshot.length; i++) {
-    var existingClip = null;
-    var found = null;
-    try {
-      existingClip = findScopeByExistingClip(snapshot[i]);
-    } catch (existingClipError) {
-      scanWarnings.push(
-        "Object " + (i + 1) + ": không dò được clip cha, dùng object đã chọn.",
-      );
-    }
-    if (!existingClip) {
-      try {
-        found = findScopeByBackground(snapshot[i]);
-      } catch (backgroundScanError) {
-        scanWarnings.push(
-          "Object " +
-            (i + 1) +
-            ": không dò được khung nền, dùng object đã chọn.",
-        );
-      }
-    }
-    var scope = existingClip
-      ? existingClip.scope
-      : found
-        ? found.scope
-        : snapshot[i];
-    var duplicate = false;
-    for (var j = 0; j < jobs.length; j++) {
-      if (jobs[j].scope === scope) {
-        duplicate = true;
-        break;
-      }
-    }
-    if (!duplicate)
-      jobs.push({
-        scope: scope,
-        anchor: existingClip
-          ? existingClip.clip
-          : found
-            ? found.background
-            : null,
-        anchorType: existingClip ? "clip" : found ? "background" : "fallback",
-      });
-  }
-
-  var results = [];
-  var done = 0;
-  var byBackground = 0;
-  var byExistingClip = 0;
-  var errors = scanWarnings;
-  for (i = 0; i < jobs.length; i++) {
-    try {
-      var clipped = clipOne(jobs[i].scope, jobs[i].anchor);
-      results.push(clipped);
-      done++;
-      if (jobs[i].anchorType === "background") byBackground++;
-      if (jobs[i].anchorType === "clip") byExistingClip++;
-    } catch (clipError) {
-      errors.push(
-        "Object " +
-          (i + 1) +
-          ": " +
-          (typeof dcMoTaLoi === "function"
-            ? dcMoTaLoi(clipError)
-            : clipError.toString()),
-      );
-    }
-  }
-
-  try {
-    doc.selection = null;
-    for (i = 0; i < results.length; i++) results[i].selected = true;
-    app.redraw();
-  } catch (selectionError) {}
-
-  var message =
-    "Đã clip " +
-    done +
-    "/" +
-    jobs.length +
-    " group thành " +
-    wCm +
-    " x " +
-    hCm +
-    " " +
-    unit +
-    (byExistingClip ? "; neo theo " + byExistingClip + " clip cha" : "") +
-    (byBackground ? "; neo theo " + byBackground + " background khớp KT" : "") +
-    (done - byBackground - byExistingClip
-      ? "; " +
-        (done - byBackground - byExistingClip) +
-        " group dùng fallback tâm geometricBounds."
-      : ".");
-  if (errors.length)
-    return (done ? "OK: " : "ERR: ") + message + "\n" + errors.join("\n");
   return "OK: " + message;
 }
 
@@ -29221,250 +28765,4 @@ function dcResizeSelectionToSize(wText, hText, unit) {
       "ERR: " + (typeof dcMoTaLoi === "function" ? dcMoTaLoi(e) : e.toString())
     );
   }
-}
-
-// ============================================================
-//  dcClipCard926 — Clip nhanh card 9.2 x 5.6 cm cho tab Auto Save.
-//  Cố định KT 9.2 x 5.6; TỰ XOAY KHUNG theo object:
-//    - object nằm ngang (rộng >= cao) -> khung 9.2 x 5.6
-//    - object đứng dọc  (cao  >  rộng) -> khung 5.6 x 9.2
-//  Canh giữa (tâm) mỗi object. Không xoay object, chỉ xoay khung clip.
-//  Trả về "OK: ..." hoặc "ERR: ...".
-// ============================================================
-var dcClipCard926Version = 2;
-
-function dcClipCard926() {
-  try {
-    return _dcClipCard926CoreV2();
-  } catch (e) {
-    return (
-      "ERR: " + (typeof dcMoTaLoi === "function" ? dcMoTaLoi(e) : e.toString())
-    );
-  }
-}
-
-function _dcClipCard926CoreV2() {
-  if (app.documents.length === 0) return "ERR: Chưa mở tài liệu nào.";
-  if (typeof _dcClipToSizeCore !== "function")
-    return "ERR: Clip core chưa được nạp.";
-  var doc = app.activeDocument;
-  var selection = doc.selection;
-  if (!selection || selection.length === 0)
-    return "ERR: Hãy chọn ít nhất 1 object để clip 9.2 x 5.6.";
-
-  function boundsOf(item) {
-    try {
-      var bounds = item.geometricBounds;
-      return bounds && bounds[2] > bounds[0] && bounds[1] > bounds[3]
-        ? bounds
-        : null;
-    } catch (e) {
-      return null;
-    }
-  }
-
-  function directChildren(group) {
-    var children = [];
-    try {
-      for (var i = 0; i < group.pageItems.length; i++) {
-        if (group.pageItems[i].parent === group)
-          children.push(group.pageItems[i]);
-      }
-    } catch (e) {}
-    return children;
-  }
-
-  function clippingBounds(item) {
-    try {
-      if (item.clipping === true) return boundsOf(item);
-    } catch (e) {}
-    try {
-      if (item.typename === "CompoundPathItem") {
-        for (var i = 0; i < item.pathItems.length; i++) {
-          if (item.pathItems[i].clipping === true) return boundsOf(item);
-        }
-      }
-    } catch (compoundError) {}
-    return null;
-  }
-
-  // Khung clip trực tiếp có sẵn cho biết hướng ngang/dọc mà không cần đọc
-  // appearance đã nở rộng hay phần bài chưa bị mask nằm ngoài card.
-  function nearestClipBounds(item) {
-    var scope = item;
-    for (var depth = 0; scope && depth < 12; depth++) {
-      try {
-        if (scope.typename === "GroupItem" && scope.clipped === true) {
-          var children = directChildren(scope);
-          for (var i = 0; i < children.length; i++) {
-            var frame = clippingBounds(children[i]);
-            if (frame) return frame;
-          }
-        }
-        scope = scope.parent;
-        if (scope.typename === "Layer" || scope.typename === "Document") break;
-      } catch (e) {
-        break;
-      }
-    }
-    return null;
-  }
-
-  var snapshot = [];
-  for (var s = 0; s < selection.length; s++) snapshot.push(selection[s]);
-
-  var results = [];
-  var errors = [];
-  for (var n = 0; n < snapshot.length; n++) {
-    try {
-      // Hướng khổ lấy theo khung Transform của object (clip → khung clip).
-      var reference =
-        (dcDoTheoKhungTransform ? dcKhungThanhPham(snapshot[n]) : null) ||
-        nearestClipBounds(snapshot[n]) ||
-        boundsOf(snapshot[n]);
-      if (!reference) throw new Error("không đo được object.");
-      var portrait = reference[1] - reference[3] > reference[2] - reference[0];
-      doc.selection = null;
-      snapshot[n].selected = true;
-      var response = _dcClipToSizeCore(
-        portrait ? 5.6 : 9.2,
-        portrait ? 9.2 : 5.6,
-        "cm",
-      );
-      if (!response || response.indexOf("ERR:") === 0)
-        throw new Error(response || "Clip thất bại.");
-      if (!doc.selection || doc.selection.length === 0)
-        throw new Error("Clip không trả về object.");
-      results.push(doc.selection[0]);
-    } catch (clipError) {
-      errors.push("Object " + (n + 1) + ": " + clipError);
-    }
-  }
-
-  try {
-    doc.selection = null;
-    for (var r = 0; r < results.length; r++) results[r].selected = true;
-    app.redraw();
-  } catch (selectionError) {}
-
-  var message =
-    "Đã clip " +
-    results.length +
-    "/" +
-    snapshot.length +
-    " object thành 9.2 x 5.6 (tự xoay, dùng chung logic Clip).";
-  if (errors.length)
-    return (
-      (results.length ? "OK: " : "ERR: ") + message + "\n" + errors.join("\n")
-    );
-  return "OK: " + message;
-}
-
-function _dcClipCard926Core() {
-  if (app.documents.length === 0) return "ERR: Chưa mở tài liệu nào.";
-  var doc = app.activeDocument;
-
-  var CM = 28.34645669;
-  var LONG = 9.2 * CM; // cạnh dài
-  var SHORT = 5.6 * CM; // cạnh ngắn
-
-  var sel = doc.selection;
-  if (!sel || sel.length === 0)
-    return "ERR: Hãy chọn ít nhất 1 object để clip 9.2×5.6.";
-
-  function bndOf(item) {
-    try {
-      return item.visibleBounds;
-    } catch (e) {
-      try {
-        return item.geometricBounds;
-      } catch (e2) {
-        return null;
-      }
-    }
-  }
-
-  function clipOne(item) {
-    var g = bndOf(item); // [left, top, right, bottom]
-    if (!g) throw new Error("không đo được object.");
-    var w = g[2] - g[0]; // rộng
-    var h = g[1] - g[3]; // cao
-    var cx = (g[0] + g[2]) / 2;
-    var cy = (g[1] + g[3]) / 2;
-
-    // Tự xoay khung: đứng dọc -> khung dọc (5.6 rộng x 9.2 cao).
-    var W, H;
-    if (h > w) {
-      W = SHORT;
-      H = LONG;
-    } // object đứng
-    else {
-      W = LONG;
-      H = SHORT;
-    } // object nằm ngang
-
-    var parent = item.parent;
-    var lay = item.layer;
-
-    var wrapper = parent.groupItems.add();
-    try {
-      wrapper.move(item, ElementPlacement.PLACEBEFORE);
-    } catch (e) {}
-
-    var maskTop = cy + H / 2;
-    var maskLeft = cx - W / 2;
-    var mask = lay.pathItems.rectangle(maskTop, maskLeft, W, H);
-    mask.filled = false;
-    mask.stroked = false;
-    mask.move(wrapper, ElementPlacement.PLACEATBEGINNING);
-
-    item.move(wrapper, ElementPlacement.PLACEATEND);
-    mask.clipping = true;
-    wrapper.clipped = true;
-    return wrapper;
-  }
-
-  var arr = [];
-  for (var i = 0; i < sel.length; i++) arr.push(sel[i]);
-
-  var results = [],
-    done = 0,
-    errs = [];
-  for (i = 0; i < arr.length; i++) {
-    try {
-      results.push(clipOne(arr[i]));
-      done++;
-    } catch (e2) {
-      errs.push(
-        "Object " +
-          (i + 1) +
-          ": " +
-          (typeof dcMoTaLoi === "function" ? dcMoTaLoi(e2) : e2.toString()),
-      );
-    }
-  }
-
-  try {
-    app.selection = null;
-    for (i = 0; i < results.length; i++) results[i].selected = true;
-  } catch (e) {}
-
-  var msg =
-    "OK: Đã clip " +
-    done +
-    "/" +
-    arr.length +
-    " object thành 9.2×5.6 (tự xoay khung, canh giữa).";
-  if (errs.length) {
-    msg =
-      (done > 0 ? "OK: " : "ERR: ") +
-      "Clip được " +
-      done +
-      "/" +
-      arr.length +
-      " object.\nLỗi:\n- " +
-      errs.join("\n- ");
-  }
-
-  return msg;
 }

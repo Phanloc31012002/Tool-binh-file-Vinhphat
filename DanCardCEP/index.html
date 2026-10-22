@@ -34,7 +34,7 @@
             id="btnClip"
             class="header-raster header-clip"
             type="button"
-            title="Clip canh giữa theo kích thước nhập"
+            title="Clip từng object đang chọn đúng bằng khung Transform của nó (group → khung group, hình → khung hình); object đã có clip giữ nguyên"
           >
             Clip
           </button>
@@ -53,25 +53,9 @@
           </button>
         </div>
 
-        <!-- Bảng nhập KT clip (ẩn, hiện khi bấm Clip) -->
+        <!-- Kết quả Clip theo khung Transform (ẩn, hiện khi bấm Clip) -->
         <div id="clipPopover" class="clip-pop hidden">
-          <div class="clip-pop-title">Clip kích thước (canh giữa)</div>
-          <div class="clip-pop-row">
-            <input type="text" id="clipW" class="clip-inp" value="5" />
-            <span class="times">×</span>
-            <input type="text" id="clipH" class="clip-inp" value="5" />
-            <select id="clipUnit" class="clip-unit">
-              <option value="cm">cm</option>
-              <option value="mm">mm</option>
-              <option value="in">in</option>
-            </select>
-          </div>
-          <div class="clip-pop-btns">
-            <button id="clipCancel" class="btn" type="button">Huỷ</button>
-            <button id="clipOk" class="btn btn-primary" type="button">
-              <span class="btn-label">OK</span>
-            </button>
-          </div>
+          <div class="clip-pop-title">Clip theo khung Transform</div>
           <div id="clipMsg" class="hint"></div>
         </div>
 
@@ -813,11 +797,6 @@
           <div class="label">Xem trước tên file</div>
           <div id="asPreview" class="out" style="font-family:monospace"></div>
         </div>
-
-        <button id="btnClipCard" class="btn" type="button" style="margin-bottom:8px">
-          <span class="btn-label">Clip 9.2 × 5.6 (tự xoay)</span>
-        </button>
-        <div id="outClipCard" class="hint"></div>
 
         <button id="btnAutoSave" class="btn btn-primary">
           <span class="btn-label">OK — Auto Save PDF</span>

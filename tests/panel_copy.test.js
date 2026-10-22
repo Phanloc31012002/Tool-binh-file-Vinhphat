@@ -6,14 +6,15 @@ const path = require("path");
 // Mốc số lượng từ lấy theo v2.15.4. Các snapshot control/điều hướng đã gồm
 // việc dời ghi chú theo yêu cầu (v2.15.17), ô tên file CTL/script đóng gói (v2.16.1), script bộ chia khu
 // dan_be_zones.js cùng tick "Chia khu cách nhau" + ô "Khoảng cách khu (mm)" của Dàn bế (v2.18.0),
-// tick "Transform" + nút "Đo khung" ở header cạnh Raster (v2.19.0, giai đoạn kiểm chứng).
+// tick "Transform" + nút "Đo khung" ở header cạnh Raster (v2.19.0, giai đoạn kiểm chứng); nút Clip clip theo khung
+// Transform không hỏi kích thước, bỏ nút "Clip 9.2 × 5.6" ở Auto Save (v2.19.1).
 // Không phụ thuộc vào extension đã cài hay đường dẫn người dùng Windows khi chạy trong CI.
 const baseline = {
   controlHash:
-    "9ce98e79df9bcdcb890f8ec0d749789a16d975da4d51cdf3846d3d6ca5eaa10f",
+    "d2aac2d53cca7b158df6fb0477f7dc9d35c22f6f66ffb0dc1a705c822292f2af",
   navigationHash:
     "d4487d9056941ac67e4b8d77215a663f0be6ad08d8a8f23a4d47da4e7561c3cc",
-  controlCount: 123,
+  controlCount: 114,
   staticHintWords: 1293,
 };
 

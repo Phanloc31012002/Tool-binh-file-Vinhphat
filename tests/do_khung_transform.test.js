@@ -187,8 +187,8 @@ assert.match(main, /dcDoKhungChon\(\)/);
 // Mọi lệnh đo khổ đều đi qua hàm đo chung (bất cứ mục tiêu nào cũng là Transform khi tick bật).
 for (const fn of ["function _dcDanCore(", "function dcDanToiUu(", "function dcDanTuTro(", "function dcDanTuTroNhieuKho(",
   "function dcThemDauCatTuDong(", "function dcRunCatalogueAuto(", "function dcRunSignature8(", "function dcRunKeoGay(",
-  "function dcHocMau(", "function dcApMauCore(", "function _dcAutoSavePDFCore(", "function _dcClipToCardStyleCore(",
-  "function _dcClipCard926CoreV2(", "function dcResizeSelectionToSize("]) {
+  "function dcHocMau(", "function dcApMauCore(", "function _dcAutoSavePDFCore(", "function _dcClipTheoTransformCore(",
+  "function dcResizeSelectionToSize("]) {
   const start = lib.indexOf(fn);
   assert.ok(start >= 0, fn);
   const next = lib.slice(start + fn.length).search(/\n(function |var dc\w+Version)/);

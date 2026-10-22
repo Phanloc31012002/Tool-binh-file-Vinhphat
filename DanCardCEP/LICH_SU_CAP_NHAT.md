@@ -6,6 +6,9 @@ _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
 - **Đo khung**: hiện bằng bảng trong Illustrator cuộn được, chữ chép được (alert của panel cắt mất dòng); group thường liệt kê thêm từng con cấp 1 kèm khung, con nào bị bỏ ghi rõ lý do (ẩn / guide / khung rỗng).
 - **Khung Transform của group thường**: bỏ qua con không có khung thật — group rỗng, path không điểm (Illustrator trả khung [0,0,0,0] ở gốc toạ độ), guide, con ẩn.
+- **Nút Clip ở header = Clip theo khung Transform**: bấm là clip ngay, không hỏi kích thước; mỗi object đang chọn được bọc bằng mask đúng khung Transform của nó (group → khung group, hình → khung hình; nét/hiệu ứng tràn ngoài khung bị cắt), object đã có clip giữ nguyên và báo số lượng. Luôn đo theo Transform, không phụ thuộc tick. Kết quả hiện trong bảng nhỏ dưới header kèm khổ đã clip.
+- **Auto Save đo khổ PDF theo khung Transform** luôn luôn (trước chỉ khi tick Transform); Transform không đo được mới dự phòng khung clip/visibleBounds như cũ.
+- Bỏ nút **Clip 9.2 × 5.6 (tự xoay)** ở tab Auto Save và bộ clip theo kích thước nhập (hai bộ logic clip song song — soát mã Q6); mã chết liên quan xoá hẳn (~860 dòng).
 - **Mask bọc trong group con** (lỗi thật của voucher 15,2 × 7,2 theo cây Đo khung anh Lộc gửi): Illustrator hay đặt mask của clip group bên trong một group thường con (clip group → group → path [mask]) chứ không phải con trực tiếp; bản trước không thấy mask nên rơi về khung clip group — mà khung đó Illustrator báo luôn cả phần ảnh bị che (367 mm). Giờ tìm mask qua các group thường lồng nhau (không vào clip group con), voucher ra đúng 152,00 × 72,00 mm như bảng Transform. Đây là chỗ bound của Illustrator khác Transform; tool đã đi đúng đường Transform.
 
 ---

@@ -22,7 +22,7 @@ for (const [name, want] of Object.entries(thresholds))
 // Mốc tối thiểu của v2.19.0 (mọi lệnh đo khổ, ghép cặp, dọn, cấp chỗ đều đổi).
 for (const [name, min] of Object.entries({
   dcDanToiUuVersion: 23, dcDanTuTroVersion: 12, dcDanBeNestingVersion: 13, dcSignature8AutoPonVersion: 41,
-  dcKeoGayAutoPonVersion: 14, dcCatalogueAutoVersion: 14, dcClipToSizeVersion: 8, dcAutoCutMarksVersion: 2,
+  dcKeoGayAutoPonVersion: 14, dcCatalogueAutoVersion: 14, dcClipToSizeVersion: 9, dcAutoCutMarksVersion: 2,
   dcDanTheoMauVersion: 3, dcCtlOffsetPdfVersion: 6,
 }))
   assert.ok(defined(name) >= min, name + " phải ≥ " + min + " (đang " + defined(name) + ")");
