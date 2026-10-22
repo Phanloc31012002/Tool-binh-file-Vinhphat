@@ -18,9 +18,9 @@
 
   var VERSION = 2;
   var BOP_TOI_DA_MM = 1; // bóp cả cụm: mỗi con bớt tối đa 1 mm (anh Lộc 22/10 21:14)
-  // Mức 2 (anh Lộc 22:00): bóp 1 mm/con rồi mà vẫn "gần lắm lắm, thiếu 1–2 mm thôi" thì cả cụm được
-  // bớt thêm tối đa 2 mm nữa theo cạnh dài của khối (chia đều cho mọi con) cho đủ.
-  var BOP_THEM_CUM_MM = 2;
+  // Mức 2 (anh Lộc 22:00–22:21, "làm theo hình 2"): bóp 1 mm/con rồi mà vẫn thiếu chút xíu thì cả
+  // cụm co đều tới 1,5 % (file anh Lộc tự bóp: card 92 → 90,62 = đúng 0,985) cho đủ.
+  var BOP_MUC2 = 0.985;
   var CELL_W = 56; // mm, ô card đã tràn theo cạnh ngắn
   var CELL_H = 92; // mm, ô card đã tràn theo cạnh dài
   var MAX_COLS = 18; // tờ 100,8 cm = 18 × 56
@@ -721,13 +721,12 @@
       }
       return memo[key];
     }
-    // Xếp vào khối; ở pha bóp (con mang bop < 1) mà chưa vừa thì thử mức 2: cả cụm bớt thêm
-    // BOP_THEM_CUM_MM theo cạnh dài của khối (mỗi con chỉ bớt thêm một phần nhỏ). Kết quả mức 2 mang
-    // theo bộ con đã co (pieces) và hệ số (bop) để khối ghi đúng.
+    // Xếp vào khối; ở pha bóp (con mang bop < 1) mà chưa vừa thì thử mức 2: cả cụm co đều tới
+    // BOP_MUC2 (1,5 %). Kết quả mức 2 mang theo bộ con đã co (pieces) và hệ số (bop) để khối ghi đúng.
     function packMemo(pieces, shape, collect, budget) {
       var r = packRaw(pieces, shape, collect, budget);
-      if (r.ok || !pieces.length || !(pieces[0].bop < 1)) return r;
-      var s2 = pieces[0].bop * (1 - BOP_THEM_CUM_MM / Math.max(shape.w, shape.h));
+      if (r.ok || !pieces.length || !(pieces[0].bop < 1) || pieces[0].bop <= BOP_MUC2 + 1e-12) return r;
+      var s2 = BOP_MUC2;
       var p2 = bopPieces(pieces, s2);
       var r2 = packRaw(p2, shape, collect, budget);
       if (!r2.ok) return r;
@@ -1003,7 +1002,7 @@
             " % (mỗi con bớt tối đa " +
             BOP_TOI_DA_MM +
             " mm" +
-            (muc2 ? ", cụm bớt thêm " + BOP_THEM_CUM_MM + " mm vì chỉ thiếu chút xíu" : "") +
+            (muc2 ? ", cụm bớt thêm tới " + (Math.round((1 - BOP_MUC2) * 1000) / 10).toString().replace(".", ",") + " % vì chỉ thiếu chút xíu" : "") +
             ") để còn " +
             cells +
             " ô thay vì " +
@@ -1107,7 +1106,7 @@
     MAX_ROWS: MAX_ROWS,
     EPS: EPS,
     BOP_TOI_DA_MM: BOP_TOI_DA_MM,
-    BOP_THEM_CUM_MM: BOP_THEM_CUM_MM,
+    BOP_MUC2: BOP_MUC2,
     heSoBop: heSoBop,
     packInto: packInto,
     verify: verify,

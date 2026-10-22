@@ -273,25 +273,32 @@ function rectOf(p) {
   assert.equal(r0.ok, true);
   assert.equal(r0.jobs[0].bop, 1);
   assert.doesNotMatch(r0.detail, /bóp/);
-  // Mức 2 (anh Lộc 22:00): bóp 1 mm/con rồi mà vẫn "thiếu 1–2 mm thôi" thì cả cụm bớt thêm tối đa
-  // 2 mm theo cạnh dài khối cho đủ. 3 con 112 × 94: sau mức 1 cột cao 461,8 (thiếu 1,8 mm) → mức 2
-  // hệ số 0,99107 × (1 − 2/460) = 0,98676 → 459,8 vừa 2 × 5 ô. Khối ghi hệ số riêng (blocks[].bop).
+  // Mức 2 (anh Lộc 22:00–22:21, "làm theo hình 2"): bóp 1 mm/con rồi mà vẫn thiếu chút xíu thì cả cụm
+  // co đều tới 1,5 % (file anh tự bóp: card 92 → 90,62 = 0,985). 3 con 112 × 94: sau mức 1 cột cao
+  // 461,8 (thiếu 1,8 mm) → mức 2 0,985 → 459,0 vừa 2 × 5 ô. Khối ghi hệ số riêng (blocks[].bop).
   const r94 = E.pack({ tags: [tag("hong", 56, 92, 4000), tag("ht", 112, 94, 3000)], budgetMs: 100000 });
   assert.equal(r94.ok, true, r94.error);
   assert.equal(r94.jobs[0].cells, 10, "mức 2 phải vừa 10 ô");
-  const s2 = (1 - 1 / 112) * (1 - E.BOP_THEM_CUM_MM / 460);
-  assert.ok(Math.abs(r94.jobs[0].blocks[0].bop - s2) < 1e-9, "hệ số mức 2: " + r94.jobs[0].blocks[0].bop);
-  assert.match(r94.detail, /cụm bớt thêm 2 mm vì chỉ thiếu chút xíu/);
+  assert.equal(E.BOP_MUC2, 0.985);
+  assert.ok(Math.abs(r94.jobs[0].blocks[0].bop - 0.985) < 1e-9, "hệ số mức 2: " + r94.jobs[0].blocks[0].bop);
+  assert.match(r94.detail, /cụm bớt thêm tới 1,5 % vì chỉ thiếu chút xíu/);
   for (const p of r94.jobs[0].blocks[0].places) {
     const goc = p.id === "ht" ? [112, 94] : [56, 92];
     const w0 = p.rot ? goc[1] : goc[0], h0 = p.rot ? goc[0] : goc[1];
-    assert.ok(w0 - p.w <= 1.5 && h0 - p.h <= 1.5 && p.w > 0, "con bớt chút xíu thôi: " + JSON.stringify(p));
+    assert.ok(Math.abs(p.w - w0 * 0.985) < 0.006 && Math.abs(p.h - h0 * 0.985) < 0.006, "co đều 1,5 %: " + JSON.stringify(p));
   }
-  // Dư quá cả mức 2 (3 con 112 × 95: còn 462,8 sau mức 2) thì không bóp, lấy thêm ô như cũ.
+  // Ca thật của anh Lộc (hình 2, 22:21): 3 con đen 112 × 77, 2 con hồng 112 × 71, 2 card 56 × 92 →
+  // cột cao 467, dư 7 mm → mức 2 còn 460,0 → vừa 10 ô, card nhỏ ra 90,62 như anh tự bóp.
+  const rThat = E.pack({ tags: [tag("den", 112, 77, 3000), tag("hong", 112, 71, 2000), tag("tp", 56, 92, 1000), tag("cn", 56, 92, 1000)], budgetMs: 100000 });
+  assert.equal(rThat.ok, true, rThat.error);
+  assert.equal(rThat.jobs[0].cells, 10, "ca thật phải 10 ô: " + rThat.detail);
+  const cn = rThat.jobs[0].blocks[0].places.find((p) => p.id === "cn");
+  assert.ok(Math.abs((cn.rot ? cn.w : cn.h) - 90.62) < 0.01, "card nhỏ 92 → 90,62: " + JSON.stringify(cn));
+  // Dư quá cả mức 2 (3 con 112 × 95: 469 × 0,985 = 462) thì không bóp, lấy thêm ô như cũ.
   const r2 = E.pack({ tags: [tag("hong", 56, 92, 4000), tag("ht", 112, 95, 3000)], budgetMs: 100000 });
   assert.equal(r2.ok, true);
   assert.equal(r2.jobs[0].bop, 1);
   assert.ok(r2.jobs[0].blocks.every((b) => b.bop === 1));
   assert.ok(r2.jobs[0].cells >= 11, "dư 9 mm không bóp nổi → " + r2.jobs[0].cells + " ô");
-  console.log("Phần 4 (bóp cả cụm ≤ 1 mm/con, mức 2 cụm bớt thêm 2 mm): ok");
+  console.log("Phần 4 (bóp cả cụm ≤ 1 mm/con, mức 2 co đều tới 1,5 %): ok");
 }
