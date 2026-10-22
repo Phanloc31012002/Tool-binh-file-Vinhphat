@@ -92,6 +92,7 @@ DanCard_Setup_23/
 │   ├── assets/, fonts/                # Ảnh & font dùng trong panel
 │   └── LICH_SU_CAP_NHAT.md             # Changelog chi tiết từng bản
 ├── docs/KE_HOACH_DAN_BE_DECAL.md  # Kế hoạch & thiết kế lõi Dàn bế decal (xếp hàng lồng)
+├── docs/THIET_KE_DAN_BE_CHIA_KHU.md  # Thiết kế bộ chia khu: dàn trộn nhiều mẫu (v2.18.0)
 ├── online/                     # Gói bản phát hành + latest.json
 └── updater/                    # Script cập nhật tự động (dùng khi cài qua bộ cài đóng gói)
 ```
@@ -109,6 +110,9 @@ Ví dụ chạy bằng Node.js từ thư mục dự án:
 node tests/dan_be_panel.test.js
 node tests/dan_be_nester.test.js
 node tests/dan_be_rows.test.js
+node tests/dan_be_zones.test.js
+node tests/dan_be_zones_unit.test.js
+node tests/dan_be_zone_core.test.js
 node tests/dan_be_cleanup.test.js
 node tests/dan_be_sheets.test.js
 node tests/dan_be_duplex.test.js

@@ -29,8 +29,8 @@ Các bộ test trong `tests/` là kết quả của nhiều lần thử – th�
 | 4 | Không chồng, không lọt vào lỗ của compound | Tiếp xúc tính trên cả đường ngoài; chốt chặn kiểm tra chứa nhau | `irregular`, `rows` |
 | 5 | Giữ nguyên kích thước, điểm neo, tay nắm; chỉ xoay 0/90/180/270 và tịnh tiến | Lõi chỉ trả về hướng xoay + vị trí, không sửa dữ liệu nguồn | `variable_sizes`, `arch_gap`, `multiband` |
 | 6 | Kết quả không đổi khi file nguồn đặt khuôn xoay hướng khác, path bắt đầu ở điểm khác hay đổi chiều | Lấy **hướng chuẩn theo hình học** của khuôn trước khi tìm | `multiband` (4 hướng), `alternating` |
-| 7 | Nhiều bài chung một khuôn: dàn một lần, chia bài xoay vòng, chênh tối đa 1 con | Nhận diện khuôn giống hệt (chỉ khác tọa độ/điểm đầu/chiều path) rồi gán bài theo vòng | `alternating`, `rows` |
-| 8 | Khuôn khác nhau trên cùng tờ: cân bằng số con | Giữ bộ tìm cũ (luân phiên cân bằng) cho trường hợp này | `irregular`, `variable_sizes`, `rows` |
+| 7 | Nhiều bài chung một khuôn: dàn một lần, mỗi bài một **cụm liền**, chênh tối đa 1 con (v2.18.0, trước đó chia xoay vòng) | Nhận diện khuôn giống hệt (chỉ khác tọa độ/điểm đầu/chiều path/xoay 90°) rồi gán bài bằng chia đôi đệ quy theo thứ tự đọc | `alternating`, `rows`, `zones_unit` |
+| 8 | Khuôn khác nhau trên cùng tờ: mỗi khuôn một khu, gần bằng nhau, lấp đầy, bài nào cũng có mặt (v2.18.0, trước đó luân phiên cân bằng tuyệt đối) | Bộ chia khu `dan_be_zones.js`: xem `docs/THIET_KE_DAN_BE_CHIA_KHU.md` | `zones`, `irregular`, `variable_sizes`, `rows` |
 | 9 | Canh giữa tờ; nếu PON chặn thì ghi rõ "Canh tâm bị giới hạn bởi vùng né PON" | Canh đúng khung thật; bị chặn thì giữ đúng tâm một trục, trục kia lệch ít nhất | `centering`, `arch_gap`, `multiband` |
 | 10 | Không ít con hơn các mốc đã chứng minh (lưới hàng an toàn, mốc 30 con vòm 40 × 70 khe 5 mm, mốc xưởng…) | Lõi mới tìm rộng hơn; bộ tìm cũ vẫn chạy **thi đua** | `multiband`, `arch_gap`, `irregular`, `rows` |
 | 11 | Thời gian hữu hạn; khuôn tí hon hàng nghìn con vẫn nhanh | Khối lượng tìm cố định theo cỡ bài; bài rất nhiều con dùng chế độ tìm gọn | `alternating` (khuôn 2 mm: >10.000 con < 2,5 giây), các giới hạn 20–60 giây |
@@ -121,7 +121,8 @@ mèo 44 → 50, thỏ 50 → 54. Khuôn chữ L lồng ghép: bộ cũ vẫn t�
 
 - **Chưa chạy trong Illustrator thật** ở lần cập nhật này: số liệu trên đo bằng bộ test Node với
   biên dạng mô phỏng và các khuôn lấy từ file thật đã có trong `tests/`.
-- Khuôn **khác nhau** trên cùng tờ vẫn dùng bộ tìm cũ (ưu tiên cân bằng số con giữa các mẫu).
+- Khuôn **khác nhau** trên cùng tờ: từ v2.18.0 dùng bộ chia khu (`docs/THIET_KE_DAN_BE_CHIA_KHU.md`);
+  bộ tìm cũ chỉ còn là phương án cứu hộ khi không chia khu được.
 - Đây là tìm kiếm có kiểm chứng, không cam kết tối ưu toán học tuyệt đối cho mọi biên dạng.
   Hình lồng ghép phức tạp (kiểu chữ L) đôi khi bộ cũ tìm được nhiều hơn — đã có thi đua nên
   tool không bao giờ chọn phương án ít con hơn bộ cũ trong cùng lần chạy.

@@ -2,6 +2,17 @@
 
 _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
+## v2.18.0 — Dàn bế trộn nhiều mẫu theo khu
+
+- Dàn nhiều mẫu KHÁC khuôn lên một tờ bằng bộ chia khu mới: tool tự nhận biết mẫu nào cùng khuôn, mẫu nào khác khuôn (kể cả file đặt xoay 90/180/270), rồi tự nghĩ ra nhiều cách chia tờ thành khu (dải ngang, dải dọc, hai tầng, đổi thứ tự), ước lượng, dàn thật các cách tốt nhất và chọn cách nhiều con nhất.
+- Mỗi mẫu một cụm liền, không xen lộn xộn: trong khu dàn như một mẫu (xếp hàng lồng theo đường bế thật), các khu khép sát nhau theo đường bế rồi lấp chỗ trống bằng chính khuôn của khu đó. Số con các mẫu chia đều trước, dư hoặc thiếu do lấp chỗ trống thì chấp nhận; bài nào cũng có mặt.
+- Nhiều bài in chung một khuôn: dàn như một mẫu rồi gom mỗi bài thành một cụm liền (hết hàng này tới hàng khác) thay cho cách chia xoay vòng A-B-C xen kẽ từng con như trước; chênh tối đa 1 con.
+- Thêm tick **Chia khu cách nhau** (hiện khi tick "Dàn nhiều mẫu vào một tờ", mặc định tắt) và ô **Khoảng cách khu (mm)** mặc định 5: bật thì các khu khác khuôn cách nhau đúng khoảng đó, tắt thì cách nhau bằng khe thường. Panel hiện "Đang suy nghĩ… phương án x/y" trong lúc tính.
+- Số đo trên tờ 33 × 35,4 cm, khe 2 mm (cũ → mới, áp sát / cách 5 mm): tròn 25 + tim + sao 48 → 75 / 78 con; card 92 × 56 + tròn 30: 23 → 43 / 58; lá + mèo + thỏ: 30 → 47 / 46; vòm + trăng khuyết + giọt nước + xương: 32 → 50 / 50; 6 khuôn nhỏ: 147 → 228 / 227. Mỗi tờ mất 2–12 giây, 8 khuôn khác nhau khoảng 15 giây.
+- Không chia khu được (tờ quá nhỏ cho đủ mọi mẫu) thì tool quay về cách dàn xen kẽ cũ và ghi rõ "Chia khu không xếp đủ mọi mẫu, tạm dùng cách dàn xen kẽ cũ." Mọi phương án vẫn qua chốt chặn độc lập về khe, khoảng cách khu, lề và né PON theo đường bế thật trước khi vẽ. Cập nhật xong cần đóng hẳn Illustrator rồi mở lại.
+
+---
+
 ## v2.17.2 — Võ sĩ "1 cú" mới cho tester Tân
 
 - Thay hình tester Tân bằng nhân vật võ sĩ "1 cú" do tool tự vẽ (2D, không dùng 3D): tóc xanh than vuốt ngược, áo hoodie tím khoá vàng, băng quấn tay, quần sọc hồng, giày trắng đế cam.
