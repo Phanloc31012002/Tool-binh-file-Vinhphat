@@ -18,6 +18,9 @@
 
   var VERSION = 2;
   var BOP_TOI_DA_MM = 1; // bóp cả cụm: mỗi con bớt tối đa 1 mm (anh Lộc 22/10 21:14)
+  // Mức 2 (anh Lộc 22:00): bóp 1 mm/con rồi mà vẫn "gần lắm lắm, thiếu 1–2 mm thôi" thì cả cụm được
+  // bớt thêm tối đa 2 mm nữa theo cạnh dài của khối (chia đều cho mọi con) cho đủ.
+  var BOP_THEM_CUM_MM = 2;
   var CELL_W = 56; // mm, ô card đã tràn theo cạnh ngắn
   var CELL_H = 92; // mm, ô card đã tràn theo cạnh dài
   var MAX_COLS = 18; // tờ 100,8 cm = 18 × 56
@@ -491,7 +494,11 @@
   }
   function bopPieces(pieces, s) {
     var out = [];
-    for (var i = 0; i < pieces.length; i++) out.push({ id: pieces[i].id, w: pieces[i].w * s, h: pieces[i].h * s, bop: s });
+    for (var i = 0; i < pieces.length; i++) {
+      var goc = pieces[i].bop || 1; // con đã bóp mức 1 thì quy về khổ gốc rồi mới áp hệ số mới
+      // Làm tròn 0,01 mm ngay ở khổ con để toạ độ cộng dồn không lệch 0,01 so với khổ (verify kẹt).
+      out.push({ id: pieces[i].id, w: r2((pieces[i].w / goc) * s), h: r2((pieces[i].h / goc) * s), bop: s });
+    }
     return out;
   }
 
@@ -657,7 +664,7 @@
         if (!allFit(list, shapes[si])) continue;
         if (areaOf(list) > shapes[si].w * shapes[si].h + EPS) continue;
         var r = packMemo(list, shapes[si]);
-        if (r.ok) return { shape: shapes[si], places: r.places, cuts: r.cuts };
+        if (r.ok) return { shape: shapes[si], places: r.places, cuts: r.cuts, pieces: r.pieces || list, bop: r.bop };
       }
       return null;
     }
@@ -666,7 +673,7 @@
         bestIdx = -1,
         bestInc = Infinity;
       for (bi = 0; bi < blocks.length; bi++) {
-        var trial = smallest(blocks[bi].pieces.concat([sorted[i]]), blocks[bi].shape.cells);
+        var trial = smallest(blocks[bi].goc.concat([sorted[i]]), blocks[bi].shape.cells);
         if (trial && trial.shape.cells - blocks[bi].shape.cells < bestInc) {
           best = trial;
           bestIdx = bi;
@@ -676,9 +683,9 @@
       var fresh = smallest([sorted[i]], 1);
       if (!fresh) return null;
       if (best && bestInc <= fresh.shape.cells) {
-        blocks[bestIdx] = { shape: best.shape, pieces: blocks[bestIdx].pieces.concat([sorted[i]]), places: best.places, cuts: best.cuts };
+        blocks[bestIdx] = { shape: best.shape, goc: blocks[bestIdx].goc.concat([sorted[i]]), pieces: best.pieces, places: best.places, cuts: best.cuts, bop: best.bop };
       } else {
-        blocks.push({ shape: fresh.shape, pieces: [sorted[i]], places: fresh.places, cuts: fresh.cuts });
+        blocks.push({ shape: fresh.shape, goc: [sorted[i]], pieces: fresh.pieces, places: fresh.places, cuts: fresh.cuts, bop: fresh.bop });
       }
     }
     return { blocks: blocks };
@@ -706,13 +713,25 @@
       finished = true;
       output = { ok: false, error: error };
     }
-    function packMemo(pieces, shape, collect, budget) {
+    function packRaw(pieces, shape, collect, budget) {
       var key = pieceKey(pieces) + "@" + shape.cols + "x" + shape.rows + "#" + (collect || 1) + "/" + (budget || 0);
       if (!memo[key]) {
         memo[key] = packInto(pieces, shape.w, shape.h, { collect: collect || 1, budget: budget || DEFAULT_BUDGET });
         if (memo[key].exhausted && !budget) exhausted = true;
       }
       return memo[key];
+    }
+    // Xếp vào khối; ở pha bóp (con mang bop < 1) mà chưa vừa thì thử mức 2: cả cụm bớt thêm
+    // BOP_THEM_CUM_MM theo cạnh dài của khối (mỗi con chỉ bớt thêm một phần nhỏ). Kết quả mức 2 mang
+    // theo bộ con đã co (pieces) và hệ số (bop) để khối ghi đúng.
+    function packMemo(pieces, shape, collect, budget) {
+      var r = packRaw(pieces, shape, collect, budget);
+      if (r.ok || !pieces.length || !(pieces[0].bop < 1)) return r;
+      var s2 = pieces[0].bop * (1 - BOP_THEM_CUM_MM / Math.max(shape.w, shape.h));
+      var p2 = bopPieces(pieces, s2);
+      var r2 = packRaw(p2, shape, collect, budget);
+      if (!r2.ok) return r;
+      return { ok: true, places: r2.places, cuts: r2.cuts, layouts: r2.layouts, exhausted: r2.exhausted, pieces: p2, bop: s2 };
     }
     // Pha tham lam chỉ cần khối cơ bản nhanh: ngân sách nút nhỏ để không treo panel khi nhiều tag khác nhau.
     function packQuick(pieces, shape) {
@@ -879,7 +898,7 @@
         var r = packMemo(job.pieces, shape, 24);
         if (r.ok) {
           for (var li = 0; li < r.layouts.length; li++)
-            consider(job, { blocks: [{ shape: shape, pieces: job.pieces, places: r.layouts[li].places, cuts: r.layouts[li].cuts }] });
+            consider(job, { blocks: [{ shape: shape, pieces: r.pieces || job.pieces, places: r.layouts[li].places, cuts: r.layouts[li].cuts, bop: r.bop }] });
         }
         return;
       }
@@ -906,7 +925,7 @@
         for (var gi = 0; gi < cand.groups.length && okAll; gi++) {
           var rr = packMemo(cand.groups[gi], cand.shapes[gi], 1);
           if (!rr.ok) okAll = false;
-          else blocks.push({ shape: cand.shapes[gi], pieces: cand.groups[gi], places: rr.places, cuts: rr.cuts });
+          else blocks.push({ shape: cand.shapes[gi], pieces: rr.pieces || cand.groups[gi], places: rr.places, cuts: rr.cuts, bop: rr.bop });
         }
         if (okAll) consider(job, { blocks: blocks });
         return;
@@ -951,6 +970,7 @@
             cells: blk.shape.cells,
             places: places,
             cuts: blk.cuts.slice(0),
+            bop: blk.bop || job.bop, // hệ số co của riêng khối này (mức 2 có thể nhỏ hơn job.bop)
           });
         }
         // Khối to trước cho dễ nhìn; số thứ tự khối (artboard TagBD k) và câu mô tả theo đúng thứ tự này.
@@ -969,17 +989,27 @@
           names.join(" + ") +
           ", " +
           (proven ? cells + "/" + cells + " ô — không thể ít hơn." : cells + " ô, tối thiểu lý thuyết " + job.lowerBound + ".");
-        if (job.bop < 1)
+        if (job.bop < 1) {
+          var bopNhat = job.bop,
+            muc2 = false;
+          for (bi = 0; bi < blocks.length; bi++)
+            if (blocks[bi].bop < job.bop - 1e-12) {
+              muc2 = true;
+              bopNhat = Math.min(bopNhat, blocks[bi].bop);
+            }
           line +=
             " Đã bóp cả cụm " +
-            (Math.round((1 - job.bop) * 1000) / 10).toString().replace(".", ",") +
+            (Math.round((1 - bopNhat) * 1000) / 10).toString().replace(".", ",") +
             " % (mỗi con bớt tối đa " +
             BOP_TOI_DA_MM +
-            " mm) để còn " +
+            " mm" +
+            (muc2 ? ", cụm bớt thêm " + BOP_THEM_CUM_MM + " mm vì chỉ thiếu chút xíu" : "") +
+            ") để còn " +
             cells +
             " ô thay vì " +
             job.cellsTruocBop +
             ".";
+        }
         lines.push(line);
         outJobs.push({
           bai: job.bai,
@@ -1077,6 +1107,7 @@
     MAX_ROWS: MAX_ROWS,
     EPS: EPS,
     BOP_TOI_DA_MM: BOP_TOI_DA_MM,
+    BOP_THEM_CUM_MM: BOP_THEM_CUM_MM,
     heSoBop: heSoBop,
     packInto: packInto,
     verify: verify,

@@ -473,11 +473,27 @@ const OPTS = { prefix: "1088", start: "1", pad: "2", canMang: "cm", ngay: "22", 
   near(f3c.geometricBounds[2] - f3c.geometricBounds[0], 40 * s * MM, "con xoay bóp");
   // Nguồn không bị bóp.
   near(c.dcDanTagBdNguon.tag_1.front.geometricBounds[2] - c.dcDanTagBdNguon.tag_1.front.geometricBounds[0], 112 * MM, "nguồn nguyên");
+  // Khối có hệ số riêng (mức 2) thì dùng hệ số của khối, không phải của bài.
+  const p2 = plan();
+  p2.jobs[0].bop = s;
+  p2.jobs[0].blocks[1].bop = 0.95;
+  const nBefore2 = mock.doc.artboards.length;
+  assert.match(c.dcDanTagBdVe(JSON.stringify(p2)), /^OK: /);
+  const lay2 = mock.doc.layers.filter((l) => /^Tag BD /.test(l.name));
+  const f3b = lay2[lay2.length - 2].pageItems.find((it) => it.identity === "f3");
+  near(f3b.geometricBounds[2] - f3b.geometricBounds[0], 40 * 0.95 * MM, "khối 2 bóp 0,95");
+  const f1b = lay2[lay2.length - 4].pageItems.find((it) => it.identity === "f1");
+  near(f1b.geometricBounds[2] - f1b.geometricBounds[0], 112 * s * MM, "khối 1 bóp theo bài");
+  assert.equal(mock.doc.artboards.length, nBefore2 + 4);
   // bop sai (ngoài 0,9…1) → ERR, không tạo gì.
   const bad = plan();
   bad.jobs[0].bop = 0.5;
   const nBefore = mock.doc.artboards.length;
   assert.match(c.dcDanTagBdVe(JSON.stringify(bad)), /^ERR: .*bóp/);
+  assert.equal(mock.doc.artboards.length, nBefore);
+  const bad2 = plan();
+  bad2.jobs[0].blocks[0].bop = 0.8;
+  assert.match(c.dcDanTagBdVe(JSON.stringify(bad2)), /^ERR: .*bóp/);
   assert.equal(mock.doc.artboards.length, nBefore);
   console.log("dcDanTagBdVe (bóp cả cụm): ok");
 }

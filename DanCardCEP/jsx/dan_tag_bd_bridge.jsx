@@ -492,6 +492,9 @@ function dcDanTagBdVe(planText) {
       if (!num(job.bop) || job.bop > 1 + EPS || job.bop < 0.9) fail("Hệ số bóp của bài " + job.bai + " không hợp lệ (" + job.bop + ").");
       for (bi = 0; bi < job.blocks.length; bi++) {
         blk = job.blocks[bi];
+        // Hệ số bóp riêng của khối (mức 2 "cụm bớt thêm 2 mm" có thể nhỏ hơn hệ số chung của bài).
+        if (blk && (blk.bop === undefined || blk.bop === null)) blk.bop = job.bop;
+        if (blk && (!num(blk.bop) || blk.bop > 1 + EPS || blk.bop < 0.9)) fail("Hệ số bóp của khối " + (bi + 1) + " bài " + job.bai + " không hợp lệ (" + blk.bop + ").");
         if (
           !blk ||
           !num(blk.cols) ||
@@ -668,7 +671,7 @@ function dcDanTagBdVe(planText) {
       var frontLayer = addLayer("Tag BD " + k + " - trước");
       for (pi = 0; pi < blk.places.length; pi++) {
         p = blk.places[pi];
-        placeCopy(dcDanTagBdNguon[p.id].front, frontLayer, p.rot, rect[0] + p.x * MM, rect[1] - p.y * MM, p.w * MM, p.h * MM, false, job.bop);
+        placeCopy(dcDanTagBdNguon[p.id].front, frontLayer, p.rot, rect[0] + p.x * MM, rect[1] - p.y * MM, p.w * MM, p.h * MM, false, blk.bop);
         totalPieces++;
       }
       drawCutMarks(frontLayer, rect, W, blk.cuts, false);
@@ -683,7 +686,7 @@ function dcDanTagBdVe(planText) {
         var back = dcDanTagBdNguon[p.id].back;
         if (!back) continue; // tag 1 mặt: mặt sau để trống
         var xBack = W - p.x - p.w;
-        placeCopy(back, backLayer, -p.rot, backRect[0] + xBack * MM, backRect[1] - p.y * MM, p.w * MM, p.h * MM, true, job.bop);
+        placeCopy(back, backLayer, -p.rot, backRect[0] + xBack * MM, backRect[1] - p.y * MM, p.w * MM, p.h * MM, true, blk.bop);
       }
       drawCutMarks(backLayer, backRect, W, blk.cuts, true);
       made.push(k + " (bài " + job.bai + ", " + blk.cols + " × " + blk.rows + " ô, " + blk.places.length + " con)");
