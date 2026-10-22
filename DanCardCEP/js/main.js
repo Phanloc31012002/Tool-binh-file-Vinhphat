@@ -1971,6 +1971,44 @@
     // ExtendScript hiểu \U \A... là escape rồi nuốt mất dấu \).
     return "'" + String(s).replace(/\\/g, "\\\\").replace(/'/g, "\\'") + "'";
   }
+  // Tuỳ chọn chung "Đo khổ theo bảng Transform": nhớ trong localStorage, mặc định bật.
+  var DO_THEO_TRANSFORM_KEY = "dc.doTheoTransform";
+  var doTheoTransformBox = document.getElementById("doTheoTransform");
+  function doTheoTransform() {
+    return doTheoTransformBox ? doTheoTransformBox.checked : true;
+  }
+  if (doTheoTransformBox) {
+    try {
+      var savedDoTheo = window.localStorage.getItem(DO_THEO_TRANSFORM_KEY);
+      if (savedDoTheo === "0") doTheoTransformBox.checked = false;
+    } catch (storageReadError) {}
+    doTheoTransformBox.addEventListener("change", function () {
+      try {
+        window.localStorage.setItem(
+          DO_THEO_TRANSFORM_KEY,
+          doTheoTransformBox.checked ? "1" : "0",
+        );
+      } catch (storageWriteError) {}
+    });
+  }
+  // Tiền tố ExtendScript cho MỌI lệnh: cờ đo khổ + thư mục extension (để jsx
+  // tìm assets như icon ghi chú). Chạy trước phần nạp jsx của từng lệnh.
+  function jsxPrelude() {
+    var root = "";
+    try {
+      root = cs.getSystemPath(SystemPath.EXTENSION).replace(/\\/g, "/");
+    } catch (rootError) {}
+    return (
+      "var dcDoTheoKhungTransform = " +
+      (doTheoTransform() ? "true" : "false") +
+      "; var dcExtensionRoot = " +
+      jsStr(root) +
+      "; "
+    );
+  }
+  function evalJsx(expr, callback) {
+    cs.evalScript(jsxPrelude() + expr, callback);
+  }
   function loadAutoCutMarksJsx() {
     try {
       var extensionRoot = cs
@@ -2185,7 +2223,7 @@
       var edge = document.getElementById("cutMarkEdge").value || "4";
       show(outCutMarks, "Đang tạo dấu cắt…");
       btnCutMarks.disabled = true;
-      cs.evalScript(
+      evalJsx(
         loadAutoCutMarksJsx() +
           "dcThemDauCatTuDong(" +
           jsStr(length) +
@@ -2215,7 +2253,7 @@
       ", " +
       (withCard ? "true" : "false") +
       ")";
-    cs.evalScript(expr, function (res) {
+    evalJsx(expr, function (res) {
       btnDan.disabled = false;
       handleRes(out, res);
     });
@@ -2235,7 +2273,7 @@
       ).checked;
       show(outDanToiUu, "Đang tính bố cục và tạo tờ giấy…");
       btnDanToiUu.disabled = true;
-      cs.evalScript(
+      evalJsx(
         loadDanToiUuJsx() +
           "dcDanToiUu(" +
           jsStr(width) +
@@ -2317,7 +2355,7 @@
       }
       show(outDanBe, "Đang đo khuôn và tạo PON theo khổ giấy nhập…");
       btnDanBe.disabled = true;
-      cs.evalScript(
+      evalJsx(
         loadDanToiUuJsx() +
           "dcDanBePrepare(" +
           jsStr(beGap) +
@@ -2401,7 +2439,7 @@
                       ? "cặp trước/sau, Khuôn và PON…"
                       : "Khuôn, Bài và PON…"),
             );
-            cs.evalScript(
+            evalJsx(
               loadDanToiUuJsx() +
                 "dcDanBeRender(" +
                 jsStr(payload.jobId) +
@@ -2556,7 +2594,7 @@
       );
       if (btnCopyToiUuNote) btnCopyToiUuNote.disabled = true;
       if (btnCopyToiUuNoteOneSide) btnCopyToiUuNoteOneSide.disabled = true;
-      cs.evalScript(
+      evalJsx(
         loadDanToiUuJsx() +
           (twoSided
             ? "dcCopyToiUuNoteToOddArtboards("
@@ -2594,7 +2632,7 @@
       var repeatFill = repeatFillBox ? repeatFillBox.checked : false;
       show(outDanOffset, "Đang tính bố cục tự trở và tạo tờ giấy…");
       btnDanOffset.disabled = true;
-      cs.evalScript(
+      evalJsx(
         loadDanTuTroJsx() +
           "dcDanTuTro(" +
           jsStr(width) +
@@ -2881,7 +2919,7 @@
   }
   function cleanupVisualThumbs(paths) {
     try {
-      cs.evalScript("dcXoaPreviewMau(" + jsStr(paths.join("|")) + ")");
+      evalJsx("dcXoaPreviewMau(" + jsStr(paths.join("|")) + ")");
     } catch (e) {}
   }
   function parseSheetRegions(encoded) {
@@ -2922,7 +2960,7 @@
       clearPendingHocMau(true);
       show(outHocMau, "Đang học mẫu…");
       btnHocMau.disabled = true;
-      cs.evalScript("dcHocMau()", function (res) {
+      evalJsx("dcHocMau()", function (res) {
         if (res && res.indexOf("PENDING_SHEET:") === 0) {
           var sheetData = res.substring(14).split("|");
           var sheetTag = sheetData.shift();
@@ -2985,7 +3023,7 @@
       btnXacNhanConChuan.disabled = true;
       if (btnHocMau) btnHocMau.disabled = true;
       show(outHocMau, "Đang đọc hướng artwork từ con chuẩn…");
-      cs.evalScript(
+      evalJsx(
         "dcHocMauXacNhanConChuan(" + jsStr(pending.tag) + ")",
         function (referenceRes) {
           if (!referenceRes || referenceRes.indexOf("OK:") !== 0) {
@@ -3031,7 +3069,7 @@
                 ", " +
                 jsStr(angles.join(",")) +
                 ")";
-              cs.evalScript(expr, function (finalRes) {
+              evalJsx(expr, function (finalRes) {
                 cleanupVisualThumbs(pending.paths);
                 if (pendingHocMau === pending) clearPendingHocMau(false);
                 if (btnHocMau) btnHocMau.disabled = false;
@@ -3061,7 +3099,7 @@
       var useMultiSource = !!(
         multiSourcePerArtboard && multiSourcePerArtboard.checked
       );
-      cs.evalScript(
+      evalJsx(
         loadDanTheoMauJsx() +
           "dcApMau(" +
           (useMultiSource ? "true" : "false") +
@@ -3086,7 +3124,7 @@
       var suffix = danMauSaveSuffix ? danMauSaveSuffix.value : "";
       show(outSaveDanMau, "Mở cửa sổ chọn nơi lưu PDF…");
       btnSaveDanMau.disabled = true;
-      cs.evalScript(
+      evalJsx(
         "dcLuuDanTheoMauPDF(" + jsStr(mode) + ", " + jsStr(suffix) + ")",
         function (res) {
           btnSaveDanMau.disabled = false;
@@ -4104,7 +4142,7 @@
   btnRaster.addEventListener("click", function () {
     btnRaster.disabled = true;
     btnRaster.textContent = "Đang raster…";
-    cs.evalScript(
+    evalJsx(
       "(" + rasterizeSelectionInHost.toString() + ")()",
       function (res) {
         btnRaster.disabled = false;
@@ -4175,7 +4213,7 @@
           ", " +
           jsStr(uv) +
           ");}catch(e){return 'ERR: ' + e.toString();}})()";
-        cs.evalScript(expr, function (res) {
+        evalJsx(expr, function (res) {
           resizeOk.disabled = false;
           if (!resizeMsg) return;
           if (res && res.indexOf("OK:") === 0) {
@@ -4233,7 +4271,7 @@
           ", " +
           jsStr(uv) +
           ");}catch(e){return 'ERR: ' + e.toString();}})()";
-        cs.evalScript(expr, function (res) {
+        evalJsx(expr, function (res) {
           clipOk.disabled = false;
           if (!clipMsg) return;
           if (res && res.indexOf("OK:") === 0) {
@@ -4275,7 +4313,7 @@
     function runCat(expr, label, button) {
       show(outCatalogue, "Đang mở dàn catalogue " + label + "…");
       button.disabled = true;
-      cs.evalScript(expr, function (res) {
+      evalJsx(expr, function (res) {
         button.disabled = false;
         handleRes(outCatalogue, res);
       });
@@ -4348,7 +4386,7 @@
       }
       show(outCatalogue, "Đang tính 1 hay 2 cuốn trên tờ...");
       btnCatalogueAuto.disabled = true;
-      cs.evalScript(
+      evalJsx(
         loadCatalogueJsx() +
           "dcRunCatalogueAuto(" +
           jsStr(w) +
@@ -4409,7 +4447,7 @@
     }
     setDisabled(true);
     show(outOffsetPdf, "Chọn nơi lưu AI + JPG + ZIP " + label + "…");
-    cs.evalScript(
+    evalJsx(
       loadOffsetPdfJsx() +
         "dcLuuCtlOffsetAIPackage(" +
         jsStr(total) +
@@ -4550,7 +4588,7 @@
       ", " +
       (coBia ? "true" : "false") +
       ")";
-    cs.evalScript(expr, function (res) {
+    evalJsx(expr, function (res) {
       btnOffset.disabled = false;
       showOffsetResult(res);
     });
@@ -4571,7 +4609,7 @@
     btnKeo.disabled = true;
     var expr =
       loadKeoGayJsx() + "dcRunKeoGay(" + jsStr(w) + ", " + jsStr(h) + ")";
-    cs.evalScript(expr, function (res) {
+    evalJsx(expr, function (res) {
       btnKeo.disabled = false;
       showOffsetResult(res);
     });
@@ -4608,7 +4646,7 @@
       ", " +
       jsStr(repeat) +
       ")";
-    cs.evalScript(expr, function (res) {
+    evalJsx(expr, function (res) {
       btnRename.disabled = false;
       handleRes(outRename, res);
     });
@@ -4620,7 +4658,7 @@
   btnVariable.addEventListener("click", function () {
     show(outVariable, "Đang mở…");
     btnVariable.disabled = true;
-    cs.evalScript("dcRunVariable()", function (res) {
+    evalJsx("dcRunVariable()", function (res) {
       btnVariable.disabled = false;
       handleRes(outVariable, res);
     });
@@ -4640,7 +4678,7 @@
     btnClipCard.addEventListener("click", function () {
       if (outClipCard) outClipCard.textContent = "Đang clip 9.2×5.6…";
       btnClipCard.disabled = true;
-      cs.evalScript(loadClipJsx() + "dcClipCard926()", function (res) {
+      evalJsx(loadClipJsx() + "dcClipCard926()", function (res) {
         btnClipCard.disabled = false;
         if (!outClipCard) return;
         if (res && res.indexOf("OK:") === 0)
@@ -4753,7 +4791,7 @@
   if (btnPickFolder) {
     btnPickFolder.addEventListener("click", function () {
       btnPickFolder.disabled = true;
-      cs.evalScript("dcPickFolder()", function (res) {
+      evalJsx("dcPickFolder()", function (res) {
         btnPickFolder.disabled = false;
         if (res && res.indexOf("OK:") === 0) {
           document.getElementById("asFolder").value = res.substring(3);
@@ -4795,7 +4833,7 @@
       ", " +
       (hopTheoThuTu ? "true" : "false") +
       ")";
-    cs.evalScript(expr, function (res) {
+    evalJsx(expr, function (res) {
       btnAutoSave.disabled = false;
       handleRes(outAutoSave, res);
     });

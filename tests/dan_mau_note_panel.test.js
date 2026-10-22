@@ -85,6 +85,10 @@ const c = vm.createContext({
       calls.push({ expression, callback });
     },
   },
+  // Panel gọi mọi lệnh qua evalJsx (tiền tố cờ đo khổ + thư mục extension) rồi mới tới cs.evalScript.
+  evalJsx(expression, callback) {
+    calls.push({ expression, callback });
+  },
   loadDanToiUuJsx: () => "LOADER;",
   jsStr: JSON.stringify,
   show(output, text) {

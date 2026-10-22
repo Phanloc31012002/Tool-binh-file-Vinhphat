@@ -453,7 +453,16 @@ function dcDanBePrepare(
       } catch (e2) {}
       return null;
     }
+    // Bài đo theo khung Transform khi panel bật cờ (hàm chung của dan_card_lib.jsx).
     function visibleBoundsOf(item) {
+      if (
+        typeof dcDoTheoKhungTransform !== "undefined" &&
+        dcDoTheoKhungTransform &&
+        typeof dcKhungThanhPham === "function"
+      ) {
+        var khung = dcKhungThanhPham(item);
+        if (khung) return khung;
+      }
       try {
         return item.visibleBounds.slice(0);
       } catch (e) {}
@@ -1024,7 +1033,16 @@ function dcDanBeRender(jobId, slotsText, reportText) {
       } catch (e2) {}
       return null;
     }
+    // Bài đo theo khung Transform khi panel bật cờ (hàm chung của dan_card_lib.jsx).
     function visibleBoundsOf(item) {
+      if (
+        typeof dcDoTheoKhungTransform !== "undefined" &&
+        dcDoTheoKhungTransform &&
+        typeof dcKhungThanhPham === "function"
+      ) {
+        var khung = dcKhungThanhPham(item);
+        if (khung) return khung;
+      }
       try {
         return item.visibleBounds.slice(0);
       } catch (e) {}

@@ -89,6 +89,10 @@ const context = vm.createContext({
       calls.push({ expr, callback });
     },
   },
+  // Panel gọi mọi lệnh qua evalJsx (tiền tố cờ đo khổ + thư mục extension) rồi mới tới cs.evalScript.
+  evalJsx(expr, callback) {
+    calls.push({ expr, callback });
+  },
   jsStr: JSON.stringify,
   loadOffsetPdfJsx: () => "RELOAD;",
   show(output, message, kind) {

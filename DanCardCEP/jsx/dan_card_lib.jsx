@@ -61,6 +61,81 @@ function dcMoTaLoi(e) {
   return (num >= 0 ? "Lỗi " + num + ": " : "Lỗi: ") + msg + line;
 }
 
+// ============================================================
+//  ĐO KHỔ DÙNG CHUNG — theo khung Transform của Illustrator
+//  Panel đặt dcDoTheoKhungTransform trước mỗi lệnh (tiền tố evalJsx).
+//  Mọi lệnh đo khổ đi qua dcDoKhung(item, cáchĐoCũ): cờ bật thì lấy khung
+//  Transform, không đo được mới rơi về cách đo riêng của từng lệnh.
+// ============================================================
+var DC_DUNG_SAI_KHO_MM = 0.5; // dung sai khổ chung (mm)
+if (typeof dcDoTheoKhungTransform === "undefined") var dcDoTheoKhungTransform = true;
+
+// Khung đúng như bảng Transform hiện: clip group → khung mask (kể cả compound
+// path); group thường bọc đúng một con → khung của con; còn lại → khung hình.
+// Illustrator đang bật "Use Preview Bounds" thì lấy visibleBounds ở mọi nhánh.
+// Trả [l,t,r,b] hoặc null khi object hỏng/không đo được. Không ném lỗi.
+function dcKhungThanhPham(item) {
+  var previewBounds = false;
+  try {
+    previewBounds =
+      app.preferences.getBooleanPreference("includeStrokeInBounds") === true;
+  } catch (prefError) {}
+  function boundsOf(it) {
+    try {
+      var b = previewBounds ? it.visibleBounds : it.geometricBounds;
+      if (b && b.length === 4) return [b[0], b[1], b[2], b[3]];
+    } catch (boundsError) {}
+    return null;
+  }
+  function frameOf(it, depth) {
+    if (!it || depth > 8) return null;
+    var typename = null,
+      clipped = false;
+    try {
+      typename = it.typename;
+    } catch (typeError) {
+      return null;
+    }
+    if (typename === "GroupItem") {
+      try {
+        clipped = it.clipped === true;
+      } catch (clipError) {}
+      var children = null,
+        count = 0;
+      try {
+        children = it.pageItems;
+        count = children.length;
+      } catch (childError) {}
+      if (clipped) {
+        for (var i = 0; i < count; i++) {
+          var isMask = false;
+          try {
+            isMask = children[i].clipping === true;
+          } catch (maskError) {}
+          if (isMask) return boundsOf(children[i]) || boundsOf(it);
+        }
+        return boundsOf(it);
+      }
+      if (count === 1) return frameOf(children[0], depth + 1) || boundsOf(it);
+    }
+    return boundsOf(it);
+  }
+  return frameOf(item, 0);
+}
+
+function dcDoKhung(item, legacy) {
+  if (dcDoTheoKhungTransform) {
+    var khung = dcKhungThanhPham(item);
+    if (khung) return khung;
+  }
+  return legacy(item);
+}
+
+// Số đo pt → chữ mm, một chữ số lẻ, dấu phẩy kiểu Việt ("92,0").
+function dcMmText(pt) {
+  return (pt / 2.834645669).toFixed(1).replace(".", ",");
+}
+
 // dcDan: wrapper bắt mọi lỗi -> trả thông báo rõ ràng cho panel.
 function dcDan(SEL_LAYOUT_KEY, VOUCHER_WITH_CARD_ARG) {
   try {
@@ -1729,6 +1804,7 @@ function _dcDanCore(SEL_LAYOUT_KEY, VOUCHER_WITH_CARD_ARG) {
   }
   // Đo vùng bao THẬT của object (gộp mọi phần nhìn thấy, bỏ vùng trong suốt,
   // xử lý cả group có clip mask). Kết quả gộp vào acc.val.
+  // Bật "Đo khổ theo bảng Transform" thì lấy thẳng khung Transform (khung clip).
   function visibleUnion(item, acc) {
     function merge(b) {
       if (!b) return;
@@ -1741,6 +1817,13 @@ function _dcDanCore(SEL_LAYOUT_KEY, VOUCHER_WITH_CARD_ARG) {
       if (b[1] > a[1]) a[1] = b[1];
       if (b[2] > a[2]) a[2] = b[2];
       if (b[3] < a[3]) a[3] = b[3];
+    }
+    if (dcDoTheoKhungTransform) {
+      var khungTransform = dcKhungThanhPham(item);
+      if (khungTransform) {
+        merge(khungTransform);
+        return;
+      }
     }
     // An toàn: object có thể đã bị xóa/không hợp lệ -> bỏ qua, tránh Error 45.
     var _tn;
@@ -5355,14 +5438,17 @@ function dcDanToiUu(
       return n * 10 * MM;
     }
 
+    // Khung thành phẩm: theo bảng Transform khi cờ bật, không thì visibleBounds như cũ.
     function boundsOf(item) {
-      try {
-        return item.visibleBounds.slice(0);
-      } catch (e) {}
-      try {
-        return item.geometricBounds.slice(0);
-      } catch (e2) {}
-      return null;
+      return dcDoKhung(item, function (it) {
+        try {
+          return it.visibleBounds.slice(0);
+        } catch (e) {}
+        try {
+          return it.geometricBounds.slice(0);
+        } catch (e2) {}
+        return null;
+      });
     }
 
     function itemRecord(item) {
@@ -5435,14 +5521,25 @@ function dcDanToiUu(
       var spec = measuredSize(models[mi].front, "mặt trước");
       if (twoSided) {
         var backSpec = measuredSize(models[mi].back, "mặt sau");
+        var khoTol = DC_DUNG_SAI_KHO_MM * MM;
         if (
-          Math.abs(spec.w - backSpec.w) > 0.2 ||
-          Math.abs(spec.h - backSpec.h) > 0.2
+          Math.abs(spec.w - backSpec.w) > khoTol ||
+          Math.abs(spec.h - backSpec.h) > khoTol
         )
           throw new Error(
             "Hai mặt của mẫu " +
               (mi + 1) +
-              " phải cùng kích thước và hướng khung.",
+              " phải cùng kích thước: trước " +
+              dcMmText(spec.w) +
+              "×" +
+              dcMmText(spec.h) +
+              " mm, sau " +
+              dcMmText(backSpec.w) +
+              "×" +
+              dcMmText(backSpec.h) +
+              " mm (lệch quá " +
+              dcMmText(DC_DUNG_SAI_KHO_MM * MM) +
+              " mm).",
           );
         spec.w = Math.max(spec.w, backSpec.w);
         spec.h = Math.max(spec.h, backSpec.h);
@@ -6462,16 +6559,19 @@ function dcDanTuTro(
       );
     }
 
+    // Khung thành phẩm: theo bảng Transform khi cờ bật, không thì visibleBounds như cũ.
     function boundsOf(item) {
-      try {
-        var visible = item.visibleBounds.slice(0);
-        if (isUsableBounds(visible)) return visible;
-      } catch (e) {}
-      try {
-        var geometric = item.geometricBounds.slice(0);
-        if (isUsableBounds(geometric)) return geometric;
-      } catch (e2) {}
-      return null;
+      return dcDoKhung(item, function (it) {
+        try {
+          var visible = it.visibleBounds.slice(0);
+          if (isUsableBounds(visible)) return visible;
+        } catch (e) {}
+        try {
+          var geometric = it.geometricBounds.slice(0);
+          if (isUsableBounds(geometric)) return geometric;
+        } catch (e2) {}
+        return null;
+      });
     }
 
     function sizeOfBounds(bounds) {
@@ -7697,16 +7797,19 @@ function dcDanTuTroNhieuKho(
       );
     }
 
+    // Khung thành phẩm: theo bảng Transform khi cờ bật, không thì visibleBounds như cũ.
     function boundsOf(item) {
-      try {
-        var visible = item.visibleBounds.slice(0);
-        if (usableBounds(visible)) return visible;
-      } catch (e) {}
-      try {
-        var geometric = item.geometricBounds.slice(0);
-        if (usableBounds(geometric)) return geometric;
-      } catch (e2) {}
-      return null;
+      return dcDoKhung(item, function (it) {
+        try {
+          var visible = it.visibleBounds.slice(0);
+          if (usableBounds(visible)) return visible;
+        } catch (e) {}
+        try {
+          var geometric = it.geometricBounds.slice(0);
+          if (usableBounds(geometric)) return geometric;
+        } catch (e2) {}
+        return null;
+      });
     }
 
     function sizeOfBounds(bounds) {
@@ -18788,16 +18891,19 @@ function dcRunCatalogueAuto(wCm, hCm) {
     return isNaN(n) ? 0 : n;
   }
 
+  // Khung thành phẩm: theo bảng Transform khi cờ bật, không thì visibleBounds như cũ.
   function getBounds(item) {
-    try {
-      return item.visibleBounds.slice(0);
-    } catch (e) {
+    return dcDoKhung(item, function (it) {
       try {
-        return item.geometricBounds.slice(0);
-      } catch (e2) {
-        return null;
+        return it.visibleBounds.slice(0);
+      } catch (e) {
+        try {
+          return it.geometricBounds.slice(0);
+        } catch (e2) {
+          return null;
+        }
       }
-    }
+    });
   }
 
   function centerAt(item, cx, cy) {
@@ -28470,16 +28576,19 @@ function dcResizeSelectionToSize(wText, hText, unit) {
     if (!selection || selection.length === 0)
       return "ERR: Hãy chọn ít nhất một object để resize.";
 
+    // Khung thành phẩm: theo bảng Transform khi cờ bật, không thì visibleBounds như cũ.
     function boundsOf(item) {
-      try {
-        return item.visibleBounds;
-      } catch (e) {
+      return dcDoKhung(item, function (it) {
         try {
-          return item.geometricBounds;
-        } catch (e2) {
-          return null;
+          return it.visibleBounds;
+        } catch (e) {
+          try {
+            return it.geometricBounds;
+          } catch (e2) {
+            return null;
+          }
         }
-      }
+      });
     }
 
     function sizeOf(bounds) {

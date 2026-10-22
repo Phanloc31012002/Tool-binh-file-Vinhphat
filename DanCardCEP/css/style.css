@@ -1121,6 +1121,16 @@ body {
   border-bottom: 1px solid var(--line);
   background: var(--bg);
 }
+/* Tuỳ chọn chung dưới thanh tab (áp cho mọi lệnh đo khổ). */
+.globalopt {
+  padding: 6px 12px 4px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg);
+}
+.globalopt .check {
+  margin: 0;
+  font-size: 12px;
+}
 .tab {
   flex: 1 0 auto;            /* chia đều theo bề ngang, không bị cắt mất */
   min-width: 62px;
