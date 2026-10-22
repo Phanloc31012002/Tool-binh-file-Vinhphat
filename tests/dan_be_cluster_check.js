@@ -32,7 +32,20 @@ function strictlyInside(h, q) {
   for (let i = 0; i < h.length; i++) if (cross(h[i], h[(i + 1) % h.length], q) <= 1e-6) return false;
   return true;
 }
-// Số cụm liền của bài k. Hai con kề nhau khi khung bao cách nhau ≤ khe + nửa cạnh dài nhất của con lớn hơn.
+// Hai con kề nhau khi khung bao cách nhau ≤ khe + nửa cạnh dài nhất của con lớn hơn. Nếu giữa hai con
+// có chấm PON (vùng né của chấm chạm khung bao hợp của hai con) thì cho phép hở thêm một con: chỗ trống
+// đó là do né PON, không phải do xếp rời.
+function adjacent(input, a, b) {
+  const gap = boxGap(a, b), side = Math.max(a.side, b.side), limit = input.gapMm + 0.5 * side + 1e-6;
+  if (gap <= limit) return true;
+  if (gap > limit + side + 1e-6) return false;
+  const u = { x0: Math.min(a.x0, b.x0), y0: Math.min(a.y0, b.y0), x1: Math.max(a.x1, b.x1), y1: Math.max(a.y1, b.y1) };
+  return (input.sheet.dots || []).some((d) => {
+    const R = d.r + input.ponClearMm;
+    return d.x + R > u.x0 && d.x - R < u.x1 && d.y + R > u.y0 && d.y - R < u.y1;
+  });
+}
+// Số cụm liền của bài k.
 function clusterCount(input, result, k) {
   const mine = result.slots.filter((s) => s.mi === k).map((s) => boxOf(input.types[s.mi].groups, s));
   if (!mine.length) return 0;
@@ -46,7 +59,7 @@ function clusterCount(input, result, k) {
       const i = stack.pop();
       for (let j = 0; j < mine.length; j++) {
         if (seen[j]) continue;
-        if (boxGap(mine[i], mine[j]) <= input.gapMm + 0.5 * Math.max(mine[i].side, mine[j].side) + 1e-6) { seen[j] = true; stack.push(j); }
+        if (adjacent(input, mine[i], mine[j])) { seen[j] = true; stack.push(j); }
       }
     }
   }

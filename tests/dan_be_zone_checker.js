@@ -124,7 +124,8 @@ function checkLayout(input, result, zoneGapMm) {
     if (a.x0 > b.x1 + need || b.x0 > a.x1 + need || a.y0 > b.y1 + need || b.y0 > a.y1 + need) continue;
     const dist = outlineDist(a, b);
     assert.ok(dist >= need - 0.001, "con " + i + " và " + j + " cách " + dist.toFixed(4) + " mm, cần " + need + " mm");
-    if (need <= 1e-9) assert.ok(!overlaps(a, b), "con " + i + " và " + j + " chồng lên nhau");
+    // Chồng vùng tô hoặc lọt vào lỗ compound: kiểm tra ở mọi mức khe (biên xa nhau vẫn có thể nằm trong lỗ).
+    assert.ok(!overlaps(a, b), "con " + i + " và " + j + " chồng lên nhau hoặc lọt vào lỗ");
   }
 }
 // Mọi cặp nhóm khuôn phải tách được bằng một đường thẳng ngang hoặc dọc qua tâm khung bao các con.

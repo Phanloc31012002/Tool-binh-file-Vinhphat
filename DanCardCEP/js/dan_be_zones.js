@@ -271,9 +271,12 @@
   }
 
   // Cấp kích thước cho từng khu của cây trong khung w × h với N con/bài, phân phần dư, cộng số con.
-  function allocate(node, w, h, N, ests, cutters, s, extents, counts) {
+  // fillMode: phần dư cho khu thêm được nhiều con nhất mỗi mm (dùng ở các mức N thấp hơn N*);
+  // mặc định (N*): phần dư chia lần lượt cho khu ít con mỗi bài nhất.
+  function allocate(node, w, h, N, ests, cutters, s, extents, counts, fillMode) {
     var horizontal, span, cross, axis, kids, lens = [], used, leftover, k, order, i, base, trial, total = 0, n, box;
     if (node.leaf !== undefined) { n = ests[node.leaf](w, h); counts[node.leaf] += n; return n; }
+    fillMode = !!fillMode;
     horizontal = node.dir === "H"; span = horizontal ? h : w; cross = horizontal ? w : h; axis = horizontal ? "y" : "x";
     kids = node.kids; used = (kids.length - 1) * s;
     for (k = 0; k < kids.length; k++) {
@@ -286,28 +289,56 @@
     function dry(kid, len) {
       var c = [], j;
       for (j = 0; j < cutters.length; j++) c.push(0);
-      return allocate(kid, horizontal ? cross : len, horizontal ? len : cross, N, ests, cutters, s, new Map(), c);
+      return allocate(kid, horizontal ? cross : len, horizontal ? len : cross, N, ests, cutters, s, new Map(), c, fillMode);
     }
     function perDesign(kid, len) {
       var c = [], j, e = new Map(), best = Infinity;
       for (j = 0; j < cutters.length; j++) c.push(0);
-      allocate(kid, horizontal ? cross : len, horizontal ? len : cross, N, ests, cutters, s, e, c);
+      allocate(kid, horizontal ? cross : len, horizontal ? len : cross, N, ests, cutters, s, e, c, fillMode);
       for (j = 0; j < cutters.length; j++) if (c[j] || cutterIn(kid, j)) best = Math.min(best, Math.floor(c[j] / cutters[j].members.length));
       return best;
     }
-    if (leftover > 1e-9) {
+    // Độ dài thêm nhỏ nhất (≤ budget) để khu `kid` được thêm con; Infinity nếu không có.
+    // Lá: lấy đúng mép kế tiếp trong hồ sơ khuôn (chính xác); nút trong: tìm nhị phân tới 0,001 mm.
+    function nextGain(kid, len, budget) {
+      var base = dry(kid, len), lo, hi, mid, j, est, edges, e;
+      if (!(budget > 1e-9) || dry(kid, len + budget) <= base) return Infinity;
+      if (kid.leaf !== undefined) {
+        est = ests[kid.leaf]; edges = horizontal ? est.ys : est.xs;
+        for (j = 0; j < edges.length; j++) {
+          e = edges[j] - len;
+          if (e <= 1e-9) continue;
+          if (e > budget + 1e-9) return Infinity;
+          if (dry(kid, len + e) > base) return e;
+        }
+        return Infinity;
+      }
+      lo = 0; hi = budget;
+      for (j = 0; j < 20 && hi - lo > 0.001; j++) { mid = (lo + hi) / 2; if (dry(kid, len + mid) > base) hi = mid; else lo = mid; }
+      return hi;
+    }
+    // Phần dư chia LẦN LƯỢT (spec §4.4): mỗi lượt cho khu đang ít con mỗi bài nhất mà còn thêm được con,
+    // đúng phần nó cần cho lần tăng kế tiếp; lặp tới khi không khu nào thêm được nữa.
+    var rounds = 0, pick, pickNeed, needK, rate, bestRate, gainK;
+    while (leftover > 1e-9 && rounds < 40) {
       order = [];
       for (k = 0; k < kids.length; k++) order.push({ k: k, per: perDesign(kids[k], lens[k]) });
       order.sort(function (a, b) { return a.per - b.per || a.k - b.k; });
+      pick = -1; pickNeed = Infinity; bestRate = -1;
       for (i = 0; i < order.length; i++) {
-        k = order[i].k; base = dry(kids[k], lens[k]); trial = dry(kids[k], lens[k] + leftover);
-        if (trial > base) { lens[k] += leftover; break; }
+        k = order[i].k; needK = nextGain(kids[k], lens[k], leftover);
+        if (!isFinite(needK)) continue;
+        if (!fillMode) { pick = k; pickNeed = needK; break; }
+        gainK = dry(kids[k], lens[k] + needK) - dry(kids[k], lens[k]); rate = gainK / Math.max(needK, 1e-9);
+        if (rate > bestRate + 1e-12) { bestRate = rate; pick = k; pickNeed = needK; }
       }
+      if (pick < 0) break;
+      lens[pick] += pickNeed; leftover -= pickNeed; rounds++;
     }
     extents.set(node, lens);
     for (k = 0; k < kids.length; k++) {
       box = horizontal ? { w: cross, h: lens[k] } : { w: lens[k], h: cross };
-      total += allocate(kids[k], box.w, box.h, N, ests, cutters, s, extents, counts);
+      total += allocate(kids[k], box.w, box.h, N, ests, cutters, s, extents, counts, fillMode);
     }
     return total;
   }
@@ -327,9 +358,18 @@
 
   // Ước lượng cây: N* lớn nhất mà mọi bài có N* con, rồi phần dư cho khu thêm được con.
   // Trả {total, minPer, counts (theo khuôn), extents (Map nút → độ dài từng con), boundaries}.
+  // Ước lượng cây ở một mức N cho trước (mỗi bài ≥ N con). fillMode: phần dư cho khu lợi con nhất mỗi mm
+  // (mức N thấp hơn N*); mặc định phần dư chia lần lượt cho khu ít con hơn (mức N*).
+  function sizeTreeAt(tree, W, H, ests, cutters, s, N, fillMode) {
+    var i, counts = [], extents = new Map(), total, minPer = Infinity;
+    for (i = 0; i < cutters.length; i++) counts.push(0);
+    total = allocate(tree, W, H, N, ests, cutters, s, extents, counts, fillMode);
+    for (i = 0; i < cutters.length; i++) minPer = Math.min(minPer, Math.floor(counts[i] / cutters[i].members.length));
+    return { total: total, minPer: minPer, counts: counts, extents: extents, boundaries: countBoundaries(tree), N: N };
+  }
   function sizeTree(tree, W, H, ests, cutters, s) {
     var horizontal = tree.dir === "H", span = horizontal ? H : W, cross = horizontal ? W : H, axis = horizontal ? "y" : "x";
-    var hi = 1, i, lo = 0, mid, counts = [], extents = new Map(), total, minPer = Infinity, m;
+    var hi = 1, i, lo = 0, mid, m;
     for (i = 0; i < cutters.length; i++) {
       m = cutters[i].members.length;
       hi = Math.max(hi, Math.floor(ests[i](W, H) / m) + 1);
@@ -337,10 +377,7 @@
     function fits(N) { return need(tree, N, cross, axis, span, ests, cutters, s) <= span + 1e-9; }
     if (!fits(1)) hi = 0;
     else { while (hi - lo > 1) { mid = Math.floor((lo + hi) / 2); if (fits(mid)) lo = mid; else hi = mid; } if (fits(hi)) lo = hi; hi = lo; }
-    for (i = 0; i < cutters.length; i++) counts.push(0);
-    total = allocate(tree, W, H, hi, ests, cutters, s, extents, counts);
-    for (i = 0; i < cutters.length; i++) minPer = Math.min(minPer, Math.floor(counts[i] / cutters[i].members.length));
-    return { total: total, minPer: minPer, counts: counts, extents: extents, boundaries: countBoundaries(tree), N: hi };
+    return sizeTreeAt(tree, W, H, ests, cutters, s, hi);
   }
 
   // ---------- Ngữ cảnh dàn thật ----------
@@ -572,9 +609,23 @@
   // Thử thêm con vào các kẽ còn trống bằng chính "lưới" của khu: các vectơ dời giữa hai con kề nhau
   // của cùng khuôn. Con mới chỉ đặt cạnh con cùng khuôn, cách khu khác ≥ s, né PON, trong lề.
   // Sửa `pieces` tại chỗ, trả số con thêm được. Tổng ứng viên thử tối đa 2000.
+  // Khung bao tâm các con của từng khuôn; hai khuôn "tách được" khi khung tâm không lấn nhau theo x hoặc y.
+  function centreExtents(pieces, ctx) {
+    var ext = {}, i, b, cx, cy, c;
+    for (i = 0; i < pieces.length; i++) {
+      b = ctx.boxOf(pieces[i]); cx = (b.x0 + b.x1) / 2; cy = (b.y0 + b.y1) / 2; c = pieces[i].c;
+      if (!ext[c]) ext[c] = { x0: cx, x1: cx, y0: cy, y1: cy };
+      else { if (cx < ext[c].x0) ext[c].x0 = cx; if (cx > ext[c].x1) ext[c].x1 = cx; if (cy < ext[c].y0) ext[c].y0 = cy; if (cy > ext[c].y1) ext[c].y1 = cy; }
+    }
+    return ext;
+  }
+  function separable(a, b) {
+    return a.x1 < b.x0 + 1e-6 || b.x1 < a.x0 + 1e-6 || a.y1 < b.y0 + 1e-6 || b.y1 < a.y0 + 1e-6;
+  }
+
   function fillGaps(pieces, ctx) {
     var added = 0, tried = 0, c, byCutter = {}, list, i, j, a, b, ba, bb, vecs, seen, key, dx, dy, limit, order, p, k, cand, cb, near, q, qb, reach;
-    var LIMIT = 2000;
+    var LIMIT = 2000, ext = centreExtents(pieces, ctx), grown, other, cx, cy, keep;
     for (i = 0; i < pieces.length; i++) {
       c = pieces[i].c;
       if (!byCutter[c]) byCutter[c] = [];
@@ -614,8 +665,16 @@
             near.push(q);
           }
           if (dup) continue;
+          // Không bò sang khu khác: sau khi thêm, khung tâm của khuôn này vẫn phải tách được với mọi khuôn khác
+          // bằng một đường ngang hoặc dọc (đúng tiêu chí "không lộn xộn").
+          cx = (cb.x0 + cb.x1) / 2; cy = (cb.y0 + cb.y1) / 2;
+          grown = { x0: Math.min(ext[c].x0, cx), x1: Math.max(ext[c].x1, cx), y0: Math.min(ext[c].y0, cy), y1: Math.max(ext[c].y1, cy) };
+          keep = true;
+          for (other in ext) if (Object.prototype.hasOwnProperty.call(ext, other) && String(other) !== String(c) && !separable(grown, ext[other])) { keep = false; break; }
+          if (!keep) continue;
           tried++;
           if (!ctx.verify([cand].concat(near))) continue;
+          ext[c] = grown;
           pieces.push(cand); order.push(cand); added++;
         }
       }
@@ -672,7 +731,18 @@
     if (byX && byY) return Math.abs(dy - byX.dy) <= Math.abs(dx - byY.dx) ? byX : byY;
     if (byX) return byX;
     if (byY) return byY;
-    return { dx: 0, dy: 0, exact: false };
+    // Cả hai trục đều bị chặn riêng: dời chung cả hai trục tới mức lớn nhất còn được, rồi đẩy thêm
+    // từng trục tới mức lớn nhất còn được (giữ lệch ít nhất).
+    lo = 0; hi = 1;
+    for (i = 0; i < 12; i++) { mid = (lo + hi) / 2; if (ok(dx * mid, dy * mid)) lo = mid; else hi = mid; }
+    var cx = dx * lo, cy = dy * lo, restX, restY;
+    restY = dy - cy; lo = 0; hi = 1;
+    for (i = 0; i < 12; i++) { mid = (lo + hi) / 2; if (ok(cx, cy + restY * mid)) lo = mid; else hi = mid; }
+    cy += restY * lo;
+    restX = dx - cx; lo = 0; hi = 1;
+    for (i = 0; i < 12; i++) { mid = (lo + hi) / 2; if (ok(cx + restX * mid, cy)) lo = mid; else hi = mid; }
+    cx += restX * lo;
+    return { dx: cx, dy: cy, exact: false };
   }
 
   // ---------- Job chia khu (chạy từng bước để panel hiện tiến độ) ----------
@@ -692,12 +762,29 @@
       for (c = 0; c < G; c++) minPer = Math.min(minPer, Math.floor(out.counts[c] / cutters[c].members.length));
       return { out: out, tree: tree, sizing: sizing, total: out.pieces.length, minPer: minPer, boundaries: countBoundaries(tree), index: index };
     }
+    // Mỗi cây được chấm ở mức chia đều lớn nhất N* và vài mức thấp hơn (tới 80 % N*, tối đa 4 mức):
+    // bớt một hàng/cột của mẫu lớn đôi khi mở ra chỗ cho rất nhiều con của mẫu nhỏ. Xếp hạng chung
+    // theo tổng con, rồi số con của bài ít nhất, rồi ít ranh giới.
     function rank() {
-      var trees = enumerateTrees(cutters), list = [], i, sz;
+      var trees = enumerateTrees(cutters), list = [], i, sz, floor, n, at, seenKey = {}, key, sized = [], bestN = 0;
       for (i = 0; i < trees.length; i++) {
         sz = sizeTree(trees[i], ctx.W, ctx.H, ests, cutters, ctx.s);
+        sized.push(sz);
+        if (sz.minPer >= 1 && sz.N > bestN) bestN = sz.N;
+      }
+      // Không để bài nào thiếu quá 20 % so với mức chia đều lớn nhất đạt được trên mọi cách chia; tối đa 6 mức mỗi cây.
+      floor = Math.max(1, Math.ceil(bestN * 0.8));
+      for (i = 0; i < trees.length; i++) {
+        sz = sized[i];
         if (sz.minPer < 1) continue;
-        list.push({ tree: trees[i], sizing: sz, total: sz.total, minPer: sz.minPer, boundaries: sz.boundaries, index: i });
+        for (n = sz.N; n >= Math.max(floor, sz.N - 5); n--) {
+          at = n === sz.N ? sz : sizeTreeAt(trees[i], ctx.W, ctx.H, ests, cutters, ctx.s, n, true);
+          if (at.minPer < 1) continue;
+          key = i + ":" + at.counts.join(",");
+          if (seenKey[key]) continue;
+          seenKey[key] = true;
+          list.push({ tree: trees[i], sizing: at, total: at.total, minPer: at.minPer, boundaries: at.boundaries, index: i * 8 + (sz.N - n) });
+        }
       }
       list.sort(function (a, b) { return better(b, a); });
       return { trees: trees.length, ranked: list };
@@ -789,6 +876,7 @@
     makeEstimator: makeEstimator,
     enumerateTrees: enumerateTrees,
     sizeTree: sizeTree,
+    sizeTreeAt: sizeTreeAt,
     _need: need
   };
 });

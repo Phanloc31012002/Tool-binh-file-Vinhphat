@@ -101,6 +101,8 @@ run("8 khuôn nhỏ trong 30 giây", () => {
   if (r.ok && !RESCUE.test(r.detail)) {
     r.counts.forEach((n, k) => assert.ok(n >= 1, "bài " + (k + 1) + " có mặt"));
     checker.checkLayout(input, r, 5);
+    types.forEach((_, k) => assert.equal(checker.clusterCount(input, r, k), 1, "8 khuôn: bài " + (k + 1) + " một cụm liền"));
+    checker.assertSeparable(input, r);
     console.log("  8 khuôn: " + r.count + " con [" + r.counts + "], " + ms + " ms");
   } else {
     assert.match(r.ok ? r.detail : r.error, RESCUE, "không chia khu được thì phải báo cứu hộ");
@@ -165,6 +167,73 @@ run("không PON thì canh giữa đúng", () => {
   const err = checker.centreError(input, r);
   assert.ok(Math.abs(err[0]) < 0.001 && Math.abs(err[1]) < 0.001, "lệch tâm " + err);
   assert.ok(Math.abs(r.centering.offsetXmm - err[0]) < 1e-8 && Math.abs(r.centering.offsetYmm - err[1]) < 1e-8);
+});
+
+// --- Bổ sung sau soát mã ---
+
+// Lấp chỗ trống không được bò sang khu khác (khuôn ring có lỗ + tròn nhỏ; card trên A4; card + tròn 10 tờ dài).
+run("lấp chỗ trống vẫn giữ khu riêng", () => {
+  checkZoned("ring + tròn 8", fx.standardInput([L.ring(44, 20), { groups: circle.curveFor(8), curveErrorMm: 0.00025 }], { zoneGapMm: 0 }), 0);
+  checkZoned("ring + tròn 8, khu cách 5", fx.standardInput([L.ring(44, 20), { groups: circle.curveFor(8), curveErrorMm: 0.00025 }], { zoneGapMm: 5 }), 5);
+  // Bộ cũ tự từ chối ca A4 này ("Bộ kiểm tra an toàn từ chối phương án canh tâm", lỗi có sẵn) nên không so với bộ cũ.
+  checkZoned("A4: card + tròn 20", fx.standardInput([L.rect(92, 56), { groups: circle.curveFor(20), curveErrorMm: 0.00025 }],
+    { zoneGapMm: 0, sheet: { widthMm: 210, heightMm: 297, dots: [{ x: 10, y: 10, r: 2.5 }, { x: 200, y: 10, r: 2.5 }, { x: 10, y: 287, r: 2.5 }, { x: 200, y: 287, r: 2.5 }] } }), 0, { skipLegacy: true });
+  checkZoned("320 × 450: card + tròn 10", fx.standardInput([L.rect(92, 56), { groups: circle.curveFor(10), curveErrorMm: 0.00025 }],
+    { zoneGapMm: 0, sheet: { widthMm: 320, heightMm: 450, dots: [{ x: 10, y: 10, r: 2.5 }, { x: 310, y: 10, r: 2.5 }, { x: 10, y: 440, r: 2.5 }, { x: 310, y: 440, r: 2.5 }] } }), 0);
+});
+
+// Khe nhỏ hơn không được ra ít con hơn hẳn khe lớn (thẻ treo + tròn 8: trước đây 81 so với 292).
+run("khe nhỏ không thua khe lớn", () => {
+  const types = [L.hangTag(), { groups: circle.curveFor(8), curveErrorMm: 0.00025 }];
+  const off = checkZoned("thẻ treo + tròn 8, áp sát", fx.standardInput(types, { zoneGapMm: 0 }), 0);
+  const on = checkZoned("thẻ treo + tròn 8, khu cách 5", fx.standardInput(types, { zoneGapMm: 5 }), 5);
+  assert.ok(off.count >= 0.9 * on.count, "áp sát " + off.count + " con phải ≥ 90% của khu cách 5 mm " + on.count);
+  assert.ok(off.count >= 200, "thẻ treo + tròn 8 phải lấp đầy: " + off.count);
+  // Thẻ treo vẫn phải có mặt đáng kể (tool chỉ bớt tối đa 20 % mức chia đều, trừ hao dàn thật vài con).
+  assert.ok(off.counts[0] >= 16 && on.counts[0] >= 16, "thẻ treo không bị cắt quá tay: " + off.counts + " / " + on.counts);
+});
+
+// PON giữa cạnh tờ: dàn qua nest(), vẫn né PON, canh giữa hợp lý, mỗi bài một cụm (cho phép hở chỗ PON).
+run("PON giữa cạnh tờ", () => {
+  const set4 = fx.mixedSets()[3];
+  const r4 = checkZoned("vòm + trăng + giọt + xương, PON giữa cạnh", fx.standardInput(set4.types, { zoneGapMm: 5, midEdgeDots: true }), 5, { skipLegacy: true });
+  const input = fx.standardInput([L.rect(92, 56), { groups: circle.curveFor(10), curveErrorMm: 0.00025 }], { zoneGapMm: 5, midEdgeDots: true });
+  const r = checkZoned("card + tròn 10, PON giữa cạnh", input, 5, { skipLegacy: true });
+  // Canh giữa bị PON chặn: không thể tiến thêm về tâm trên bất kỳ trục nào (dời thêm 0,5 mm là phạm PON/lề).
+  for (const res of [r4, r]) {
+    const inp = res === r ? input : fx.standardInput(set4.types, { zoneGapMm: 5, midEdgeDots: true });
+    const err = checker.centreError(inp, res);
+    assert.ok(Math.abs(res.centering.offsetXmm - err[0]) < 1e-8 && Math.abs(res.centering.offsetYmm - err[1]) < 1e-8);
+    if (res.centering.exact) continue;
+    assert.match(res.detail, /Canh tâm bị giới hạn bởi vùng né PON\./);
+    [0, 1].forEach((axis) => {
+      if (Math.abs(err[axis]) < 0.001) return;
+      const step = -Math.sign(err[axis]) * Math.min(Math.abs(err[axis]), 0.5);
+      const moved = { slots: res.slots.map((q) => ({ ...q, x: q.x + (axis === 0 ? step : 0), y: q.y + (axis === 1 ? step : 0) })) };
+      assert.throws(() => checker.checkLayout(inp, moved, 5), /PON|lề/, "trục " + (axis ? "y" : "x") + " còn tiến thêm về tâm được mà tool không làm (lệch " + err[axis].toFixed(3) + ")");
+    });
+  }
+});
+
+// nestAsync không được làm treo panel khi lõi ném lỗi: onDone nhận ok:false.
+run("nestAsync bắt lỗi", () => {
+  const realSetTimeout = global.setTimeout;
+  global.setTimeout = (fn) => { fn(); return 1; };
+  let done = null;
+  try {
+    nester.nestAsync({ sheet: { widthMm: 100, heightMm: 100, dots: [] }, types: [{ groups: "hỏng" }], gapMm: 1, marginMm: 2, ponClearMm: 1 },
+      () => {}, (res) => { done = res; });
+  } finally { global.setTimeout = realSetTimeout; }
+  assert.ok(done && done.ok === false && typeof done.error === "string", "đầu vào hỏng → ok:false, không ném: " + JSON.stringify(done));
+});
+
+// Bộ cũ thắng với các bài cùng khuôn (chữ L lồng ghép): chữ mode không được vừa "luân phiên" vừa "gom cụm".
+run("mode khi bộ cũ thắng", () => {
+  const input = fx.standardInput([L.elbow(), L.elbow()], { gapMm: 1 });
+  const r = nester.nest(input);
+  assert.equal(r.ok, true);
+  assert.match(r.mode, /gom cụm các bài cùng khuôn/);
+  assert.doesNotMatch(r.mode, /luân phiên/);
 });
 
 assert.ok(Date.now() - began < 600000, "bộ test chia khu chạy trong thời gian hữu hạn");

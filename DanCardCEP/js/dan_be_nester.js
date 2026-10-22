@@ -3646,7 +3646,7 @@
     var result = {};
     for (key in finished) if (Object.prototype.hasOwnProperty.call(finished, key)) result[key] = finished[key];
     result.slots = out.slots; result.counts = out.counts;
-    result.mode = String(finished.mode || "") + " + gom cụm các bài cùng khuôn";
+    result.mode = String(finished.mode || "").replace(/ \+ luân phiên các bài cùng khuôn/g, "") + " + gom cụm các bài cùng khuôn";
     return result;
   }
 
@@ -3726,17 +3726,20 @@
   // onProgress({done, total}); các trường hợp khác chạy nest() liền một mạch rồi onDone(kết quả).
   function nestAsync(input, onProgress, onDone) {
     var zones = zonesModule(), cutters = inputUsable(input) ? cutterGroupsOf(input) : null, job = null;
+    // Mọi lỗi bất ngờ đều về onDone({ok:false}) để panel không bị treo ở nút "Dàn bế".
+    function failed(error) { return { ok: false, error: error && error.message ? error.message : String(error) }; }
+    function safe(fn) { var r; try { r = fn(); } catch (error) { r = failed(error); } return r; }
     if (!zones || !cutters || cutters.length < 2 || !allCuttersFit(input, cutters)) {
-      setTimeout(function () { onDone(nest(input)); }, 0);
+      setTimeout(function () { onDone(safe(function () { return nest(input); })); }, 0);
       return;
     }
     try { job = zones.createJob(input, coreApi); } catch (createError) { job = null; }
-    if (!job) { setTimeout(function () { onDone(rescueLegacy(input)); }, 0); return; }
+    if (!job) { setTimeout(function () { onDone(safe(function () { return rescueLegacy(input); })); }, 0); return; }
     function tick() {
       var r;
-      try { r = job.step(); } catch (stepError) { onDone(rescueLegacy(input)); return; }
+      try { r = job.step(); } catch (stepError) { onDone(safe(function () { return rescueLegacy(input); })); return; }
       if (typeof onProgress === "function") onProgress(r.progress);
-      if (r.done) { onDone(r.result && r.result.ok ? r.result : rescueLegacy(input)); return; }
+      if (r.done) { onDone(r.result && r.result.ok ? r.result : safe(function () { return rescueLegacy(input); })); return; }
       setTimeout(tick, 0);
     }
     setTimeout(tick, 0);

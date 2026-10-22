@@ -211,6 +211,48 @@ run("lấp chỗ trống bằng lưới của khu", () => {
   assert.equal(JSON.stringify(all), snapshot);
 });
 
+run("canh giữa khi cả hai trục bị chặn", () => {
+  // Ô 10 × 10 ở góc; tâm đúng cần dời (45, 45). Vùng cấm chặn riêng từng trục ở đúng tâm,
+  // nên phải dời chung cả hai trục tới mức lớn nhất còn được (giữ lệch ít nhất), không được bỏ cuộc.
+  const pieces = [{ c: 0, vi: 0, x: 0, y: 0 }];
+  const fake = { W: 100, H: 100, boxOf: (p) => ({ x0: p.x, y0: p.y, x1: p.x + 10, y1: p.y + 10 }),
+    fitsSheet: (pts) => pts.every((p) => !(p.x >= 40 && p.x < 46) && !(p.y >= 40 && p.y < 46)) };
+  const cen = Z.centerLayout(pieces, fake);
+  assert.equal(cen.exact, false);
+  assert.ok(cen.dx > 35 && cen.dx < 40 && cen.dy > 35 && cen.dy < 40, "dời chung cả hai trục gần tâm nhất: " + JSON.stringify(cen));
+});
+
+run("phần dư chia lần lượt", () => {
+  // Khuôn A: ô 10 mm, 10 con/hàng (cần 10 mm mỗi hàng); khuôn B: ô 5 mm, 20 con/hàng (cần 5 mm mỗi hàng).
+  const grid = (k, n) => ({ boxes: [...Array(n)].flatMap((_, r) => [...Array(n)].map((_, c) =>
+    ({ x0: c * k, y0: r * k, x1: (c + 1) * k, y1: (r + 1) * k }))) });
+  const ests = [Z.makeEstimator(grid(10, 10)), Z.makeEstimator(grid(5, 20))];
+  const cutters = [{ members: [{}], area: 100 }, { members: [{}], area: 25 }];
+  const tree = { dir: "H", kids: [{ leaf: 0 }, { leaf: 1 }] };
+  // N* trên khung 100 × 100: A 80 mm + B 20 mm = 100 → N* = 80, không dư.
+  const sz = Z.sizeTree(tree, 100, 100, ests, cutters, 0);
+  assert.equal(sz.N, 80);
+  assert.deepEqual(sz.counts, [80, 80]);
+  // Ở mức N = 50: A 50 mm + B 15 mm (60 con), dư 35. Lần lượt: A (50) +10 → 60; A (hoà, đứng trước) +10 → 70;
+  // B (60) +5 → 80; A (70) +10 → 80; hết. Dồn hết cho A như trước sẽ ra [80, 60].
+  const lower = Z.sizeTreeAt(tree, 100, 100, ests, cutters, 0, 50);
+  assert.equal(lower.N, 50);
+  assert.deepEqual(lower.counts, [80, 80], "dư chia lần lượt cho khu ít con hơn");
+});
+
+run("bộ đo độc lập bắt con nằm trong vùng tô khi khe > 0", () => {
+  // Ring 44/20 (vành rộng 12 mm) với một tròn 8 đặt ngay trong VÀNH: cách cả hai biên 2 mm (≥ khe 1)
+  // nên phép đo khoảng cách không bắt được, nhưng chồng vùng tô → bộ đo phải ném lỗi.
+  const ring = L.ring(44, 20), small = { groups: core.normalizeGroups(require("./dan_be_circle_fixture").curveFor(8)), curveErrorMm: 0.00025 };
+  const input = fx.standardInput([ring, small], { gapMm: 1, sheet: { widthMm: 200, heightMm: 200, dots: [] } });
+  const slots = [{ mi: 0, vi: 0, x: 50, y: 50, angle: 0 }, { mi: 1, vi: 0, x: 50 + 22 + 16 - 4, y: 50 + 22 - 4, angle: 0 }];
+  assert.throws(() => checker.checkLayout(input, { ok: true, slots, counts: [1, 1], count: 2 }, 0), /chồng|lọt/,
+    "tròn nhỏ nằm trong vành ring phải bị bộ đo bắt dù khe > 0");
+  // Trong LỖ của ring thì là chỗ trống (đúng luật lõi hiện có): không chồng, chỉ cần đủ khe tới mép lỗ.
+  const inHole = [{ mi: 0, vi: 0, x: 50, y: 50, angle: 0 }, { mi: 1, vi: 0, x: 50 + 22 - 4, y: 50 + 22 - 4, angle: 0 }];
+  checker.checkLayout(input, { ok: true, slots: inHole, counts: [1, 1], count: 2 }, 0);
+});
+
 assert.ok(Date.now() - began < 120000, "bộ test khối chia khu chạy trong thời gian hữu hạn");
 assert.deepEqual(failures, [], failures.join("\n"));
 console.log("Khối chia khu: mọi ca đạt trong " + (Date.now() - began) + " ms.");
