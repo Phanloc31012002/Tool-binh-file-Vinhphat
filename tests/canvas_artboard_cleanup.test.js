@@ -136,9 +136,9 @@ assert.ok(
     bridge.indexOf("finishFace(backFace);"),
   "Bế cleanup follows final face rendering",
 );
-assert.match(main, /dcDanToiUuVersion[^\n]*22/);
-assert.match(main, /dcDanTuTroVersion[^\n]*11/);
-assert.match(main, /dcDanBeNestingVersion[^\n]*12/);
+assert.match(main, /dcDanToiUuVersion[^\n]*23/);
+assert.match(main, /dcDanTuTroVersion[^\n]*12/);
+assert.match(main, /dcDanBeNestingVersion[^\n]*13/);
 console.log(
   "Canvas cleanup: result-only frames on success, old frames retained on failure, reverse deletion and partial-removal warning passed.",
 );
