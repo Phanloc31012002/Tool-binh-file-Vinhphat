@@ -17,10 +17,12 @@
   "use strict";
 
   var VERSION = 2;
-  var BOP_TOI_DA_MM = 1; // bóp cả cụm: mỗi con bớt tối đa 1 mm (anh Lộc 22/10 21:14)
-  // Mức 2 (anh Lộc 22:00–22:21, "làm theo hình 2"): bóp 1 mm/con rồi mà vẫn thiếu chút xíu thì cả
-  // cụm co đều tới 1,5 % (file anh Lộc tự bóp: card 92 → 90,62 = đúng 0,985) cho đủ.
-  var BOP_MUC2 = 0.985;
+  // Bóp để vừa khối khi cụm chỉ dư chút ít so với n ô:
+  //  - mức 1: mỗi con bớt tối đa 1 mm theo chiều đang thiếu (cột thiếu 6 mm có 6 con → mỗi con 1 mm);
+  //    chỗ trống trong khối hút trước, con chỉ bớt phần còn lại;
+  //  - mức 2: bóp 1 mm/con rồi mà vẫn thiếu 1–2 mm nữa thì cả cụm co thêm cho đủ (chia theo cỡ con).
+  var BOP_MOI_CON_MM = 1;
+  var BOP_THEM_CUM_MM = 2;
   var CELL_W = 56; // mm, ô card đã tràn theo cạnh ngắn
   var CELL_H = 92; // mm, ô card đã tràn theo cạnh dài
   var MAX_COLS = 18; // tờ 100,8 cm = 18 × 56
@@ -480,26 +482,273 @@
   }
   function pieceKey(pieces) {
     var ids = [];
-    for (var i = 0; i < pieces.length; i++) ids.push(pieces[i].id + (pieces[i].bop ? "~" + pieces[i].bop : ""));
+    for (var i = 0; i < pieces.length; i++) ids.push(pieces[i].id);
     ids.sort();
     return ids.join(",");
   }
-  // Hệ số bóp cả cụm: co đều mọi con (không méo) sao cho con có cạnh dài nhất bớt đúng 1 mm;
-  // mọi con khác bớt ít hơn. 1 nghĩa là không bóp được (không có con nào).
-  function heSoBop(pieces) {
-    var maxDim = 0;
-    for (var i = 0; i < pieces.length; i++) maxDim = Math.max(maxDim, pieces[i].w, pieces[i].h);
-    if (maxDim <= BOP_TOI_DA_MM) return 1;
-    return 1 - BOP_TOI_DA_MM / maxDim;
-  }
-  function bopPieces(pieces, s) {
-    var out = [];
-    for (var i = 0; i < pieces.length; i++) {
-      var goc = pieces[i].bop || 1; // con đã bóp mức 1 thì quy về khổ gốc rồi mới áp hệ số mới
-      // Làm tròn 0,01 mm ngay ở khổ con để toạ độ cộng dồn không lệch 0,01 so với khổ (verify kẹt).
-      out.push({ id: pieces[i].id, w: r2((pieces[i].w / goc) * s), h: r2((pieces[i].h / goc) * s), bop: s });
+
+  // ------------------------------------------------------------------
+  //  BÓP ĐỂ VỪA KHỐI. Xếp con nguyên khổ vào khối rộng/cao hơn khối thật vài mm, dựng lại cây
+  //  guillotine từ nhát cắt, rồi "co" cây về đúng khối: chỗ trống hút trước; còn lại chia cho
+  //  các con trên cùng dãy, mỗi con ≤ 1 mm (mức 1); còn thiếu ≤ 2 mm nữa thì chia tiếp cho cả cụm
+  //  theo cỡ con (mức 2). Con nằm cạnh nhau (nhát dọc) phải co cùng một lượng theo chiều cao, và
+  //  ngược lại — đúng như bóp tay trong Illustrator.
+  // ------------------------------------------------------------------
+  function treeFromLayout(places, cuts, W, H) {
+    function build(x, y, w, h) {
+      var inside = [],
+        i,
+        p,
+        c,
+        a,
+        b;
+      for (i = 0; i < places.length; i++) {
+        p = places[i];
+        if (p.x >= x - EPS && p.y >= y - EPS && p.x + p.w <= x + w + EPS && p.y + p.h <= y + h + EPS) inside.push(p);
+      }
+      if (!inside.length) return { kind: "empty", w: w, h: h };
+      for (i = 0; i < cuts.length; i++) {
+        c = cuts[i];
+        if (c.axis === "V" && c.from <= y + EPS && c.to >= y + h - EPS && c.at > x + EPS && c.at < x + w - EPS) {
+          a = build(x, y, c.at - x, h);
+          b = build(c.at, y, x + w - c.at, h);
+          return a && b ? { kind: "V", a: a, b: b, w: w, h: h } : null;
+        }
+        if (c.axis === "H" && c.from <= x + EPS && c.to >= x + w - EPS && c.at > y + EPS && c.at < y + h - EPS) {
+          a = build(x, y, w, c.at - y);
+          b = build(x, c.at, w, y + h - c.at);
+          return a && b ? { kind: "H", a: a, b: b, w: w, h: h } : null;
+        }
+      }
+      if (inside.length === 1) {
+        p = inside[0];
+        if (Math.abs(p.w - w) <= EPS && Math.abs(p.h - h) <= EPS) return { kind: "piece", p: p, w: p.w, h: p.h };
+        // Con ở góc trên trái, phần còn lại trống (nhát bị bỏ vì hai bên đều trống).
+        if (Math.abs(p.x - x) <= EPS && Math.abs(p.y - y) <= EPS) {
+          if (p.w < w - EPS) {
+            a = build(x, y, p.w, h);
+            return a ? { kind: "V", a: a, b: { kind: "empty", w: w - p.w, h: h }, w: w, h: h } : null;
+          }
+          a = build(x, y, w, p.h);
+          return a ? { kind: "H", a: a, b: { kind: "empty", w: w, h: h - p.h }, w: w, h: h } : null;
+        }
+      }
+      return null;
     }
+    return build(0, 0, W, H);
+  }
+  // Sức co của một nút theo trục: { trong: chỗ trống hút được, con: tổng 1 mm của các con }.
+  // Dọc (y): nhát ngang cộng hai phần, nhát dọc lấy phần yếu hơn (hai bên phải co bằng nhau).
+  function sucCo(n, truc) {
+    var congKind = truc === "y" ? "H" : "V";
+    if (n.kind === "empty") return { trong: truc === "y" ? n.h : n.w, con: 0 };
+    if (n.kind === "piece") return { trong: 0, con: BOP_MOI_CON_MM };
+    var a = sucCo(n.a, truc),
+      b = sucCo(n.b, truc);
+    if (n.kind === congKind) return { trong: a.trong + b.trong, con: a.con + b.con };
+    var ta = a.trong + a.con,
+      tb = b.trong + b.con,
+      yeu = ta <= tb ? a : b;
+    return { trong: yeu.trong, con: yeu.con };
+  }
+  // Tổng cỡ các con của nút theo trục (để chia mức 2 theo cỡ): H cộng, V lấy max.
+  function coCon(n, truc) {
+    if (n.kind === "empty") return 0;
+    if (n.kind === "piece") return truc === "y" ? n.h : n.w;
+    var congKind = truc === "y" ? "H" : "V",
+      a = coCon(n.a, truc),
+      b = coCon(n.b, truc);
+    return n.kind === congKind ? a + b : Math.max(a, b);
+  }
+  // Co nút đi d theo trục. Thứ tự: chỗ trống → mỗi con ≤ 1 mm (chia đều theo sức) → phần dư chia
+  // cho cả cụm theo cỡ con.
+  function coNut(n, truc, d) {
+    if (d <= 1e-9) return;
+    var congKind = truc === "y" ? "H" : "V";
+    if (n.kind === "empty") {
+      if (truc === "y") n.h -= d;
+      else n.w -= d;
+      return;
+    }
+    if (n.kind === "piece") {
+      if (truc === "y") n.h = n.p.h = r2(n.p.h - d);
+      else n.w = n.p.w = r2(n.p.w - d);
+      return;
+    }
+    if (n.kind !== congKind) {
+      coNut(n.a, truc, d);
+      coNut(n.b, truc, d);
+    } else {
+      var sa = sucCo(n.a, truc),
+        sb = sucCo(n.b, truc),
+        da = Math.min(sa.trong, d),
+        db = Math.min(sb.trong, d - da),
+        con = d - da - db;
+      if (con > 1e-9) {
+        var ca = sa.con,
+          cb = sb.con,
+          phanCon = Math.min(con, ca + cb);
+        if (ca + cb > 0) {
+          da += (phanCon * ca) / (ca + cb);
+          db += (phanCon * cb) / (ca + cb);
+        }
+        var them = con - phanCon; // mức 2: chia theo cỡ con cho cả cụm
+        if (them > 1e-9) {
+          var ka = coCon(n.a, truc),
+            kb = coCon(n.b, truc);
+          if (ka + kb > 0) {
+            da += (them * ka) / (ka + kb);
+            db += (them * kb) / (ka + kb);
+          } else da += them;
+        }
+      }
+      coNut(n.a, truc, da);
+      coNut(n.b, truc, db);
+    }
+    if (truc === "y") n.h -= d;
+    else n.w -= d;
+  }
+  function coCay(n) {
+    if (n.kind === "empty" || n.kind === "piece") return;
+    coCay(n.a);
+    coCay(n.b);
+    if (n.kind === "V") {
+      n.w = n.a.w + n.b.w;
+      n.h = Math.max(n.a.h, n.b.h);
+    } else {
+      n.w = Math.max(n.a.w, n.b.w);
+      n.h = n.a.h + n.b.h;
+    }
+  }
+  function coCon2(n) {
+    return n.kind === "piece" || (n.kind !== "empty" && (coCon2(n.a) || coCon2(n.b)));
+  }
+  function layoutTuCay(n, x, y, out) {
+    if (n.kind === "empty") return;
+    if (n.kind === "piece") {
+      out.places.push({ id: n.p.id, x: r2(x), y: r2(y), w: r2(n.p.w), h: r2(n.p.h), rot: n.p.rot, bopX: n.p.bopX, bopY: n.p.bopY });
+      return;
+    }
+    if (n.kind === "V") {
+      if (coCon2(n.a) || coCon2(n.b)) out.cuts.push({ axis: "V", at: r2(x + n.a.w), from: r2(y), to: r2(y + n.h) });
+      layoutTuCay(n.a, x, y, out);
+      layoutTuCay(n.b, x + n.a.w, y, out);
+    } else {
+      if (coCon2(n.a) || coCon2(n.b)) out.cuts.push({ axis: "H", at: r2(y + n.a.h), from: r2(x), to: r2(x + n.w) });
+      layoutTuCay(n.a, x, y, out);
+      layoutTuCay(n.b, x, y + n.a.h, out);
+    }
+  }
+  // Thử co một bố cục (xếp trong khối W+dx × H+dy) về đúng W × H. Trả { places, cuts, bop } hoặc null.
+  function coBoCuc(layout, W, H, dx, dy) {
+    var tree = treeFromLayout(layout.places, layout.cuts, W + dx, H + dy);
+    if (!tree) return null;
+    var i;
+    // Gắn khổ gốc để tính hệ số co từng con.
+    for (i = 0; i < layout.places.length; i++) {
+      layout.places[i].bopX = 1;
+      layout.places[i].bopY = 1;
+      layout.places[i].w0 = layout.places[i].w;
+      layout.places[i].h0 = layout.places[i].h;
+    }
+    if (dy > 1e-9) {
+      var sy = sucCo(tree, "y");
+      if (dy > sy.trong + sy.con + BOP_THEM_CUM_MM + 1e-9) return null;
+      coNut(tree, "y", dy);
+    }
+    if (dx > 1e-9) {
+      var sx = sucCo(tree, "x");
+      if (dx > sx.trong + sx.con + BOP_THEM_CUM_MM + 1e-9) return null;
+      coNut(tree, "x", dx);
+    }
+    coCay(tree);
+    // Khổ con làm tròn 0,01 mm nên tổng có thể dư vài phần trăm mm. Bớt phần dư đó theo đơn vị
+    // 0,01 (số nguyên) để tổng khớp đúng khổ: chỗ trống hút trước, rồi mỗi con bớt 0,01 cho tới đủ;
+    // hai bên một nhát dọc bớt bằng nhau theo chiều cao (và ngược lại).
+    function sucHundredths(n, truc) {
+      var congKind = truc === "y" ? "H" : "V";
+      if (n.kind === "empty") return Math.floor((truc === "y" ? n.h : n.w) * 100 + 1e-6);
+      if (n.kind === "piece") return 1;
+      var a = sucHundredths(n.a, truc),
+        b = sucHundredths(n.b, truc);
+      return n.kind === congKind ? a + b : Math.min(a, b);
+    }
+    function botHundredths(n, truc, R) {
+      if (R <= 0) return;
+      var congKind = truc === "y" ? "H" : "V",
+        d = R / 100;
+      if (n.kind === "empty") {
+        if (truc === "y") n.h = r2(n.h - d);
+        else n.w = r2(n.w - d);
+        return;
+      }
+      if (n.kind === "piece") {
+        if (truc === "y") n.h = n.p.h = r2(n.p.h - d);
+        else n.w = n.p.w = r2(n.p.w - d);
+        return;
+      }
+      if (n.kind !== congKind) {
+        botHundredths(n.a, truc, R);
+        botHundredths(n.b, truc, R);
+        return;
+      }
+      var ra = Math.min(sucHundredths(n.a, truc), R);
+      botHundredths(n.a, truc, ra);
+      botHundredths(n.b, truc, R - ra);
+    }
+    for (i = 0; i < 3 && (tree.w > W + 1e-9 || tree.h > H + 1e-9); i++) {
+      if (tree.h > H + 1e-9) {
+        var Ry = Math.ceil((tree.h - H) * 100 - 1e-6);
+        if (Ry > sucHundredths(tree, "y")) return null;
+        botHundredths(tree, "y", Ry);
+      }
+      if (tree.w > W + 1e-9) {
+        var Rx = Math.ceil((tree.w - W) * 100 - 1e-6);
+        if (Rx > sucHundredths(tree, "x")) return null;
+        botHundredths(tree, "x", Rx);
+      }
+      coCay(tree);
+    }
+    if (tree.w > W + EPS || tree.h > H + EPS) return null;
+    var out = { places: [], cuts: [] },
+      soCon = 0,
+      maxMm = 0,
+      muc2 = 0;
+    for (i = 0; i < layout.places.length; i++) {
+      var p = layout.places[i];
+      if (p.w <= EPS || p.h <= EPS) return null;
+      p.bopX = p.w / p.w0;
+      p.bopY = p.h / p.h0;
+      var mm = Math.max(p.w0 - p.w, p.h0 - p.h);
+      if (mm > 1e-6) soCon++;
+      if (mm > BOP_MOI_CON_MM + 1e-6) muc2++;
+      maxMm = Math.max(maxMm, mm);
+    }
+    layoutTuCay(tree, 0, 0, out);
+    out.bop = { soCon: soCon, maxMm: Math.round(maxMm * 100) / 100, muc2: muc2 };
     return out;
+  }
+  // Tìm cách bóp để bộ con vừa khối W × H: nới khối thêm dy (cao) / dx (rộng) từ ít tới nhiều,
+  // xếp nguyên khổ rồi co về. packFn(w, h) trả kết quả packInto (có layouts).
+  function bopKhoi(pieces, W, H, packFn) {
+    var toiDa = pieces.length * BOP_MOI_CON_MM + BOP_THEM_CUM_MM,
+      k,
+      li,
+      r,
+      co;
+    var thu = [];
+    for (k = 1; k <= toiDa; k++) thu.push([0, k], [k, 0]);
+    for (k = 1; k <= toiDa; k++) thu.push([k, k]);
+    for (k = 0; k < thu.length; k++) {
+      r = packFn(W + thu[k][0], H + thu[k][1]);
+      if (!r.ok) continue;
+      for (li = 0; li < r.layouts.length; li++) {
+        var lay = { places: r.layouts[li].places.map(function (q) { return { id: q.id, x: q.x, y: q.y, w: q.w, h: q.h, rot: q.rot }; }), cuts: r.layouts[li].cuts };
+        co = coBoCuc(lay, W, H, thu[k][0], thu[k][1]);
+        if (co) return co;
+      }
+    }
+    return null;
   }
 
   // ------------------------------------------------------------------
@@ -650,7 +899,8 @@
   }
 
   // Tham lam mở khối: con lớn trước; mỗi con vào khối sẵn có nếu tổng ô tăng ít nhất, không thì mở khối mới.
-  function greedyPlan(pieces, shapes, packMemo) {
+  function greedyPlan(pieces, shapes, packMemo, dienTichFn) {
+    dienTichFn = dienTichFn || areaOf;
     var sorted = pieces.slice(0).sort(function (a, b) {
       var d = b.w * b.h - a.w * a.h;
       return d !== 0 ? d : a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
@@ -662,9 +912,9 @@
       for (var si = 0; si < shapes.length; si++) {
         if (shapes[si].cells < minCells) continue;
         if (!allFit(list, shapes[si])) continue;
-        if (areaOf(list) > shapes[si].w * shapes[si].h + EPS) continue;
+        if (dienTichFn(list) > shapes[si].w * shapes[si].h + EPS) continue;
         var r = packMemo(list, shapes[si]);
-        if (r.ok) return { shape: shapes[si], places: r.places, cuts: r.cuts, pieces: r.pieces || list, bop: r.bop };
+        if (r.ok) return { shape: shapes[si], places: r.places, cuts: r.cuts, pieces: list, bop: r.bop };
       }
       return null;
     }
@@ -713,24 +963,28 @@
       finished = true;
       output = { ok: false, error: error };
     }
-    function packRaw(pieces, shape, collect, budget) {
-      var key = pieceKey(pieces) + "@" + shape.cols + "x" + shape.rows + "#" + (collect || 1) + "/" + (budget || 0);
+    function packRaw(pieces, w, h, collect, budget) {
+      var key = pieceKey(pieces) + "@" + r2(w) + "x" + r2(h) + "#" + (collect || 1) + "/" + (budget || 0);
       if (!memo[key]) {
-        memo[key] = packInto(pieces, shape.w, shape.h, { collect: collect || 1, budget: budget || DEFAULT_BUDGET });
+        memo[key] = packInto(pieces, w, h, { collect: collect || 1, budget: budget || DEFAULT_BUDGET });
         if (memo[key].exhausted && !budget) exhausted = true;
       }
       return memo[key];
     }
-    // Xếp vào khối; ở pha bóp (con mang bop < 1) mà chưa vừa thì thử mức 2: cả cụm co đều tới
-    // BOP_MUC2 (1,5 %). Kết quả mức 2 mang theo bộ con đã co (pieces) và hệ số (bop) để khối ghi đúng.
+    // Xếp nguyên khổ; ở pha bóp (job.bopMode) mà chưa vừa thì thử bóp (bopKhoi). Kết quả bóp mang
+    // bop = { soCon, maxMm, muc2 } và places có bopX/bopY.
+    var bopMode = false;
     function packMemo(pieces, shape, collect, budget) {
-      var r = packRaw(pieces, shape, collect, budget);
-      if (r.ok || !pieces.length || !(pieces[0].bop < 1) || pieces[0].bop <= BOP_MUC2 + 1e-12) return r;
-      var s2 = BOP_MUC2;
-      var p2 = bopPieces(pieces, s2);
-      var r2 = packRaw(p2, shape, collect, budget);
-      if (!r2.ok) return r;
-      return { ok: true, places: r2.places, cuts: r2.cuts, layouts: r2.layouts, exhausted: r2.exhausted, pieces: p2, bop: s2 };
+      var r = packRaw(pieces, shape.w, shape.h, collect, budget);
+      if (r.ok || !bopMode) return r;
+      var key = "bop:" + pieceKey(pieces) + "@" + shape.cols + "x" + shape.rows + "/" + (budget || 0);
+      if (!memo[key]) {
+        var co = bopKhoi(pieces, shape.w, shape.h, function (w, h) {
+          return packRaw(pieces, w, h, 4, budget);
+        });
+        memo[key] = co ? { ok: true, places: co.places, cuts: co.cuts, layouts: [{ places: co.places, cuts: co.cuts }], bop: co.bop } : { ok: false, places: [], cuts: [], layouts: [] };
+      }
+      return memo[key];
     }
     // Pha tham lam chỉ cần khối cơ bản nhanh: ngân sách nút nhỏ để không treo panel khi nhiều tag khác nhau.
     function packQuick(pieces, shape) {
@@ -739,9 +993,7 @@
     function initJob(job) {
       job.lowerBound = lowerBoundOf(job.pieces);
       job.best = null;
-      job.bop = 1; // hệ số bóp đang xét (1 = chưa bóp)
       job.bestKhongBop = null; // phương án tốt nhất khi chưa bóp (để so sau pha bóp)
-      job.piecesGoc = job.pieces;
       job.lowerBoundGoc = job.lowerBound;
       job.daThuBop = false;
       job.phase = "greedy";
@@ -772,7 +1024,7 @@
       for (si = 0; si < shapes.length; si++) {
         if (shapes[si].cells < job.lowerBound) continue;
         if (!allFit(job.pieces, shapes[si])) continue;
-        if (areaOf(job.pieces) > shapes[si].w * shapes[si].h + EPS) continue;
+        if (dienTich(job.pieces) > shapes[si].w * shapes[si].h + EPS) continue;
         list.push(shapes[si]);
       }
       return list;
@@ -807,7 +1059,7 @@
         lbs = [];
         var sumLb = 0;
         for (gi = 0; gi < groups.length; gi++) {
-          lbs.push(lowerBoundOf(groups[gi]));
+          lbs.push(canDuoi(groups[gi]));
           sumLb += lbs[gi];
         }
         if (sumLb > T) continue;
@@ -825,25 +1077,35 @@
       }
       greedyDone = true;
     }
-    // Pha bóp: xong tìm kiếm thường mà vẫn dư ô so với cận dưới của cụm đã bóp → thử lại toàn bộ
-    // với mọi con co đều (mỗi con bớt ≤ 1 mm). Trả về false khi không đáng thử.
+    // Diện tích/cận dưới khi được bóp: mỗi con có thể bớt 1 mm mỗi chiều (+ chút ít mức 2).
+    function areaBop(pieces) {
+      var area = 0;
+      for (var i = 0; i < pieces.length; i++) area += Math.max(0, pieces[i].w - 2) * Math.max(0, pieces[i].h - 2);
+      return area;
+    }
+    function lowerBoundBop(pieces) {
+      return Math.max(1, Math.ceil(areaBop(pieces) / (CELL_W * CELL_H) - 1e-9));
+    }
+    function dienTich(pieces) {
+      return bopMode ? areaBop(pieces) : areaOf(pieces);
+    }
+    function canDuoi(pieces) {
+      return bopMode ? lowerBoundBop(pieces) : lowerBoundOf(pieces);
+    }
+    // Pha bóp: xong tìm kiếm thường mà vẫn dư ô so với cận dưới khi bóp → tìm lại với quyền bóp.
     function batDauBop(job) {
       if (job.daThuBop || !job.best) return false;
       job.daThuBop = true;
-      var s = heSoBop(job.piecesGoc);
-      if (s >= 1) return false;
-      var bopped = bopPieces(job.piecesGoc, s),
-        lb = lowerBoundOf(bopped);
+      var lb = lowerBoundBop(job.pieces);
       if (lb >= planCells(job.best)) return false; // bóp cũng không thể ít ô hơn
       job.bestKhongBop = job.best;
       job.best = null;
-      job.bop = s;
-      job.pieces = bopped;
       job.lowerBound = lb;
       job.cands = null;
       job.candIdx = 0;
       job.done = 0;
       job.total = 1;
+      bopMode = true;
       return true;
     }
     // Chốt sau pha bóp: chỉ nhận phương án bóp khi thật sự ít ô hơn; không thì trả về như chưa bóp.
@@ -856,8 +1118,6 @@
         return;
       }
       job.best = job.bestKhongBop;
-      job.bop = 1;
-      job.pieces = job.piecesGoc;
       job.lowerBound = job.lowerBoundGoc;
       job.bestKhongBop = null;
     }
@@ -867,7 +1127,7 @@
         return;
       }
       if (job.phase === "greedyBop") {
-        var gb = greedyPlan(job.pieces, shapes, packQuick);
+        var gb = greedyPlan(job.pieces, shapes, packQuick, dienTich);
         if (gb) consider(job, gb);
         job.phase = "single";
         job.cands = singleCandidates(job);
@@ -897,7 +1157,7 @@
         var r = packMemo(job.pieces, shape, 24);
         if (r.ok) {
           for (var li = 0; li < r.layouts.length; li++)
-            consider(job, { blocks: [{ shape: shape, pieces: r.pieces || job.pieces, places: r.layouts[li].places, cuts: r.layouts[li].cuts, bop: r.bop }] });
+            consider(job, { blocks: [{ shape: shape, pieces: job.pieces, places: r.layouts[li].places, cuts: r.layouts[li].cuts, bop: r.bop }] });
         }
         return;
       }
@@ -924,7 +1184,7 @@
         for (var gi = 0; gi < cand.groups.length && okAll; gi++) {
           var rr = packMemo(cand.groups[gi], cand.shapes[gi], 1);
           if (!rr.ok) okAll = false;
-          else blocks.push({ shape: cand.shapes[gi], pieces: rr.pieces || cand.groups[gi], places: rr.places, cuts: rr.cuts, bop: rr.bop });
+          else blocks.push({ shape: cand.shapes[gi], pieces: cand.groups[gi], places: rr.places, cuts: rr.cuts, bop: rr.bop });
         }
         if (okAll) consider(job, { blocks: blocks });
         return;
@@ -959,7 +1219,7 @@
           for (pi = 0; pi < blk.places.length; pi++) {
             var p = blk.places[pi];
             counts[p.id] = (counts[p.id] || 0) + 1;
-            places.push({ id: p.id, copy: counts[p.id], x: p.x, y: p.y, w: p.w, h: p.h, rot: p.rot });
+            places.push({ id: p.id, copy: counts[p.id], x: p.x, y: p.y, w: p.w, h: p.h, rot: p.rot, bopX: p.bopX || 1, bopY: p.bopY || 1 });
           }
           blocks.push({
             cols: blk.shape.cols,
@@ -969,7 +1229,7 @@
             cells: blk.shape.cells,
             places: places,
             cuts: blk.cuts.slice(0),
-            bop: blk.bop || job.bop, // hệ số co của riêng khối này (mức 2 có thể nhỏ hơn job.bop)
+            bop: blk.bop || null, // { soCon, maxMm, muc2 } khi khối này có con bị bóp
           });
         }
         // Khối to trước cho dễ nhìn; số thứ tự khối (artboard TagBD k) và câu mô tả theo đúng thứ tự này.
@@ -988,27 +1248,28 @@
           names.join(" + ") +
           ", " +
           (proven ? cells + "/" + cells + " ô — không thể ít hơn." : cells + " ô, tối thiểu lý thuyết " + job.lowerBound + ".");
-        if (job.bop < 1) {
-          var bopNhat = job.bop,
-            muc2 = false;
-          for (bi = 0; bi < blocks.length; bi++)
-            if (blocks[bi].bop < job.bop - 1e-12) {
-              muc2 = true;
-              bopNhat = Math.min(bopNhat, blocks[bi].bop);
-            }
+        var daBop = 0,
+          bopMax = 0,
+          bopMuc2 = 0;
+        for (bi = 0; bi < blocks.length; bi++)
+          if (blocks[bi].bop) {
+            daBop += blocks[bi].bop.soCon;
+            bopMax = Math.max(bopMax, blocks[bi].bop.maxMm);
+            bopMuc2 += blocks[bi].bop.muc2;
+          }
+        if (daBop > 0)
           line +=
-            " Đã bóp cả cụm " +
-            (Math.round((1 - bopNhat) * 1000) / 10).toString().replace(".", ",") +
-            " % (mỗi con bớt tối đa " +
-            BOP_TOI_DA_MM +
+            " Đã bóp " +
+            daBop +
+            " con để vừa khối (nhiều nhất " +
+            String(bopMax).replace(".", ",") +
             " mm" +
-            (muc2 ? ", cụm bớt thêm tới " + (Math.round((1 - BOP_MUC2) * 1000) / 10).toString().replace(".", ",") + " % vì chỉ thiếu chút xíu" : "") +
-            ") để còn " +
+            (bopMuc2 ? ", " + bopMuc2 + " con ăn thêm chút xíu vì chỉ thiếu 1–2 mm" : ", mỗi con ≤ 1 mm") +
+            ") — còn " +
             cells +
             " ô thay vì " +
             job.cellsTruocBop +
             ".";
-        }
         lines.push(line);
         outJobs.push({
           bai: job.bai,
@@ -1019,7 +1280,7 @@
           lowerBound: job.lowerBound,
           proven: proven,
           pieces: job.pieces.length,
-          bop: job.bop, // 1 = không bóp; < 1 = mọi con trong bài đã co đều theo hệ số này
+          daBop: daBop, // số con bị bóp trong bài (0 = không bóp)
         });
       }
       var allProven = true;
@@ -1105,9 +1366,11 @@
     MAX_COLS: MAX_COLS,
     MAX_ROWS: MAX_ROWS,
     EPS: EPS,
-    BOP_TOI_DA_MM: BOP_TOI_DA_MM,
-    BOP_MUC2: BOP_MUC2,
-    heSoBop: heSoBop,
+    BOP_MOI_CON_MM: BOP_MOI_CON_MM,
+    BOP_THEM_CUM_MM: BOP_THEM_CUM_MM,
+    treeFromLayout: treeFromLayout,
+    coBoCuc: coBoCuc,
+    bopKhoi: bopKhoi,
     packInto: packInto,
     verify: verify,
     scoreLayout: scoreLayout,

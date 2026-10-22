@@ -446,56 +446,45 @@ const OPTS = { prefix: "1088", start: "1", pad: "2", canMang: "cm", ngay: "22", 
   console.log("dcDanTagBdVe (khổ đổi sau khi Thêm, canh tâm mặt sau): ok");
 }
 
-// ---------- Bóp cả cụm (job.bop < 1): mọi bản sao co đều quanh tâm rồi mới đặt ----------
+// ---------- Bóp theo từng con (place.bopX/bopY): bản sao co quanh tâm theo từng chiều rồi mới đặt ----------
 {
   const { mock, c } = load({ rect: [0, 100, 400, 0] });
   registerSources(mock, c);
   const p = plan();
-  const s = 1 - 1 / 112; // con lớn nhất 112 bớt đúng 1 mm
-  p.jobs[0].bop = s;
-  for (const blk of p.jobs[0].blocks) for (const pl of blk.places) {
-    pl.w = Math.round(pl.w * s * 100) / 100;
-    pl.h = Math.round(pl.h * s * 100) / 100;
-  }
+  // Khối 1: tag_1 bớt 1 mm chiều cao (72 → 71), tag_2 giữ nguyên; khối 2: con xoay bớt 0,5 mm bề rộng sau xoay.
+  const p1 = p.jobs[0].blocks[0].places[0];
+  p1.h = 71;
+  p1.bopY = 71 / 72;
+  const p3 = p.jobs[0].blocks[1].places[0];
+  p3.w = 39.5;
+  p3.bopX = 39.5 / 40;
   const res = c.dcDanTagBdVe(JSON.stringify(p));
   assert.match(res, /^OK: /, res);
   const layers = mock.doc.layers.filter((l) => /^Tag BD /.test(l.name));
   const front1 = mock.doc.artboards[1].artboardRect;
   const a1 = layers[0].pageItems.find((it) => it.identity === "f1");
-  near(a1.geometricBounds[2] - a1.geometricBounds[0], 112 * s * MM, "bản sao rộng đã bóp");
-  near(a1.geometricBounds[1] - a1.geometricBounds[3], 72 * s * MM, "bản sao cao đã bóp");
+  near(a1.geometricBounds[2] - a1.geometricBounds[0], 112 * MM, "bề rộng giữ nguyên");
+  near(a1.geometricBounds[1] - a1.geometricBounds[3], 71 * MM, "chiều cao đã bóp 1 mm");
   near(a1.geometricBounds[0], front1[0], "vẫn canh góc trên trái ô");
   near(a1.geometricBounds[1], front1[1], "vẫn canh góc trên trái ô");
-  // Mặt sau cũng bóp, con xoay 90 cũng bóp (khổ sau xoay 40 × 92 → ×s).
+  const b2 = layers[0].pageItems.find((it) => it.identity === "f2");
+  near(b2.geometricBounds[1] - b2.geometricBounds[3], 20 * MM, "con không bóp giữ nguyên");
+  // Mặt sau của tag_1 cũng bóp đúng như mặt trước.
   const b1 = layers[1].pageItems.find((it) => it.identity === "b1");
-  near(b1.geometricBounds[2] - b1.geometricBounds[0], 112 * s * MM, "mặt sau bóp");
+  near(b1.geometricBounds[1] - b1.geometricBounds[3], 71 * MM, "mặt sau bóp theo");
+  // Con xoay 90: bopX áp sau khi xoay (bề rộng sau xoay 40 → 39,5), chiều cao 92 giữ.
   const f3c = layers[2].pageItems.find((it) => it.identity === "f3");
-  near(f3c.geometricBounds[2] - f3c.geometricBounds[0], 40 * s * MM, "con xoay bóp");
+  near(f3c.geometricBounds[2] - f3c.geometricBounds[0], 39.5 * MM, "con xoay bóp bề rộng");
+  near(f3c.geometricBounds[1] - f3c.geometricBounds[3], 92 * MM, "con xoay giữ chiều cao");
   // Nguồn không bị bóp.
-  near(c.dcDanTagBdNguon.tag_1.front.geometricBounds[2] - c.dcDanTagBdNguon.tag_1.front.geometricBounds[0], 112 * MM, "nguồn nguyên");
-  // Khối có hệ số riêng (mức 2) thì dùng hệ số của khối, không phải của bài.
-  const p2 = plan();
-  p2.jobs[0].bop = s;
-  p2.jobs[0].blocks[1].bop = 0.95;
-  const nBefore2 = mock.doc.artboards.length;
-  assert.match(c.dcDanTagBdVe(JSON.stringify(p2)), /^OK: /);
-  const lay2 = mock.doc.layers.filter((l) => /^Tag BD /.test(l.name));
-  const f3b = lay2[lay2.length - 2].pageItems.find((it) => it.identity === "f3");
-  near(f3b.geometricBounds[2] - f3b.geometricBounds[0], 40 * 0.95 * MM, "khối 2 bóp 0,95");
-  const f1b = lay2[lay2.length - 4].pageItems.find((it) => it.identity === "f1");
-  near(f1b.geometricBounds[2] - f1b.geometricBounds[0], 112 * s * MM, "khối 1 bóp theo bài");
-  assert.equal(mock.doc.artboards.length, nBefore2 + 4);
-  // bop sai (ngoài 0,9…1) → ERR, không tạo gì.
+  near(c.dcDanTagBdNguon.tag_1.front.geometricBounds[1] - c.dcDanTagBdNguon.tag_1.front.geometricBounds[3], 72 * MM, "nguồn nguyên");
+  // Hệ số sai (ngoài 0,9…1) → ERR, không tạo gì.
   const bad = plan();
-  bad.jobs[0].bop = 0.5;
+  bad.jobs[0].blocks[0].places[0].bopY = 0.5;
   const nBefore = mock.doc.artboards.length;
   assert.match(c.dcDanTagBdVe(JSON.stringify(bad)), /^ERR: .*bóp/);
   assert.equal(mock.doc.artboards.length, nBefore);
-  const bad2 = plan();
-  bad2.jobs[0].blocks[0].bop = 0.8;
-  assert.match(c.dcDanTagBdVe(JSON.stringify(bad2)), /^ERR: .*bóp/);
-  assert.equal(mock.doc.artboards.length, nBefore);
-  console.log("dcDanTagBdVe (bóp cả cụm): ok");
+  console.log("dcDanTagBdVe (bóp từng con): ok");
 }
 
 // ---------- Đọc tag: object không có khung (guide, ẩn, rỗng) được bỏ qua và báo, không chặn cả lượt ----------

@@ -487,14 +487,8 @@ function dcDanTagBdVe(planText) {
     for (ji = 0; ji < plan.jobs.length; ji++) {
       job = plan.jobs[ji];
       if (!job || (job.bai !== 500 && job.bai !== 1000) || !isArray(job.blocks) || !job.blocks.length) fail("Phương án bài " + (ji + 1) + " không hợp lệ.");
-      // Hệ số bóp cả cụm (lõi tính, mỗi con bớt ≤ 1 mm): thiếu = 1; ngoài 0,9…1 là dữ liệu hỏng.
-      if (job.bop === undefined || job.bop === null) job.bop = 1;
-      if (!num(job.bop) || job.bop > 1 + EPS || job.bop < 0.9) fail("Hệ số bóp của bài " + job.bai + " không hợp lệ (" + job.bop + ").");
       for (bi = 0; bi < job.blocks.length; bi++) {
         blk = job.blocks[bi];
-        // Hệ số bóp riêng của khối (mức 2 "cụm bớt thêm 2 mm" có thể nhỏ hơn hệ số chung của bài).
-        if (blk && (blk.bop === undefined || blk.bop === null)) blk.bop = job.bop;
-        if (blk && (!num(blk.bop) || blk.bop > 1 + EPS || blk.bop < 0.9)) fail("Hệ số bóp của khối " + (bi + 1) + " bài " + job.bai + " không hợp lệ (" + blk.bop + ").");
         if (
           !blk ||
           !num(blk.cols) ||
@@ -517,6 +511,11 @@ function dcDanTagBdVe(planText) {
         for (pi = 0; pi < blk.places.length; pi++) {
           p = blk.places[pi];
           if (!p || !num(p.x) || !num(p.y) || !num(p.w) || !num(p.h) || (p.rot !== 0 && p.rot !== 90)) fail("Vị trí con " + (pi + 1) + " trong khối " + (bi + 1) + " không hợp lệ.");
+          // Hệ số bóp từng con theo từng chiều (lõi tính: mỗi con ≤ 1 mm, thiếu thêm chút thì cả cụm ăn tiếp).
+          if (p.bopX === undefined || p.bopX === null) p.bopX = 1;
+          if (p.bopY === undefined || p.bopY === null) p.bopY = 1;
+          if (!num(p.bopX) || !num(p.bopY) || p.bopX > 1 + EPS || p.bopY > 1 + EPS || p.bopX < 0.9 || p.bopY < 0.9)
+            fail("Hệ số bóp của con " + (pi + 1) + " trong khối " + (bi + 1) + " không hợp lệ (" + p.bopX + " × " + p.bopY + ").");
           if (p.x < -EPS || p.y < -EPS || p.x + p.w > blk.w + EPS || p.y + p.h > blk.h + EPS) fail("Con " + (pi + 1) + " trong khối " + (bi + 1) + " nằm ngoài khối.");
           var src = dcDanTagBdNguon[p.id];
           if (!src || !src.front) fail("Tag " + p.id + " không còn trong danh sách nguồn. Hãy xoá danh sách, chọn lại tag rồi Thêm.");
@@ -636,16 +635,17 @@ function dcDanTagBdVe(planText) {
       }
     }
     // Đặt bản sao: mặt trước canh góc trên trái ô; mặt sau canh TÂM ô lật (khổ lệch nhỏ trong dung sai vẫn cân).
-    function placeCopy(sourceItem, layer, angle, leftPt, topPt, wPt, hPt, centre, bop) {
+    function placeCopy(sourceItem, layer, angle, leftPt, topPt, wPt, hPt, centre, bopX, bopY) {
       doc.activeLayer = layer;
       var copy = sourceItem.duplicate(layer, ElementPlacement.PLACEATEND);
       try {
         copy.note = "DANCARD_TAGBD_COPY";
       } catch (copyNoteError) {}
       if (angle) copy.rotate(angle);
-      // Bóp cả cụm: co đều bản sao quanh tâm (không méo), nét co theo; nguồn không đụng.
-      if (bop && bop < 1 - 1e-9)
-        copy.transform(app.getScaleMatrix(bop * 100, bop * 100), true, true, true, true, bop * 100, Transformation.CENTER);
+      // Bóp: co bản sao quanh tâm theo từng chiều (sau khi xoay, theo trục tài liệu), nét giữ nguyên;
+      // nguồn không đụng.
+      if ((bopX && bopX < 1 - 1e-9) || (bopY && bopY < 1 - 1e-9))
+        copy.transform(app.getScaleMatrix((bopX || 1) * 100, (bopY || 1) * 100), true, true, true, true, 100, Transformation.CENTER);
       var kb = dcDanTagBdKhung(copy);
       if (!kb) fail("Không đo được bản sao tag sau khi xoay.");
       if (centre) copy.translate(leftPt + wPt / 2 - (kb[0] + kb[2]) / 2, topPt - hPt / 2 - (kb[1] + kb[3]) / 2);
@@ -671,7 +671,7 @@ function dcDanTagBdVe(planText) {
       var frontLayer = addLayer("Tag BD " + k + " - trước");
       for (pi = 0; pi < blk.places.length; pi++) {
         p = blk.places[pi];
-        placeCopy(dcDanTagBdNguon[p.id].front, frontLayer, p.rot, rect[0] + p.x * MM, rect[1] - p.y * MM, p.w * MM, p.h * MM, false, blk.bop);
+        placeCopy(dcDanTagBdNguon[p.id].front, frontLayer, p.rot, rect[0] + p.x * MM, rect[1] - p.y * MM, p.w * MM, p.h * MM, false, p.bopX, p.bopY);
         totalPieces++;
       }
       drawCutMarks(frontLayer, rect, W, blk.cuts, false);
@@ -686,7 +686,7 @@ function dcDanTagBdVe(planText) {
         var back = dcDanTagBdNguon[p.id].back;
         if (!back) continue; // tag 1 mặt: mặt sau để trống
         var xBack = W - p.x - p.w;
-        placeCopy(back, backLayer, -p.rot, backRect[0] + xBack * MM, backRect[1] - p.y * MM, p.w * MM, p.h * MM, true, blk.bop);
+        placeCopy(back, backLayer, -p.rot, backRect[0] + xBack * MM, backRect[1] - p.y * MM, p.w * MM, p.h * MM, true, p.bopX, p.bopY);
       }
       drawCutMarks(backLayer, backRect, W, blk.cuts, true);
       made.push(k + " (bài " + job.bai + ", " + blk.cols + " × " + blk.rows + " ô, " + blk.places.length + " con)");
