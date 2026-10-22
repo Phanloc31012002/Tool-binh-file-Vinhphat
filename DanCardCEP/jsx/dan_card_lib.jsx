@@ -63,12 +63,16 @@ function dcMoTaLoi(e) {
 
 // ============================================================
 //  ĐO KHỔ DÙNG CHUNG — theo khung Transform của Illustrator
-//  Panel đặt dcDoTheoKhungTransform trước mỗi lệnh (tiền tố evalJsx).
 //  Mọi lệnh đo khổ đi qua dcDoKhung(item, cáchĐoCũ): cờ bật thì lấy khung
-//  Transform, không đo được mới rơi về cách đo riêng của từng lệnh.
+//  Transform (clip → khung clip, group → khung group), không đo được mới rơi
+//  về cách đo riêng của từng lệnh; cờ tắt thì đo y như các bản trước.
+//  Panel đặt cờ trước mỗi lệnh (tick "Transform" ở header, tiền tố evalJsx).
+//  Giai đoạn kiểm chứng: mặc định TẮT; nút "Đo khung" (dcDoKhungChon) in số đo
+//  để đối chiếu với bảng Transform; đạt rồi mới bật mặc định.
 // ============================================================
 var DC_DUNG_SAI_KHO_MM = 0.5; // dung sai khổ chung (mm)
-if (typeof dcDoTheoKhungTransform === "undefined") var dcDoTheoKhungTransform = true;
+if (typeof dcDoTheoKhungTransform === "undefined")
+  var dcDoTheoKhungTransform = false;
 
 // Khung đúng như bảng Transform hiện: clip group → khung mask (kể cả compound path, cờ
 // clipping nằm trên path con của compound); group thường → hợp khung các con đang hiện (bằng
@@ -273,6 +277,75 @@ function dcVungBaiCu(doc, canvasRect, skipItems) {
 // Số đo pt → chữ mm, một chữ số lẻ, dấu phẩy kiểu Việt ("92,0").
 function dcMmText(pt) {
   return (pt / 2.834645669).toFixed(1).replace(".", ",");
+}
+
+// Số đo khung [l,t,r,b] → "92,00 × 56,00 mm" (2 số lẻ); null → "không đo được".
+function dcKhungText(b) {
+  if (!b) return "không đo được";
+  function mm(pt) {
+    return (pt / 2.834645669).toFixed(2).replace(".", ",");
+  }
+  return mm(b[2] - b[0]) + " × " + mm(b[1] - b[3]) + " mm";
+}
+
+// Nút "Đo khung" ở header: in khung Transform (cách đo mới) và visibleBounds (cách đo cũ) của
+// từng object đang chọn để đối chiếu với bảng Transform của Illustrator. Không đụng tài liệu.
+function dcDoKhungChon() {
+  try {
+    if (app.documents.length === 0) return "ERR: Chưa mở tài liệu.";
+    var sel = app.activeDocument.selection;
+    if (!sel || !sel.length) return "ERR: Hãy chọn object cần đo khung.";
+    var previewBounds = false;
+    try {
+      previewBounds =
+        app.preferences.getBooleanPreference("includeStrokeInBounds") === true;
+    } catch (prefError) {}
+    var MAX = 20,
+      lines = [];
+    for (var i = 0; i < sel.length && i < MAX; i++) {
+      var it = sel[i],
+        loai = "object";
+      try {
+        loai = it.typename;
+        if (loai === "GroupItem" && it.clipped === true) loai += " (clip)";
+      } catch (typeError) {}
+      var khung = dcKhungThanhPham(it),
+        cu = null;
+      try {
+        cu = it.visibleBounds;
+      } catch (boundsError) {}
+      var lech =
+        khung &&
+        cu &&
+        (Math.abs(khung[2] - khung[0] - (cu[2] - cu[0])) > 0.0284 ||
+          Math.abs(khung[1] - khung[3] - (cu[1] - cu[3])) > 0.0284);
+      lines.push(
+        i +
+          1 +
+          ". " +
+          loai +
+          "\n   Transform: " +
+          dcKhungText(khung) +
+          "\n   Cách cũ (visibleBounds): " +
+          dcKhungText(cu) +
+          (lech ? "   ← KHÁC" : ""),
+      );
+    }
+    if (sel.length > MAX)
+      lines.push("… và " + (sel.length - MAX) + " object nữa.");
+    return (
+      "OK: Đo khung " +
+      sel.length +
+      " object đang chọn (mm, 2 số lẻ). " +
+      (previewBounds
+        ? "Illustrator đang bật Use Preview Bounds (tính cả nét)."
+        : "Use Preview Bounds: tắt.") +
+      "\n\n" +
+      lines.join("\n")
+    );
+  } catch (e) {
+    return "ERR: " + (typeof dcMoTaLoi === "function" ? dcMoTaLoi(e) : e.toString());
+  }
 }
 
 // Thư mục chứa file jsx này (để tìm assets đi kèm extension); null nếu không rõ.
@@ -3104,27 +3177,30 @@ function dcThemDauCatTuDong(lengthText, edgeText, gapText) {
         : parseMm(gapText, "Cách bài", true)) * MM;
     var edgeEpsilon = 0.05;
 
+    // Khung bài = khung Transform (clip group → khung clip, group → khung group).
     function itemBounds(item) {
-      var isClipped = false;
-      try {
-        isClipped = item.typename === "GroupItem" && item.clipped === true;
-      } catch (e) {}
-      if (isClipped) {
+      return dcDoKhung(item, function (it) {
+        var isClipped = false;
         try {
-          var children = item.pageItems;
-          for (var ci = 0; ci < children.length; ci++) {
-            if (children[ci].clipping === true)
-              return children[ci].geometricBounds.slice(0);
-          }
+          isClipped = it.typename === "GroupItem" && it.clipped === true;
         } catch (e) {}
-      }
-      try {
-        return item.visibleBounds.slice(0);
-      } catch (e) {}
-      try {
-        return item.geometricBounds.slice(0);
-      } catch (e) {}
-      return null;
+        if (isClipped) {
+          try {
+            var children = it.pageItems;
+            for (var ci = 0; ci < children.length; ci++) {
+              if (children[ci].clipping === true)
+                return children[ci].geometricBounds.slice(0);
+            }
+          } catch (e) {}
+        }
+        try {
+          return it.visibleBounds.slice(0);
+        } catch (e) {}
+        try {
+          return it.geometricBounds.slice(0);
+        } catch (e) {}
+        return null;
+      });
     }
 
     function isCutMarkItem(item) {
@@ -19824,6 +19900,14 @@ function dcRunSignature8(wCm, hCm, coBia) {
         if (b[2] > a[2]) a[2] = b[2];
         if (b[3] < a[3]) a[3] = b[3];
       }
+      // Trang đo theo khung Transform (khung clip của trang), không đo nội dung bên trong.
+      if (dcDoTheoKhungTransform) {
+        var khungTransform = dcKhungThanhPham(item);
+        if (khungTransform) {
+          merge(khungTransform);
+          return;
+        }
+      }
       var tn;
       try {
         tn = item.typename;
@@ -23109,6 +23193,14 @@ function dcRunKeoGay(wCm, hCm) {
         if (b[2] > a[2]) a[2] = b[2];
         if (b[3] < a[3]) a[3] = b[3];
       }
+      // Trang đo theo khung Transform (khung clip của trang), không đo nội dung bên trong.
+      if (dcDoTheoKhungTransform) {
+        var khungTransform = dcKhungThanhPham(item);
+        if (khungTransform) {
+          merge(khungTransform);
+          return;
+        }
+      }
       var tn;
       try {
         tn = item.typename;
@@ -24192,18 +24284,21 @@ function dcHocMau() {
     } catch (e) {}
     return null;
   }
+  // Khung object = khung Transform; cách đo cũ chỉ còn là dự phòng khi không đo được.
   function bnd(item) {
-    var mb = clipMaskBounds(item);
-    if (mb) return mb;
-    try {
-      return item.visibleBounds;
-    } catch (e) {
+    return dcDoKhung(item, function (it) {
+      var mb = clipMaskBounds(it);
+      if (mb) return mb;
       try {
-        return item.geometricBounds;
-      } catch (e2) {
-        return null;
+        return it.visibleBounds;
+      } catch (e) {
+        try {
+          return it.geometricBounds;
+        } catch (e2) {
+          return null;
+        }
       }
-    }
+    });
   }
   function shapeKind(item) {
     var type = "";
@@ -25480,18 +25575,21 @@ function dcApMauCore(multiSourcePerArtboard) {
     } catch (e) {}
     return null;
   }
+  // Khung object = khung Transform; cách đo cũ chỉ còn là dự phòng khi không đo được.
   function bnd(item) {
-    var mb = clipMaskBounds(item);
-    if (mb) return mb;
-    try {
-      return item.visibleBounds;
-    } catch (e) {
+    return dcDoKhung(item, function (it) {
+      var mb = clipMaskBounds(it);
+      if (mb) return mb;
       try {
-        return item.geometricBounds;
-      } catch (e2) {
-        return null;
+        return it.visibleBounds;
+      } catch (e) {
+        try {
+          return it.geometricBounds;
+        } catch (e2) {
+          return null;
+        }
       }
-    }
+    });
   }
   function readAngle(item) {
     var m = null;
@@ -27759,7 +27857,7 @@ function _dcAutoSavePDFCore(
   for (var i = 0; i < sel.length; i++) {
     var g = null;
     try {
-      g = sel[i].geometricBounds;
+      g = dcKhungThanhPham(sel[i]) || sel[i].geometricBounds;
     } catch (boundsError) {}
     if (
       !g ||
@@ -27938,11 +28036,13 @@ function _dcAutoSavePDFCore(
     } catch (e) {}
     return null;
   }
-  // Ưu tiên khung clip; không có clip thì mới dùng visibleBounds.
+  // Khung con = khung Transform (clip → khung clip, group → khung group); dự phòng cách cũ.
   function frameOf(item) {
-    var c = clipRectOf(item);
-    if (c) return c;
-    return bndOf(item);
+    return dcDoKhung(item, function (it) {
+      var c = clipRectOf(it);
+      if (c) return c;
+      return bndOf(it);
+    });
   }
 
   function exportCard(card, filePath) {
@@ -28265,6 +28365,14 @@ function _dcClipToCardStyleCore(wText, hText, unit) {
       if (bounds[1] > current[1]) current[1] = bounds[1];
       if (bounds[2] > current[2]) current[2] = bounds[2];
       if (bounds[3] < current[3]) current[3] = bounds[3];
+    }
+    // Khung để clip = khung Transform của object (tâm clip đặt theo khung đó).
+    if (dcDoTheoKhungTransform) {
+      var khungTransform = dcKhungThanhPham(item);
+      if (khungTransform) {
+        merge(khungTransform);
+        return;
+      }
     }
     var type = "";
     try {
@@ -29056,7 +29164,11 @@ function _dcClipCard926CoreV2() {
   var errors = [];
   for (var n = 0; n < snapshot.length; n++) {
     try {
-      var reference = nearestClipBounds(snapshot[n]) || boundsOf(snapshot[n]);
+      // Hướng khổ lấy theo khung Transform của object (clip → khung clip).
+      var reference =
+        (dcDoTheoKhungTransform ? dcKhungThanhPham(snapshot[n]) : null) ||
+        nearestClipBounds(snapshot[n]) ||
+        boundsOf(snapshot[n]);
       if (!reference) throw new Error("không đo được object.");
       var portrait = reference[1] - reference[3] > reference[2] - reference[0];
       doc.selection = null;

@@ -2,6 +2,18 @@
 
 _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
+## v2.19.0 — Sửa theo soát mã, đo khổ theo bảng Transform
+
+- **Đo khổ theo khung Transform** (anh Lộc yêu cầu: chọn là phải đúng Transform, không đụng bound của nội dung): mọi lệnh đo khổ — Dàn Card, KTS, Tự trở, Dấu cắt, Catalogue, CTL Đóng ghim/Keo gáy, Học/Áp mẫu, Auto Save, Resize, Clip, Bài của Dàn bế — cùng đi qua một hàm đo chung lấy đúng khung Illustrator hiện trong bảng Transform: object đã clip lấy khung clip (kể cả mask compound), group lấy hợp khung các con (đúng cả khi Illustrator gộp nhầm phần ảnh bị mask che), đang bật "Use Preview Bounds" thì tính cả nét. **Giai đoạn kiểm chứng:** ở header cạnh nút Raster có tick **Transform** (mặc định TẮT — tắt thì mọi lệnh đo y như bản trước) và nút **Đo khung**: bấm là Illustrator liệt kê từng object đang chọn với số đo theo Transform và số đo theo cách cũ để đối chiếu với bảng Transform. Khớp thì tick Transform để mọi lệnh dàn dùng số đó; anh Lộc xác nhận xong, bản sau bỏ tick và làm mặc định. Riêng bước tự sửa khổ của Dàn Card chỉ chạy khi khung Transform sai khổ và luôn phán xét kết quả theo nội dung thật (khung clip vừa tạo không nói lên gì), nên object sai khổ không bao giờ được nhận là đúng.
+- Dàn Card không còn huỷ hay xoá dữ liệu của bạn: tự sửa khổ chạy trên bản sao (không ra đúng khổ thì nguồn vector còn nguyên); dọn mẻ cũ chỉ xoá object do tool tạo, object lạ trong vùng artboard được giữ lại và báo số lượng; object đang chọn và group cha của nó không bao giờ bị xoá.
+- Tờ mới của KTS, Tự trở và Dàn bế né cả bài cũ còn nằm trên canvas (khung đã xoá ở lượt trước), không đè lên kết quả cũ.
+- Ghép cặp trước/sau theo hàng dùng chung một hàm cho Tự trở, Dàn Card 2 mặt và Dàn bế 1 mặt: vai trái/phải chốt theo hình học, hàng lẻ con thì báo lỗi rõ thay vì ghép chéo hàng trong im lặng. Chặt hơn bản trước: hai mặt của một cặp phải cùng hàng (tâm lệch không quá 1/4 chiều cao con thấp hơn) — cặp đặt so le sẽ báo lỗi để canh lại. Tên layer "Background" không còn bị nhận là mặt sau ("back2", "Mặt sau" vẫn nhận).
+- Icon ghi chú CTL/Keo gáy lấy trong `DanCardCEP\assets\icon.ai` theo thư mục extension (không còn đường dẫn cứng theo một máy); thiếu icon thì ghi chú vẫn điền và báo thiếu, không làm hỏng lượt dàn.
+- Thông báo đúng trạng thái: CTL/Keo gáy lỗi đầu vào báo đỏ (trước là alert rồi tô xanh "(dừng)"); Dàn Card bấm Hủy báo "Đã hủy, chưa thay đổi gì" thay vì "đã dàn xong"; ô số nhận dấu phẩy; báo khi ô khe bị layout bỏ qua; KTS hai mặt dùng dung sai chung 0,5 mm và câu lỗi in số đo được; Clip header đếm riêng object đã có clip.
+- Thêm 8 bộ test tự động (52 bộ, tất cả qua); nâng mốc nạp nóng của mọi lệnh để engine Illustrator đang mở cũng nhận code mới. Cập nhật xong cần đóng hẳn Illustrator rồi mở lại; CTL/Keo gáy muốn có icon ghi chú thì chép `icon.ai` vào `DanCardCEP\assets\`.
+
+---
+
 ## v2.18.0 — Dàn bế trộn nhiều mẫu theo khu
 
 - Dàn nhiều mẫu KHÁC khuôn lên một tờ bằng bộ chia khu mới: tool tự nhận biết mẫu nào cùng khuôn, mẫu nào khác khuôn (kể cả file đặt xoay 90/180/270), rồi tự nghĩ ra nhiều cách chia tờ thành khu (dải ngang, dải dọc, hai tầng, đổi thứ tự), ước lượng, dàn thật các cách tốt nhất và chọn cách nhiều con nhất.
@@ -46,13 +58,13 @@ _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 - Đo trên **44 biên dạng × 2 khe (1 và 2 mm)** — tròn, elip, tim, giọt nước, khiên, sao, mũi tên, tam giác, hình thang, lục/bát giác, trăng khuyết, compound có lỗ, muỗng, lá, mũ cong, vòm 40 × 70, mèo, thỏ… — tờ **33 × 35,4 cm**, PON 5 mm cách mép 10 mm: tổng **4.692 con** so với **4.390** của bản cũ (**+6,9%**), nhiều hơn ở **68 ca**, bằng **20 ca**, **không ca nào ít hơn**. Trên máy thử, thời gian trung bình khoảng **3,4 giây/tờ** (bản cũ khoảng 5 giây; ca chậm nhất từ 56 giây xuống khoảng 10 giây).
 - Khuôn tròn thực tế của xưởng (khe 1 mm): 2,5 cm **174** con (khuôn xưởng 162), 3 cm **118** (114), 4 cm **67** (63), 5 cm **42** (42), 6 cm **28** (27), 7,5 cm **18** (18), 8 cm **16** (14).
 - Thêm bộ test **dan_be_rows.test.js** và thư viện biên dạng tổng quát **dan_be_shape_library.js**. Mốc canh giữa của khuôn mũ cong 1 mm: nay dàn nhiều hơn 94 con, khối dày hơn chạm vùng né PON nên cho lệch tâm có báo, vẫn kiểm tra PON thật sự chặn tâm. **41 bộ kiểm thử tự động đạt**, giữ nguyên các giới hạn thời gian cũ.
-- Nạp lõi Dàn bế **10**, giữ cầu nối **12**. Không đổi giao diện, CTL/KTS, raster hay JPG. **Chưa chạy trong Illustrator thật** ở lần cập nhật này: cần tắt hẳn Illustrator, mở lại rồi thử với file khuôn thật. Chỉ cài local, chưa phát hành GitHub.
+- Nạp lõi Dàn bế **10**, giữ cầu nối **12**. Không đổi giao diện, CTL/KTS, raster hay JPG. **Chưa chạy trong Illustrator thật** ở lần cập nhật này: cần tắt hẳn Illustrator, mở lại rồi thử với file khuôn thật.
 
 ---
 
-## v2.16.20 — PHÁT HÀNH SAU TEST
+## v2.16.20 — Bản phát hành sau kiểm thử
 
-- PHÁT HÀNH SAU TEST
+- Gom các bản 2.16.x đã kiểm thử tại máy thành bản phát hành GitHub; không đổi chức năng.
 
 ---
 
@@ -87,7 +99,7 @@ _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 - Áp dụng chung theo hình học, không nhận diện riêng tên hình hoặc gắn công thức cho khuôn mẫu. Giữ sửa khe tròn v2.16.16, khe 0, luân phiên mẫu và đăng ký hai mặt.
 - Kiểm chứng **37 bộ kiểm thử tự động**. Khuôn sáu điểm **42 × 72 mm**: khe 5 mm → **27 con**, khe 1,5 mm → **28 con**; **40 × 70 mm**: lần lượt **28/32 con**. Qua cả bốn hướng xoay, hai bài chung khuôn, giới hạn phục hồi và trường hợp thực sự không đủ chỗ; giữ nguyên nguồn và kích thước.
 - Chạy Illustrator trên tài liệu thử riêng với đường bế thực **42 × 72 mm**, giấy **33 × 35,4 cm**, khe **5 mm**, một/hai mặt: **27 con**. Đo độc lập **351 cặp mỗi mặt** từ điểm neo/tay nắm gốc, khe nhỏ nhất **5,000499 mm**, không chồng khuôn, không co bài, giữ đăng ký mặt sau. Tài liệu người dùng và trạng thái ứng dụng không thay đổi.
-- Nạp lõi Dàn bế **8**, giữ cầu nối **11**. Chỉ cài local, chưa phát hành GitHub; không đổi CTL/KTS, raster hoặc JPG.
+- Nạp lõi Dàn bế **8**, giữ cầu nối **11**. không đổi CTL/KTS, raster hoặc JPG.
 
 ---
 
@@ -98,7 +110,7 @@ _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 - Giữ kiểm tra hình học, lề và vùng né PON. Đĩa bao chỉ nhận nhanh các cặp chắc chắn xa nhau; cặp gần vẫn đo đường bế thật. Ca **13.440 khuôn tròn nhỏ** vẫn qua kiểm tra tốc độ hữu hạn.
 - Kiểm chứng **36 bộ kiểm thử tự động**: các khe tròn 0,7 / 1,1 / 1,5 / 1,9 mm, kích thước lẻ, nhiều bài chung khuôn, muỗng, lá, compound, khe 0, một/hai mặt và các chức năng khác.
 - Chạy trực tiếp Illustrator trên tài liệu thử riêng: tròn **50 × 50 mm**, giấy **33 × 35,4 cm**, khe **1,5 mm** → **42 con**, một/hai mặt. Đo độc lập điểm neo/tay nắm đường cong thực trên **861 cặp mỗi mặt**: khe nhỏ nhất **1,500490 mm**, không chồng khuôn; giữ nguyên kích thước, nguồn và đăng ký hai mặt. Tài liệu người dùng và trạng thái ứng dụng không thay đổi.
-- Nạp lõi Dàn bế **7**, cầu nối **11**. Chỉ cài local, chưa phát hành GitHub; không đổi CTL/KTS, raster 500 ppi hay JPG 300 ppi.
+- Nạp lõi Dàn bế **7**, cầu nối **11**. không đổi CTL/KTS, raster 500 ppi hay JPG 300 ppi.
 
 ---
 
@@ -115,7 +127,7 @@ _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 - Loại phương án khe 0 bị chồng thật ở phần ô lẻ; giữ phương án an toàn qua bước thêm con, sửa cạnh và canh tâm. Sửa kiểm tra biên trùng/lỗ compound và chồng lấn rất nhỏ, không phụ thuộc điểm bắt đầu hay chiều path. Các hình tròn nhỏ hàng chục nghìn con vẫn được kiểm tra hình học cuối.
 - Rà JSX vừa được định dạng lại: giữ phần định dạng, bỏ code ô PPI CTL cũ xuất hiện lại theo yêu cầu; JPG vẫn cố định 300 ppi. Sửa ba khóa `"in"` bị formatter bỏ ngoặc kép gây lỗi cú pháp ES3; thêm `prettier-ignore` đúng ba dòng để không tái diễn. Kiểm tra biên dịch toàn bộ thư viện và cầu nối bằng engine Illustrator, không thực thi thư viện hay sửa tài liệu người dùng.
 - Kiểm chứng khuôn muỗng gốc **46,0864 × 122 mm**, giấy **33 × 35,4 cm**, lề **4 mm**, tâm chấm PON cách mép **10 mm**, né mép chấm **7,5 mm**: **24 con với khe nhập 1 mm**, và **24 con với khe 0**, cả một/hai mặt. Canh giữa, không đổi kích thước/điểm neo/tay nắm đường cong; mặt sau giữ đăng ký lật ngang. Kiểm tra độc lập đường cong thực của Illustrator trên từng cặp khuôn: khe nhỏ nhất khoảng **1,40779 mm** và **0,00050008 mm**, không chồng khuôn. Các tài liệu người dùng và trạng thái ứng dụng không thay đổi.
-- **35 bộ kiểm thử tự động qua**, gồm nhiều tỷ lệ/hướng, biên dạng lẻ, tròn/lá/muỗng, khe dương, PON, một/hai mặt và nhiều mẫu. Nạp lõi Dàn bế **6**, cầu nối **10**. Chỉ cài local, chưa phát hành GitHub; không đổi CTL/KTS, raster 500 ppi hay JPG 300 ppi. Đây là phương án đã kiểm chứng, không cam kết tối ưu toán học tuyệt đối cho mọi biên dạng.
+- **35 bộ kiểm thử tự động qua**, gồm nhiều tỷ lệ/hướng, biên dạng lẻ, tròn/lá/muỗng, khe dương, PON, một/hai mặt và nhiều mẫu. Nạp lõi Dàn bế **6**, cầu nối **10**. không đổi CTL/KTS, raster 500 ppi hay JPG 300 ppi. Đây là phương án đã kiểm chứng, không cam kết tối ưu toán học tuyệt đối cho mọi biên dạng.
 
 ---
 
@@ -124,7 +136,7 @@ _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 - Sửa lỗi từ chối phương án an toàn ở một số kích thước do sai số đổi tọa độ Illustrator sang mm: cạnh 122 mm có thể thành 122,0000000125 mm. Khung bao đã bỏ sai số cực nhỏ nhưng scanline chưa bỏ, nên phát sinh thêm một ô va chạm 0,25 mm không có thật. Dùng cùng ngưỡng sai số số học cho cả hai; vẫn làm tròn ra ngoài khi cạnh vượt ô thực sự.
 - Áp dụng chung cho biên dạng và kích thước bất kỳ, không nhận diện riêng muỗng hay cố định công thức theo tên hình. Giữ kiểm tra khe/lề/PON bằng cả lưới và hình học liên tục, không thu nhỏ bài hoặc bỏ kiểm tra an toàn. Nạp lõi Dàn bế 5.
 - Sửa bộ đọc JSON trên ExtendScript để giữ đúng `true`/`false`; tránh lỗi engine trả về `NaN` khi dùng chuỗi toán tử điều kiện. Nạp cầu nối 9 và tự nạp lại nếu engine còn bản 8.
-- Kiểm chứng mẫu muỗng thực **46,0864 × 122 mm**, giấy **33 × 35,4 cm**, khe **1 mm**: **20 con** trong Illustrator, một/hai mặt, không đổi kích thước; lề trái/phải khoảng **19,3318 mm**, trên/dưới khoảng **15,9568 mm**. Tài liệu người dùng không thay đổi. Kiểm thử thêm nhiều tỷ lệ, bốn hướng xoay, hai kích thước chung tờ và sai số sát biên ô; các mẫu tròn, lá, khuôn cong và muỗng cũ vẫn qua kiểm tra. Chỉ cài local, chưa phát hành GitHub.
+- Kiểm chứng mẫu muỗng thực **46,0864 × 122 mm**, giấy **33 × 35,4 cm**, khe **1 mm**: **20 con** trong Illustrator, một/hai mặt, không đổi kích thước; lề trái/phải khoảng **19,3318 mm**, trên/dưới khoảng **15,9568 mm**. Tài liệu người dùng không thay đổi. Kiểm thử thêm nhiều tỷ lệ, bốn hướng xoay, hai kích thước chung tờ và sai số sát biên ô; các mẫu tròn, lá, khuôn cong và muỗng cũ vẫn qua kiểm tra.
 
 ---
 
@@ -132,7 +144,7 @@ _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
 - Sửa lệch tâm khoảng 0,12 mm do canh khung lưới 0,25 mm thay vì biên dạng thực. Sau khi tìm dàn, dịch **toàn bộ khối khuôn/bài** theo kích thước thật và khổ giấy đầy đủ; không làm tròn vị trí cuối về lưới. Không đổi số con, góc xoay, thứ tự mẫu hay khoảng cách giữa các khuôn.
 - Vị trí mới phải giữ lề và khoảng né PON bằng kiểm tra hình học liên tục. Nếu PON bất đối xứng chặn tâm tờ, chọn phép dịch an toàn gần tâm hơn trong phạm vi tìm kiếm; không bỏ/thu nhỏ mẫu để ép vào tâm. Mặt sau vẫn đối xứng lật ngang. Nạp lõi Dàn bế 4.
-- Kiểm chứng trên Illustrator với khuôn cong mẫu, một/hai mặt: giữ **94 con/khe 1 mm**; lề trái/phải khoảng **9,8745 mm**, trên/dưới khoảng **8,369 mm**, sai số tâm dưới **0,001 mm**. Khổ, khuôn, tâm bài và PON đúng; tài liệu người dùng đang mở không thay đổi. Các kiểm thử khe/PON, kích thước giấy lẻ và tâm bị PON chặn giữ nguyên số con. Chỉ cài local, chưa phát hành GitHub.
+- Kiểm chứng trên Illustrator với khuôn cong mẫu, một/hai mặt: giữ **94 con/khe 1 mm**; lề trái/phải khoảng **9,8745 mm**, trên/dưới khoảng **8,369 mm**, sai số tâm dưới **0,001 mm**. Khổ, khuôn, tâm bài và PON đúng; tài liệu người dùng đang mở không thay đổi. Các kiểm thử khe/PON, kích thước giấy lẻ và tâm bị PON chặn giữ nguyên số con.
 
 ---
 
@@ -142,7 +154,7 @@ _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 - Giữ kiểm tra cuối bằng cả scanline và khoảng cách hình học liên tục: không chồng khuôn, không thu bài, giữ lề và khoảng né mép PON. Các bài cùng khuôn vẫn phân luân phiên; hai mặt giữ đăng ký lật ngang, chữ/hình mặt sau không bị lật gương.
 - Khuôn cong 7 điểm **53 × 26,51 mm** đọc từ file mẫu: trên giấy **33 × 35,4 cm**, lề **4 mm**, chấm PON **5 mm** có tâm cách mép **10 mm**, né PON **7,5 mm** → **94 con/khe 1 mm**, **86 con/khe 2 mm**. Đây là kết quả kiểm chứng theo các khoảng an toàn trên, không cam kết tối ưu toán học tuyệt đối hoặc đồng nhất với bản dàn tay chưa đo khe/PON.
 - Giảm dựng lưới va chạm lặp lại cho các cụm đã chứng minh cách nhau an toàn; các trường hợp lõm/lỗ có thể khóa nhau vẫn kiểm tra lưới như cũ. Ca vuông **2 mm**, giấy 33 × 35,4 cm, khe 1 mm không PON: hơn 10.000 con trong khoảng **0,6 giây** trên máy thử, so với hơn 5 giây ở bản cũ. Nạp lõi Dàn bế 3.
-- Kiểm chứng: 31 bộ kiểm thử tự động; tròn 42 con, muỗng 10 con, lá 50 con giữ nguyên. Đã chạy Illustrator trên tài liệu thử riêng với khuôn cong thật ở chế độ một/hai mặt: 94 con, đúng kích thước/góc xoay/tâm bài/PON/đối xứng đường bế. Các tài liệu người dùng đang mở không thay đổi. Chỉ cài local, chưa phát hành GitHub.
+- Kiểm chứng: 31 bộ kiểm thử tự động; tròn 42 con, muỗng 10 con, lá 50 con giữ nguyên. Đã chạy Illustrator trên tài liệu thử riêng với khuôn cong thật ở chế độ một/hai mặt: 94 con, đúng kích thước/góc xoay/tâm bài/PON/đối xứng đường bế. Các tài liệu người dùng đang mở không thay đổi.
 - Theo yêu cầu bỏ qua ô PPI, không thêm ô này; JPG CTL vẫn **300 ppi**, raster xử lý bài vẫn **500 ppi**.
 
 ---
@@ -158,7 +170,7 @@ _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 - Theo yêu cầu mới, bỏ giới hạn con lớn bằng số object đã chọn trong chế độ ghép nhiều kích thước. Tự nhân mẫu lớn đến mức tối đa tìm được, rồi mới nhân mẫu nhỏ lấp phần còn lại; không lấy nhiều con nhỏ để đổi bớt con lớn. Có hơn hai nhóm kích thước thì ưu tiên lần lượt từ lớn xuống nhỏ, chia bản sao tương đối đều trong cùng nhóm. Mẫu nhỏ có thể chưa được dàn nếu con lớn đã lấp kín tờ.
 - Đổi ghi chú in đậm trên panel thành **“Tự nhân bản tối đa con lớn trước, rồi nhân bản con nhỏ lấp phần còn lại.”** Giữ nguyên kích thước thật, lề 3 mm, đường ra dao thẳng, gom cụm và ưu tiên ít công cắt trong các phương án cùng số con. Chỉ xóa nguồn đã dùng sau khi tạo đủ bản sao trước/sau; giữ nguyên nguồn không lọt.
 - Giấy **33 × 35,4 cm**: một mẫu hoặc 5/6 mẫu lớn **18,4 × 5,6 cm** + mẫu nhỏ **9,2 × 5,6 cm** → **8 lớn + 3 nhỏ**. Ca 6 mẫu lớn **15,2 × 7,2 cm** cũng → **8 lớn + 3 nhỏ**. Không bắt chuẩn bị đủ object lớn trước như v2.16.7.
-- Nạp engine KTS 22; giữ giới hạn tìm kiếm 128 con/tờ và cảnh báo khi chạm giới hạn. Đây là tìm kiếm có giới hạn với đường cắt đã kiểm chứng, không cam kết tối ưu toán học tuyệt đối. Không đổi Dàn bế, CTL, raster/JPG hay chế độ mỗi mẫu một tờ. Chỉ cài local, chưa phát hành GitHub.
+- Nạp engine KTS 22; giữ giới hạn tìm kiếm 128 con/tờ và cảnh báo khi chạm giới hạn. Đây là tìm kiếm có giới hạn với đường cắt đã kiểm chứng, không cam kết tối ưu toán học tuyệt đối. Không đổi Dàn bế, CTL, raster/JPG hay chế độ mỗi mẫu một tờ.
 - Kiểm chứng: 30 bộ kiểm thử tự động qua; có ca một mẫu lớn tự nhân lên 8 con, nhiều mẫu lớn chia bản sao, nguồn nhỏ dọc, ưu tiên ba nhóm kích thước, nguồn dư/quá khổ, 128 con, hai mặt và lỗi tạo bản sao không xóa nguồn. Phát lại độc lập từng đường dao để kiểm tra không cắt qua bài. Đã chuẩn bị 12 ca native; chưa chạy trực tiếp bản này vì Illustrator đang đóng/không có kết nối COM, không tự mở ứng dụng hay sửa tài liệu người dùng.
 
 ---
@@ -167,7 +179,7 @@ _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
 - Sửa kiểm tra TT4 A4 trên tờ **64,8 × 41,8 cm**: artwork vốn canh giữa, nhưng lưới kiểm tra/PON lại chừa cố định 9 mm trên. Khung **20,9 × 30 cm** xoay ra cao đúng **41,8 cm**, không cần cộng thêm 9 mm thành 427 mm rồi báo vượt giấy. Lưới danh định TT4 nay canh giữa cùng artwork; PON cắt bám đúng lưới mới.
 - Giữ nguyên kích thước nhập, không thu **20,9 × 30 cm** xuống nhỏ hơn. Trang nhỏ hơn tự có lề trên/dưới bằng nhau; **20 × 30 cm** vẫn chừa 9 mm mỗi đầu. Khổ thực sự quá lớn vẫn báo trước khi raster hoặc sửa nguồn. Không đổi bù độ dày gáy của ruột, A5, AB **85,8 × 62,5 cm**, vị trí ghi chú/icon hay lưu AI/JPG/ZIP.
-- Nạp lại engine Đóng ghim 40. Chỉ cài local, chưa phát hành GitHub.
+- Nạp lại engine Đóng ghim 40.
 - Kiểm chứng: 30 bộ kiểm thử tự động qua; 4 ca trên Illustrator qua (bìa 20,9 × 30 cm, bìa 20 × 29,7 cm, từ chối khung 21 × 30 cm thực sự vượt TT4 trước khi raster, AB 21,2 × 30 cm không đổi). Đo bốn trang bìa TT4 đúng 20,9 × 30 cm sau xoay; PON cắt/giấy, ghi chú và kế hoạch lưu đúng. Các tài liệu người dùng đang mở và trạng thái ứng dụng được giữ nguyên.
 
 ---
@@ -178,7 +190,7 @@ _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 - Không tự nhân thêm con lớn. Ưu tiên dàn nhiều nhất các object lớn đã chọn, mỗi object lớn tối đa một lần; thiếu chỗ thì giữ nguyên object chưa dàn để làm tiếp. Sau đó mới nhân mẫu nhỏ lấp phần dư. Chỉ xóa nguồn đã dùng sau khi tất cả bản sao trước/sau đã tạo xong; mẫu nhỏ dù nhân nhiều bản cũng chỉ xóa nguồn một lần. Nếu tạo bản sao lỗi, chưa xóa nguồn; nếu không xóa được nguồn thì báo rõ trên panel.
 - Bổ sung tìm kiếm chia vùng theo kích thước thật cho hai nhóm kích thước, phối hợp tìm kiếm chung và gom cụm cắt. Phương án phải có thứ tự tách bằng dao thẳng, không khóa đường cắt. Ưu tiên số con lớn, số con nhỏ, rồi công hạ dao/đường cắt. Giữ kích thước, xoay 0°/90°, lề 3 mm và đăng ký hai mặt; không thu nhỏ bài. Tìm kiếm có giới hạn, không cam kết tối ưu toán học tuyệt đối. Giới hạn ghép 128 con/tờ và báo nếu chạm giới hạn này, tránh nhân hàng nghìn mẫu nhỏ làm treo Illustrator.
 - Giấy **33 × 35,4 cm**: 5 object lớn **18,4 × 5,6 cm** + mẫu nhỏ **9,2 × 5,6 cm** → **5 lớn + 10 nhỏ**; chuẩn bị 6 lớn → **6 lớn + 7 nhỏ**. Chọn 9 lớn chỉ lọt 8 → **8 lớn + 3 nhỏ**, giữ lại 1 nguồn lớn. Ca 6 lớn **15,2 × 7,2 cm** → **6 lớn + 7 nhỏ**; chọn 9 → **8 lớn + 3 nhỏ**, giữ lại 1 nguồn lớn.
-- Nạp lại engine KTS 21. Chỉ cài local, chưa phát hành GitHub; không thay Dàn bế, CTL hay raster/JPG.
+- Nạp lại engine KTS 21. không thay Dàn bế, CTL hay raster/JPG.
 - Kiểm chứng: 30 bộ kiểm thử tự động qua; 10 ca trên Illustrator qua (1/2 mặt, nhiều nhóm, 5/6 con lớn, mẫu nhỏ nguồn dọc, chọn dư 9 con lớn). Đúng số con, kích thước và đăng ký hai mặt; chỉ xóa nguồn đã dàn sau khi tạo đủ hai mặt, giữ nguyên nguồn chưa dàn. Các tài liệu người dùng đang mở không đổi. Kiểm thử độc lập phát lại từng đường dao, có ca lỗi tạo bản sao giữ toàn bộ nguồn, nguồn quá khổ và cảnh báo 128 con.
 
 ---
@@ -188,7 +200,7 @@ _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 - Sửa việc dừng nhân mẫu nhỏ khi các mẫu lớn hết chỗ: chia số con tương đối đều trước, sau đó lấp phần trống bằng mẫu còn vừa, không giới hạn mẫu nhỏ chỉ được dư 1 con. Giữ kích thước thật, lề 3 mm và đăng ký trước/sau.
 - Phương án ghép phải có thứ tự cắt dao thẳng, không xếp khóa nhau. So sánh các phương án theo số con, diện tích sử dụng rồi công cắt: gom các hàng/cột cùng kích thước liền nhau, ưu tiên các cụm có thể chồng và dùng chung lần cắt. Không chỉ đếm đoạn cắt từng ô. Đây là tìm kiếm có giới hạn, không cam kết tối ưu toán học tuyệt đối cho mọi bộ mẫu.
 - Ca 6 mẫu **15,2 × 7,2 cm** và 1 mẫu **9,2 × 5,6 cm**, giấy **33 × 35,4 cm**: dàn **8 con lớn thành cụm 2 cột × 4 hàng phía trên**, **3 con nhỏ cùng một hàng dưới cùng**, tổng 11 con. Không để hàng nhỏ chen giữa cụm lớn. Thứ tự tách từng vùng có 13 đường; ước tính 9 lần hạ dao khi chồng các cụm đồng dạng, chưa tính xén lề 3 mm của giấy. Không vẽ thêm đường lên artwork.
-- Nạp lại engine KTS 20; không thay Dàn bế, CTL hay raster/JPG. Chỉ cài local, chưa phát hành GitHub.
+- Nạp lại engine KTS 20; không thay Dàn bế, CTL hay raster/JPG.
 - Kiểm chứng: 30 bộ kiểm thử tự động qua; chạy riêng trên Illustrator cả ca nhiều kích thước thông thường và ca 6 lớn + 1 nhỏ, mỗi ca 1/2 mặt. Ca người dùng đều ra 11 con, đúng cụm lớn trên/nhỏ dưới, không đổi kích thước, không chồng bài, đăng ký hai mặt đúng; các tài liệu đang mở của người dùng không đổi. Kiểm thử độc lập phát lại từng đường dao và loại bố cục khóa đường cắt.
 
 ---
@@ -198,7 +210,7 @@ _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 - Theo xác nhận mới **“Khớp chính xác hai cạnh theo panel”**, Keo gáy lấy rộng/cao nhập làm kích thước thật của object, thay chế độ giữ tỷ lệ trong khung tối đa. Không thêm khung trắng. Nguồn khác tỷ lệ sẽ được chỉnh hai trục cho khớp.
 - Bù chênh kích thước bitmap sau raster: nhập **21,2 × 30 cm** cho AB thì object ra đúng **21,2 × 30 cm**, không còn 29,9716 cm do tỷ lệ 3722 × 5262 pixel. Scale theo trục tài liệu để xử lý cả ảnh nguồn đã xoay.
 - Giữ AB **85,8 × 62,5 cm**, thứ tự trang/A–B, PON giấy/cắt và ghi chú. Tờ nhỏ giữ mức thu khung về cạnh **20,9 cm** trước khi khớp object vào khung đó; không thu các trang AB. Không đổi Đóng ghim giữa hay raster 500 ppi/JPG 300 ppi.
-- Nạp lại engine Keo gáy 13. Chỉ cài local, chưa phát hành GitHub.
+- Nạp lại engine Keo gáy 13.
 - Kiểm chứng: 30 bộ kiểm thử tự động qua, có ca bitmap 3722 × 5262 pixel và nguồn xoay. Ba bài mẫu riêng trên Illustrator qua: bitmap xoay AB + tự trở 4, nguồn vector/bốn tỷ lệ khác nhau AB + tự trở 4, A5 tự trở 4 khổ tối đa. Đo AB ra 21,2000 × 30,0000 cm; PON, A/B, tâm ô, ghi chú và khổ tờ nhỏ đúng. Không chạy sửa trên bài người dùng đang mở.
 
 ---
@@ -208,7 +220,7 @@ _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 - Đổi riêng **tờ AB A4/A5** của cả **Đóng ghim giữa và Keo gáy** sang rộng **85,8 cm**, cao **62,5 cm**, đúng số đã xác nhận. Giữ nguyên kích thước bài, thứ tự trang và đăng ký A/B; không đổi khổ bìa hay tờ tự trở.
 - PON giấy bám bốn góc của artboard mới, PON cắt bám lưới bài. Canvas và các nút lưu lấy khổ AB mới từ kết quả dàn. Keo gáy không nhận nhầm AB ngắn hơn là tờ nhỏ để thu bài về 20,9 cm.
 - Theo xác nhận bổ sung, **giữ nguyên cách đặt ghi chú và icon hiện tại**, không đổi vị trí tương đối/cỡ chữ/kích thước icon. Đóng ghim giữ lề nhíp A4/lưới A5 hiện tại; Keo gáy giữ lề trên 23,7 mm và kiểm tra trang A5 lớn vẫn vừa tờ mới. Không bóp/di chuyển ghi chú cùng khung giấy.
-- Nạp lại engine Đóng ghim 39 / Keo gáy 12. Chỉ cài local, chưa phát hành GitHub.
+- Nạp lại engine Đóng ghim 39 / Keo gáy 12.
 - Kiểm chứng: 30 bộ kiểm thử tự động qua. Illustrator chạy bốn bài mẫu riêng: ghim AB A4 21,2 × 30 cm/A5 15 × 21,15 cm; keo gáy A4 AB + tự trở 4/A5 AB + tự trở 8. Đo khổ AB, trang nằm trong giấy, PON ở góc mới, ghi chú và khổ tự trở không đổi. Các file người dùng đang mở được giữ nguyên.
 
 ---
@@ -223,7 +235,7 @@ _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
 - **Tờ 65 × 86**: khung A4 tối đa **21,2 × 30 cm**. Phóng/thu đồng đều hai trục cho bài nằm vừa khung, canh giữa phần dư; không kéo méo để ép tỷ lệ nguồn vào khung. Giữ thứ tự trang và đăng ký A/B.
 - **Tờ 65 × 43 / 43 × 32,5**: dùng khung riêng, thu đều cạnh tương ứng về tối đa **20,9 cm** nếu cần; không thu các trang nằm trên tờ lớn. A4 khung 21,2 × 30 xuống tờ nhỏ thành khoảng **20,9 × 29,575 cm**, không bóp riêng ngang. PON cắt và vị trí trang theo đúng khung của từng tờ; giữ kích thước giấy thực 64,8 × 41,8 / 42,8 × 31,3 cm.
-- Tự trở 4 trang canh theo tâm ô cố định, không theo bounds tổng của hai bài có tỷ lệ khác nhau. Dấu cắt ở sát biên giấy vẫn có chiều dài, không biến thành điểm. Kiểm tra giới hạn khung/khổ giấy trước khi raster; nạp engine phiên bản 11. Chỉ cài local, chưa phát hành GitHub.
+- Tự trở 4 trang canh theo tâm ô cố định, không theo bounds tổng của hai bài có tỷ lệ khác nhau. Dấu cắt ở sát biên giấy vẫn có chiều dài, không biến thành điểm. Kiểm tra giới hạn khung/khổ giấy trước khi raster; nạp engine phiên bản 11.
 - Kiểm chứng: 30 bộ kiểm thử tự động qua; native Illustrator chạy bài mẫu A4 20 trang gồm A/B + tự trở 4 với bốn tỷ lệ nguồn khác nhau, đo cùng scale X/Y, đúng tâm ô, A/B và PON, nguồn không chọn giữ nguyên. Chạy thêm A5 tự trở 4 ở khổ nhập 15 × 21,15 cm, thu đều cạnh dài xuống 20,9 cm và kiểm tra ghi chú/PON nằm trong tờ nhỏ.
 
 ---
@@ -235,7 +247,7 @@ _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 - Nén ZIP chạy nền sau khi xuất, không chặn Illustrator trong lúc nén. Tên tiếng Việt/ký tự hợp lệ được truyền như dữ liệu, không ghép vào lệnh shell; lệnh không dài theo số ruột. Không ghi đè AI/JPG/ZIP có sẵn. Xuất JPG/nén lỗi thì giữ AI đã lưu và các JPG hoàn tất, báo rõ lỗi; ZIP chỉ đổi sang tên cuối sau khi kiểm tra đủ hai file. Chỉ copy/group/dịch nguyên cụm trên bản sao, không thay đổi tài liệu nguồn.
 - **Keo gáy**: bỏ ép ngang/dọc riêng. Phóng/thu đồng đều hai trục, giữ tỷ lệ; kiểm tra toàn bộ trang trước khi tạo artboard/raster. Sai tỷ lệ với khổ nhập thì báo số trang và giữ nguồn; kiểm tra khung nguồn với dung sai 0,2 mm, không tự thêm viền trắng lớn. Sau raster vẫn dùng cùng tỷ lệ hai trục, tính đến làm tròn pixel, không báo sai giữa chừng khi phóng nguồn nhỏ. Không thu nhỏ thêm để vừa tờ, không đổi thứ tự trang, A/B hay khổ PON. Nạp engine phiên bản 10.
 - **Raster xử lý bài**: thống nhất **500 ppi** cho nút Raster, logic raster/clip và các bước raster khi dàn card, catalogue, CTL, keo gáy, theo mẫu; cập nhật thông báo/tooltip. Helper chung ép 500 ppi cả với caller cũ. Ảnh có sẵn ở luồng vốn bỏ qua raster vẫn được giữ, không nội suy lại để giả tăng chất lượng.
-- Kiểm chứng native Illustrator 28: lưu/mở lại AI bìa và ruột A/B, đủ vector/raster/PON/ghi chú, nguồn không đổi; đọc JPG xác nhận CMYK, Baseline, 300 ppi, chất lượng tối đa và ICC SWOP. Nén/mở ZIP, so hai nội dung byte-for-byte với file rời; thử tên Unicode/ký tự đặc biệt, trùng file, thiếu JPG và lỗi xử lý. Đo nút Raster/entry JSX/helper chung đều 500 ppi, Keo gáy giữ hai trục đồng đều và từ chối tỷ lệ sai trước raster. Chỉ cài local, chưa phát hành GitHub.
+- Kiểm chứng native Illustrator 28: lưu/mở lại AI bìa và ruột A/B, đủ vector/raster/PON/ghi chú, nguồn không đổi; đọc JPG xác nhận CMYK, Baseline, 300 ppi, chất lượng tối đa và ICC SWOP. Nén/mở ZIP, so hai nội dung byte-for-byte với file rời; thử tên Unicode/ký tự đặc biệt, trùng file, thiếu JPG và lỗi xử lý. Đo nút Raster/entry JSX/helper chung đều 500 ppi, Keo gáy giữ hai trục đồng đều và từ chối tỷ lệ sai trước raster.
 
 ---
 
@@ -252,7 +264,7 @@ _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 - **CTL bấm ghim/keo gáy**: đọc biên canvas thực từ phần đầu file AI đã lưu thay vì mặc định ±7200 pt, vẫn bắt đầu tại vị trí nguồn. Kiểm tra/tạo đủ khung trước khi raster hoặc thay PON; lỗi biên/tạo khung thì dọn riêng khung mới, giữ nguồn. Trả lại chế độ tọa độ của người dùng.
 - **Keo gáy A5 tự trở 8 trang** 14,5 × 20,7 cm dùng đúng artboard **64,8 × 41,8 cm**: bài 58 × 41,4 cm vừa tờ, không bị điều kiện cộng dư lề PON đẩy lên khổ lớn. Nét PON sát biên được giới hạn trong tờ, không bóp bài. Nếu bài thực sự không vừa thì vẫn dùng khổ lớn. Ghi chú/nút Lưu AI lấy đúng khổ kết quả.
 - **Lưu AI CTL**: trên tài liệu tạm, gom bài + PON + ghi chú của mỗi artboard thành một cụm và dịch vị trí **một lần cho cả cụm**, rồi trả nhóm về layer tương ứng. Không snap từng object nữa. Bỏ group nguồn rỗng do raster; chỉ mở khóa bản sao/layer tạm, không group, di chuyển hay mở khóa nguồn. Illustrator vẫn phải copy object qua tài liệu tạm; chưa đo tăng tốc trên bài sản xuất lớn. Giữ bìa/ruột thành file riêng, A/B chung file AI, không ghi đè file có sẵn.
-- Kiểm chứng: 27 file kiểm thử tự động; KTS chạy native một/hai mặt với 3 kích thước 90 × 50, 60 × 40, 75 × 65 mm ra 25 con (9–8–8), đo không chồng bài, đủ lề, đúng đối xứng và nguồn không đổi. CTL chạy trên bản sao file canvas lệch gốc, cả hai kiểu dàn thành công; hai ca vượt biên bị chặn trước raster và giữ nguồn. Lưu/mở lại 3 AI bìa/ruột tự trở/ruột A+B, kiểm tra bài/PON/ghi chú và nguồn không đổi. Chỉ cài local, chưa phát hành GitHub.
+- Kiểm chứng: 27 file kiểm thử tự động; KTS chạy native một/hai mặt với 3 kích thước 90 × 50, 60 × 40, 75 × 65 mm ra 25 con (9–8–8), đo không chồng bài, đủ lề, đúng đối xứng và nguồn không đổi. CTL chạy trên bản sao file canvas lệch gốc, cả hai kiểu dàn thành công; hai ca vượt biên bị chặn trước raster và giữ nguồn. Lưu/mở lại 3 AI bìa/ruột tự trở/ruột A+B, kiểm tra bài/PON/ghi chú và nguồn không đổi.
 
 ---
 

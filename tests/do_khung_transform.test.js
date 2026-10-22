@@ -34,7 +34,14 @@ function group(children, clipped) {
 const c = load(false);
 assert.equal(typeof c.dcKhungThanhPham, "function");
 assert.equal(c.DC_DUNG_SAI_KHO_MM, 0.5);
-assert.equal(c.dcDoTheoKhungTransform, true, "Mặc định đo theo Transform");
+// Giai đoạn kiểm chứng: mặc định TẮT (đo như bản trước); tick "Transform" ở header bật qua tiền tố.
+assert.equal(c.dcDoTheoKhungTransform, false, "Mặc định tắt cho tới khi anh Lộc kiểm chứng xong");
+{
+  const pre = vm.createContext({ dcDoTheoKhungTransform: true, app: { preferences: { getBooleanPreference: () => false } } });
+  vm.runInContext(lib, pre);
+  assert.equal(pre.dcDoTheoKhungTransform, true, "lib không ghi đè cờ panel đã đặt trước khi nạp");
+}
+c.dcDoTheoKhungTransform = true;
 
 // (a) Clip group: mask 92×56, nội dung 90×54 lệch vào trong → khung = mask (như Transform).
 const mask = shape("PathItem", rect(0, 0, 92, 56), { clipping: true });
@@ -84,6 +91,23 @@ const p = load(true);
 assert.deepEqual(plain(p.dcKhungThanhPham(group([mask, content], true))), grow(rect(0, 0, 92, 56), 1));
 assert.deepEqual(plain(p.dcKhungThanhPham(simple)), grow(rect(3, -3, 40, 20), 1));
 
+// Nút "Đo khung": in Transform và cách cũ của từng object đang chọn, đánh dấu chỗ khác nhau.
+{
+  const clipped = group([mask, spill], true);
+  clipped.visibleBounds = spill.geometricBounds.slice(); // Illustrator báo visibleBounds gồm cả ảnh tràn
+  const doc = { selection: [clipped, simple] };
+  const ctx = vm.createContext({ app: { documents: [doc], activeDocument: doc, preferences: { getBooleanPreference: () => false } } });
+  vm.runInContext(lib, ctx);
+  const out = ctx.dcDoKhungChon();
+  assert.match(out, /^OK: Đo khung 2 object/);
+  assert.match(out, /1\. GroupItem \(clip\)\n   Transform: 92,00 × 56,00 mm\n   Cách cũ \(visibleBounds\): 120,00 × 80,00 mm   ← KHÁC/);
+  assert.match(out, /2\. PathItem\n   Transform: 40,00 × 20,00 mm\n   Cách cũ \(visibleBounds\): 40,71 × 20,71 mm   ← KHÁC/);
+  assert.match(out, /Use Preview Bounds: tắt/);
+  assert.equal(ctx.dcDoKhungChon.call(null), out, "không đụng tài liệu, gọi lại cho cùng kết quả");
+  doc.selection = [];
+  assert.match(ctx.dcDoKhungChon(), /^ERR: Hãy chọn object/);
+}
+
 // (f) dcDoKhung: cờ tắt → cách đo cũ; cờ bật → khung Transform, rơi về cách cũ khi không đo được.
 const legacy = (item) => ["legacy", item];
 c.dcDoTheoKhungTransform = false;
@@ -99,6 +123,21 @@ assert.match(main, /function evalJsx\(/);
 assert.match(main, /function jsxPrelude\(/);
 assert.match(main, /dcDoTheoKhungTransform = /);
 assert.match(main, /dcExtensionRoot = /);
-assert.match(html, /id="doTheoTransform"/);
-assert.match(html, /Đo khổ theo bảng Transform/);
+// Tick "Transform" + nút "Đo khung" nằm ở header cạnh Raster; tick mặc định tắt (không checked).
+assert.match(html, /id="hdrTransform"/);
+assert.ok(!/id="hdrTransform"[^>]*checked/.test(html), "mặc định tắt");
+assert.match(html, /id="btnDoKhung"/);
+assert.ok(html.indexOf('id="btnDoKhung"') > html.indexOf('id="btnRaster"') && html.indexOf('id="btnDoKhung"') < html.indexOf("tabbar"), "nằm trong header");
+assert.match(main, /dcDoKhungChon\(\)/);
+// Mọi lệnh đo khổ đều đi qua hàm đo chung (bất cứ mục tiêu nào cũng là Transform khi tick bật).
+for (const fn of ["function _dcDanCore(", "function dcDanToiUu(", "function dcDanTuTro(", "function dcDanTuTroNhieuKho(",
+  "function dcThemDauCatTuDong(", "function dcRunCatalogueAuto(", "function dcRunSignature8(", "function dcRunKeoGay(",
+  "function dcHocMau(", "function dcApMauCore(", "function _dcAutoSavePDFCore(", "function _dcClipToCardStyleCore(",
+  "function _dcClipCard926CoreV2(", "function dcResizeSelectionToSize("]) {
+  const start = lib.indexOf(fn);
+  assert.ok(start >= 0, fn);
+  const next = lib.slice(start + fn.length).search(/\n(function |var dc\w+Version)/);
+  const body = lib.slice(start, next < 0 ? lib.length : start + fn.length + next);
+  assert.ok(/dcDoKhung\(|dcKhungThanhPham\(/.test(body), fn + " phải đo qua hàm Transform chung");
+}
 console.log("do_khung_transform: ok");

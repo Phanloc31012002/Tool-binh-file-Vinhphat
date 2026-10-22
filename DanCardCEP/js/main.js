@@ -1971,28 +1971,29 @@
     // ExtendScript hiểu \U \A... là escape rồi nuốt mất dấu \).
     return "'" + String(s).replace(/\\/g, "\\\\").replace(/'/g, "\\'") + "'";
   }
-  // Tuỳ chọn chung "Đo khổ theo bảng Transform": nhớ trong localStorage, mặc định bật.
-  var DO_THEO_TRANSFORM_KEY = "dc.doTheoTransform";
-  var doTheoTransformBox = document.getElementById("doTheoTransform");
+  // Tick "Transform" ở header (giai đoạn kiểm chứng, mặc định tắt): bật thì mọi lệnh đo khổ
+  // theo khung Transform của Illustrator; tắt thì đo như các bản trước. Nhớ trong localStorage.
+  var HDR_TRANSFORM_KEY = "dc.hdrTransform";
+  var hdrTransformBox = document.getElementById("hdrTransform");
   function doTheoTransform() {
-    return doTheoTransformBox ? doTheoTransformBox.checked : true;
+    return hdrTransformBox ? hdrTransformBox.checked : false;
   }
-  if (doTheoTransformBox) {
+  if (hdrTransformBox) {
     try {
-      var savedDoTheo = window.localStorage.getItem(DO_THEO_TRANSFORM_KEY);
-      if (savedDoTheo === "0") doTheoTransformBox.checked = false;
+      hdrTransformBox.checked =
+        window.localStorage.getItem(HDR_TRANSFORM_KEY) === "1";
     } catch (storageReadError) {}
-    doTheoTransformBox.addEventListener("change", function () {
+    hdrTransformBox.addEventListener("change", function () {
       try {
         window.localStorage.setItem(
-          DO_THEO_TRANSFORM_KEY,
-          doTheoTransformBox.checked ? "1" : "0",
+          HDR_TRANSFORM_KEY,
+          hdrTransformBox.checked ? "1" : "0",
         );
       } catch (storageWriteError) {}
     });
   }
-  // Tiền tố ExtendScript cho MỌI lệnh: cờ đo khổ + thư mục extension (để jsx
-  // tìm assets như icon ghi chú). Chạy trước phần nạp jsx của từng lệnh.
+  // Tiền tố ExtendScript cho MỌI lệnh: cờ đo khổ + thư mục extension (để jsx tìm assets
+  // như icon ghi chú). Chạy trước phần nạp jsx của từng lệnh.
   function jsxPrelude() {
     var root = "";
     try {
@@ -4171,6 +4172,31 @@
       },
     );
   });
+
+  // ---- Đo khung (kiểm chứng cách đo Transform, cạnh nút Raster) ----
+  var btnDoKhung = document.getElementById("btnDoKhung");
+  if (btnDoKhung)
+    btnDoKhung.addEventListener("click", function () {
+      btnDoKhung.disabled = true;
+      evalJsx(loadDanToiUuJsx() + "dcDoKhungChon()", function (res) {
+        btnDoKhung.disabled = false;
+        if (
+          res === "EvalScript error." ||
+          res === undefined ||
+          res === "" ||
+          res.indexOf("ERR:") === 0
+        ) {
+          window.alert(
+            "Đo khung không chạy:\n\n" +
+              (res || "Không nhận được phản hồi từ Illustrator."),
+          );
+          return;
+        }
+        window.alert(
+          res.indexOf("OK:") === 0 ? res.substring(3).replace(/^\s+/, "") : res,
+        );
+      });
+    });
 
   // ---- Resize theo KT (nut Resize canh Raster) ----
   var btnResize = document.getElementById("btnResize");

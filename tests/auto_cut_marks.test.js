@@ -11,10 +11,17 @@ const main = fs.readFileSync(
   require.resolve("../DanCardCEP/js/main.js"),
   "utf8",
 );
-const block = lib.slice(
-  lib.indexOf("var dcAutoCutMarksVersion"),
-  lib.indexOf("var dcDanToiUuVersion = 2;"),
+// Bộ đo khổ dùng chung (khung Transform) mà mọi lệnh đi qua.
+const doKhung = lib.slice(
+  lib.indexOf("//  ĐO KHỔ DÙNG CHUNG"),
+  lib.indexOf("// dcDan: wrapper bắt mọi lỗi"),
 );
+const block =
+  doKhung +
+  lib.slice(
+    lib.indexOf("var dcAutoCutMarksVersion"),
+    lib.indexOf("var dcDanToiUuVersion = 2;"),
+  );
 function fixture() {
   const f = illustrator({ rect: [0, 400, 600, 0] });
   let adds = 0,

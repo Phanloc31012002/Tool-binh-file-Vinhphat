@@ -7,10 +7,17 @@ const lib = fs.readFileSync(
   require.resolve("../DanCardCEP/jsx/dan_card_lib.jsx"),
   "utf8",
 );
-const keo = lib.slice(
-  lib.indexOf("var dcKeoGayAutoPonVersion"),
-  lib.indexOf("//  DÀN THEO MẪU", lib.indexOf("var dcKeoGayAutoPonVersion")),
+// Bộ đo khổ dùng chung (khung Transform) mà mọi lệnh đi qua.
+const doKhung = lib.slice(
+  lib.indexOf("//  ĐO KHỔ DÙNG CHUNG"),
+  lib.indexOf("// dcDan: wrapper bắt mọi lỗi"),
 );
+const keo =
+  doKhung +
+  lib.slice(
+    lib.indexOf("var dcKeoGayAutoPonVersion"),
+    lib.indexOf("//  DÀN THEO MẪU", lib.indexOf("var dcKeoGayAutoPonVersion")),
+  );
 const cleanup = lib.slice(
   lib.indexOf("function dcRemoveOldCanvasArtboards("),
   lib.indexOf("function dcCopyToiUuNoteToOddArtboards("),

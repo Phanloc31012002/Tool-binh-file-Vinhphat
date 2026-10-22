@@ -64,9 +64,15 @@ Panel gồm 9 tab:
 | **Variable**     | Mở công cụ Variable Importer — nhập dữ liệu CSV/TXT (giữ dấu tiếng Việt) để tạo nhiều bản từ 1 template.                                                                                                                                                                                                                                                                                                                                   |
 | **Auto Save**    | Rà các hàng từ trên xuống: hàng có 2 object là trước/sau và xuất PDF 2 trang; hàng có 1 object là card một mặt, tên file thêm ` - 1 mat` trước `cm/km`. Tool kiểm tra trùng tên file trước khi xuất. Kèm nút **Clip 9.2 × 5.6 (tự xoay)** để cắt khung nhanh.                                                                                                                                                                              |
 
-Nút **Raster** trên header: raster nhanh object đang chọn (CMYK, 450 ppi, nền
-trong suốt). Cạnh đó là nút **Clip**: cắt object đang chọn theo khung KT nhập
-vào (cm/mm/in), canh giữa.
+Nút **Raster** trên header: raster nhanh object đang chọn (CMYK, 500 ppi, nền
+trong suốt). Cạnh đó là nút **Resize** (đổi kích thước object đang chọn theo số
+nhập) và nút **Clip**: cắt object đang chọn theo khung KT nhập vào (cm/mm/in),
+canh giữa.
+
+Ở header cạnh Raster có tick **Transform** và nút **Đo khung** (giai đoạn kiểm
+chứng, tick mặc định tắt): bấm Đo khung để xem số đo theo khung Transform và theo
+cách cũ của từng object đang chọn; tick Transform để mọi lệnh đo khổ lấy đúng khung
+Illustrator hiện trong bảng Transform (clip → khung clip, group → khung group).
 
 ### Dàn Catalogue A4/A5
 
@@ -87,12 +93,16 @@ DanCard_Setup_23/
 │   ├── css/style.css              # Style
 │   ├── js/main.js                  # Logic giao diện (gọi ExtendScript qua CSInterface)
 │   ├── js/dan_be_nester.js           # Lõi tối ưu Dàn bế theo biên khuôn (CEP)
+│   ├── js/dan_be_zones.js            # Bộ chia khu: dàn trộn nhiều mẫu khác khuôn
+│   ├── js/ctl_package.js             # Đóng gói AI + JPG + ZIP cho CTL Offset
 │   ├── jsx/dan_be_bridge.jsx         # Đọc khuôn, tạo PON và vẽ kết quả Dàn bế
 │   ├── jsx/dan_card_lib.jsx          # Thư viện các chức năng dàn bình còn lại
 │   ├── assets/, fonts/                # Ảnh & font dùng trong panel
 │   └── LICH_SU_CAP_NHAT.md             # Changelog chi tiết từng bản
 ├── docs/KE_HOACH_DAN_BE_DECAL.md  # Kế hoạch & thiết kế lõi Dàn bế decal (xếp hàng lồng)
 ├── docs/THIET_KE_DAN_BE_CHIA_KHU.md  # Thiết kế bộ chia khu: dàn trộn nhiều mẫu (v2.18.0)
+├── docs/THIET_KE_DAN_BE_TOI_UU.md    # Thiết kế dàn bế duyệt hết phương án (kế tiếp)
+├── docs/SOAT_MA_2026-10-22.md        # Soát mã toàn bộ thư mục + trạng thái sửa (v2.19.0)
 ├── online/                     # Gói bản phát hành + latest.json
 └── updater/                    # Script cập nhật tự động (dùng khi cài qua bộ cài đóng gói)
 ```

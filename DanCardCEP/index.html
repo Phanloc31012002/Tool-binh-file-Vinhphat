@@ -38,6 +38,19 @@
           >
             Clip
           </button>
+          <label
+            class="header-check"
+            title="Bật: mọi lệnh đo khổ theo khung Transform của Illustrator (clip → khung clip, group → khung group). Tắt: đo như các bản trước."
+            ><input type="checkbox" id="hdrTransform" /><span>Transform</span></label
+          >
+          <button
+            id="btnDoKhung"
+            class="header-raster header-measure"
+            type="button"
+            title="Đo khung từng object đang chọn theo Transform và theo cách cũ, để đối chiếu với bảng Transform của Illustrator"
+          >
+            Đo khung
+          </button>
         </div>
 
         <!-- Bảng nhập KT clip (ẩn, hiện khi bấm Clip) -->
@@ -180,13 +193,6 @@
         <button class="tab" data-tab="rename">Đổi tên</button>
         <button class="tab" data-tab="variable">Variable</button>
         <button class="tab" data-tab="autosave">Auto Save</button>
-      </div>
-      <!-- Tuỳ chọn chung cho mọi lệnh đo khổ -->
-      <div class="globalopt">
-        <label class="check" title="Đo khổ đúng như bảng Transform của Illustrator: object đã clip lấy khung clip, không lấy phần ảnh bên trong.">
-          <input type="checkbox" id="doTheoTransform" checked />
-          <span>Đo khổ theo bảng Transform (khung clip, như Illustrator hiện)</span>
-        </label>
       </div>
 
       <!-- TAB: DÀN FILE (Card) -->
@@ -820,7 +826,7 @@
       </main>
 
       <footer class="foot">
-          <span class="ver">v2.18.0</span>
+          <span class="ver">v2.19.0</span>
       </footer>
     </div>
 
