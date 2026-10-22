@@ -4687,7 +4687,7 @@
         "if (typeof dcKhungThanhPham !== 'function' || typeof dcPickFolder !== 'function') { $.evalFile(" +
         jsStr(libPath) +
         "); } " +
-        "if (typeof dcDanTagBdVe !== 'function' || typeof dcDanTagBdXuatPdf !== 'function' || typeof dcDanTagBdVersion === 'undefined' || dcDanTagBdVersion < 1) { $.evalFile(" +
+        "if (typeof dcDanTagBdVe !== 'function' || typeof dcDanTagBdXuatPdf !== 'function' || typeof dcDanTagBdVersion === 'undefined' || dcDanTagBdVersion < 2) { $.evalFile(" +
         jsStr(bridgePath) +
         "); } "
       );
@@ -4833,10 +4833,12 @@
           tagBdDanhSach.push({ id: t.id, name: t.name, w: t.w, h: t.h, twoSided: !!t.twoSided, qty: qty });
         }
         tagBdVeDanhSach();
+        // Object không phải tag (guide, ẩn, rỗng) lọt vào vùng chọn: đã bỏ qua, báo để người dùng biết.
+        var boQua = data.boQua && data.boQua.length ? " Bỏ qua " + data.boQua.length + " object không phải tag: " + data.boQua.join("; ") + "." : "";
         show(
           outTagBd,
-          "Đã thêm " + data.tags.length + " tag, số lượng " + qty + " (bài " + tagBdBai(qty) + ", " + tagBdSoCon(qty) + " con/tag). Chọn tiếp hoặc bấm Dàn tag.",
-          "ok",
+          "Đã thêm " + data.tags.length + " tag, số lượng " + qty + " (bài " + tagBdBai(qty) + ", " + tagBdSoCon(qty) + " con/tag)." + boQua + " Chọn tiếp hoặc bấm Dàn tag.",
+          boQua ? "warn" : "ok",
         );
       });
     });

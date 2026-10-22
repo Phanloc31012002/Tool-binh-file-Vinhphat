@@ -6,7 +6,7 @@
 // 2 trang. Phần ghép khối chạy ở Chromium của CEP (dan_tag_bd.js).
 // Luật chốt với anh Lộc 22/10/2026: docs/THIET_KE_DAN_TAG_BD.md
 // ============================================================
-var dcDanTagBdVersion = 1;
+var dcDanTagBdVersion = 2;
 if (typeof dcDanTagBdNguon === "undefined") var dcDanTagBdNguon = {};
 if (typeof dcDanTagBdNguonDem === "undefined") var dcDanTagBdNguonDem = 1;
 
@@ -173,18 +173,52 @@ function dcDanTagBdKhung(item) {
 
 // Gom selection thành hàng: 2 object = trước (trái) + sau (phải); 1 object ở cột trái = tag 1 mặt.
 // Luật y như Auto Save (dung sai 45 % chiều cao con thấp nhất).
+// Vì sao một object trong vùng chọn không phải tag: guide, đang ẩn, không có khung (group rỗng, path
+// không điểm, khung 0 × 0). Trả "" khi object đo được bình thường.
+function dcDanTagBdLyDoBo(item, g) {
+  try {
+    if (item.guides === true) return "guide";
+  } catch (guideError) {}
+  try {
+    if (item.hidden === true) return "ẩn";
+  } catch (hiddenError) {}
+  if (!g || g.length !== 4 || !isFinite(g[0]) || !isFinite(g[1]) || !isFinite(g[2]) || !isFinite(g[3])) return "không đo được khung";
+  if (g[2] - g[0] <= 0.01 || g[1] - g[3] <= 0.01) return "khung rỗng (0 mm)";
+  return "";
+}
+function dcDanTagBdTenObject(item, index) {
+  var ten = "Object " + (index + 1),
+    kieu = "";
+  try {
+    kieu = String(item.typename || "");
+  } catch (typeError) {}
+  try {
+    if (item.name) ten += ' "' + String(item.name) + '"';
+  } catch (nameError) {}
+  return ten + (kieu ? " (" + kieu + ")" : "");
+}
+// Kết quả: { rows: [...], boQua: ["Object 3 (PathItem): guide", ...] }.
 function dcDanTagBdGomHang(sel) {
   var items = [],
+    boQua = [],
     minH = Number.MAX_VALUE,
     i;
   for (i = 0; i < sel.length; i++) {
     var g = dcDanTagBdKhung(sel[i]);
-    if (!g || g.length !== 4 || !isFinite(g[0]) || !isFinite(g[1]) || !isFinite(g[2]) || !isFinite(g[3]) || g[2] <= g[0] || g[1] <= g[3])
-      throw new Error("Object " + (i + 1) + " không có khung hợp lệ. Hãy bỏ object lỗi/đang ẩn rồi thử lại.");
+    var lyDo = dcDanTagBdLyDoBo(sel[i], g);
+    if (lyDo) {
+      // Không chặn cả lượt vì một guide/object rỗng lọt vào vùng chọn; báo rõ rồi bỏ qua.
+      boQua.push(dcDanTagBdTenObject(sel[i], i) + ": " + lyDo);
+      continue;
+    }
     var h = g[1] - g[3];
     if (h > 0 && h < minH) minH = h;
     items.push({ o: sel[i], khung: g, left: g[0], cy: (g[1] + g[3]) / 2, cx: (g[0] + g[2]) / 2 });
   }
+  if (!items.length)
+    throw new Error(
+      "Trong vùng chọn không có tag nào đo được (" + boQua.join("; ") + "). Hãy chọn các tag đã tràn theo hàng: trái = trước, phải = sau.",
+    );
   if (!isFinite(minH) || minH <= 0) minH = 10;
   items.sort(function (a, b) {
     return b.cy - a.cy;
@@ -242,7 +276,7 @@ function dcDanTagBdGomHang(sel) {
       throw new Error("Hàng " + (i + 1) + " chỉ có object ở gần cột phải. Hãy chọn thêm mặt trước ở cột trái, hoặc đặt tag 1 mặt ở cột trái.");
     out.push({ front: row[0], back: null });
   }
-  return out;
+  return { rows: out, boQua: boQua };
 }
 
 // Đọc tag đang chọn -> OKJSON:{tags:[{id,w,h,twoSided,name}]} và đăng ký object vào dcDanTagBdNguon.
@@ -260,7 +294,8 @@ function dcDanTagBdDocTag() {
       MM = 2.834645669;
     var sel = doc.selection;
     if (!sel || !sel.length) return "ERR: Chưa chọn tag nào. Hãy chọn các tag theo hàng (trái = trước, phải = sau).";
-    var rows = dcDanTagBdGomHang(sel),
+    var gom = dcDanTagBdGomHang(sel),
+      rows = gom.rows,
       tags = [],
       i;
     for (i = 0; i < rows.length; i++) {
@@ -276,7 +311,7 @@ function dcDanTagBdDocTag() {
       dcDanTagBdNguon[id] = { front: f.o, back: rows[i].back ? rows[i].back.o : null, w: w, h: h };
       tags.push({ id: id, w: w, h: h, twoSided: !!rows[i].back, name: name });
     }
-    return "OKJSON:" + dcDanTagBdJSON.stringify({ tags: tags });
+    return "OKJSON:" + dcDanTagBdJSON.stringify({ tags: tags, boQua: gom.boQua });
   } catch (e) {
     return "ERR: " + dcDanTagBdMoTaLoi(e);
   } finally {
@@ -452,6 +487,9 @@ function dcDanTagBdVe(planText) {
     for (ji = 0; ji < plan.jobs.length; ji++) {
       job = plan.jobs[ji];
       if (!job || (job.bai !== 500 && job.bai !== 1000) || !isArray(job.blocks) || !job.blocks.length) fail("Phương án bài " + (ji + 1) + " không hợp lệ.");
+      // Hệ số bóp cả cụm (lõi tính, mỗi con bớt ≤ 1 mm): thiếu = 1; ngoài 0,9…1 là dữ liệu hỏng.
+      if (job.bop === undefined || job.bop === null) job.bop = 1;
+      if (!num(job.bop) || job.bop > 1 + EPS || job.bop < 0.9) fail("Hệ số bóp của bài " + job.bai + " không hợp lệ (" + job.bop + ").");
       for (bi = 0; bi < job.blocks.length; bi++) {
         blk = job.blocks[bi];
         if (
@@ -595,13 +633,16 @@ function dcDanTagBdVe(planText) {
       }
     }
     // Đặt bản sao: mặt trước canh góc trên trái ô; mặt sau canh TÂM ô lật (khổ lệch nhỏ trong dung sai vẫn cân).
-    function placeCopy(sourceItem, layer, angle, leftPt, topPt, wPt, hPt, centre) {
+    function placeCopy(sourceItem, layer, angle, leftPt, topPt, wPt, hPt, centre, bop) {
       doc.activeLayer = layer;
       var copy = sourceItem.duplicate(layer, ElementPlacement.PLACEATEND);
       try {
         copy.note = "DANCARD_TAGBD_COPY";
       } catch (copyNoteError) {}
       if (angle) copy.rotate(angle);
+      // Bóp cả cụm: co đều bản sao quanh tâm (không méo), nét co theo; nguồn không đụng.
+      if (bop && bop < 1 - 1e-9)
+        copy.transform(app.getScaleMatrix(bop * 100, bop * 100), true, true, true, true, bop * 100, Transformation.CENTER);
       var kb = dcDanTagBdKhung(copy);
       if (!kb) fail("Không đo được bản sao tag sau khi xoay.");
       if (centre) copy.translate(leftPt + wPt / 2 - (kb[0] + kb[2]) / 2, topPt - hPt / 2 - (kb[1] + kb[3]) / 2);
@@ -627,7 +668,7 @@ function dcDanTagBdVe(planText) {
       var frontLayer = addLayer("Tag BD " + k + " - trước");
       for (pi = 0; pi < blk.places.length; pi++) {
         p = blk.places[pi];
-        placeCopy(dcDanTagBdNguon[p.id].front, frontLayer, p.rot, rect[0] + p.x * MM, rect[1] - p.y * MM, p.w * MM, p.h * MM, false);
+        placeCopy(dcDanTagBdNguon[p.id].front, frontLayer, p.rot, rect[0] + p.x * MM, rect[1] - p.y * MM, p.w * MM, p.h * MM, false, job.bop);
         totalPieces++;
       }
       drawCutMarks(frontLayer, rect, W, blk.cuts, false);
@@ -642,7 +683,7 @@ function dcDanTagBdVe(planText) {
         var back = dcDanTagBdNguon[p.id].back;
         if (!back) continue; // tag 1 mặt: mặt sau để trống
         var xBack = W - p.x - p.w;
-        placeCopy(back, backLayer, -p.rot, backRect[0] + xBack * MM, backRect[1] - p.y * MM, p.w * MM, p.h * MM, true);
+        placeCopy(back, backLayer, -p.rot, backRect[0] + xBack * MM, backRect[1] - p.y * MM, p.w * MM, p.h * MM, true, job.bop);
       }
       drawCutMarks(backLayer, backRect, W, blk.cuts, true);
       made.push(k + " (bài " + job.bai + ", " + blk.cols + " × " + blk.rows + " ô, " + blk.places.length + " con)");

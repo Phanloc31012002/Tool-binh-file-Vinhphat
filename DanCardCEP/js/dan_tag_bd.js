@@ -16,7 +16,8 @@
 })(typeof window !== "undefined" ? window : this, function () {
   "use strict";
 
-  var VERSION = 1;
+  var VERSION = 2;
+  var BOP_TOI_DA_MM = 1; // bóp cả cụm: mỗi con bớt tối đa 1 mm (anh Lộc 22/10 21:14)
   var CELL_W = 56; // mm, ô card đã tràn theo cạnh ngắn
   var CELL_H = 92; // mm, ô card đã tràn theo cạnh dài
   var MAX_COLS = 18; // tờ 100,8 cm = 18 × 56
@@ -476,9 +477,22 @@
   }
   function pieceKey(pieces) {
     var ids = [];
-    for (var i = 0; i < pieces.length; i++) ids.push(pieces[i].id);
+    for (var i = 0; i < pieces.length; i++) ids.push(pieces[i].id + (pieces[i].bop ? "~" + pieces[i].bop : ""));
     ids.sort();
     return ids.join(",");
+  }
+  // Hệ số bóp cả cụm: co đều mọi con (không méo) sao cho con có cạnh dài nhất bớt đúng 1 mm;
+  // mọi con khác bớt ít hơn. 1 nghĩa là không bóp được (không có con nào).
+  function heSoBop(pieces) {
+    var maxDim = 0;
+    for (var i = 0; i < pieces.length; i++) maxDim = Math.max(maxDim, pieces[i].w, pieces[i].h);
+    if (maxDim <= BOP_TOI_DA_MM) return 1;
+    return 1 - BOP_TOI_DA_MM / maxDim;
+  }
+  function bopPieces(pieces, s) {
+    var out = [];
+    for (var i = 0; i < pieces.length; i++) out.push({ id: pieces[i].id, w: pieces[i].w * s, h: pieces[i].h * s, bop: s });
+    return out;
   }
 
   // ------------------------------------------------------------------
@@ -707,6 +721,11 @@
     function initJob(job) {
       job.lowerBound = lowerBoundOf(job.pieces);
       job.best = null;
+      job.bop = 1; // hệ số bóp đang xét (1 = chưa bóp)
+      job.bestKhongBop = null; // phương án tốt nhất khi chưa bóp (để so sau pha bóp)
+      job.piecesGoc = job.pieces;
+      job.lowerBoundGoc = job.lowerBound;
+      job.daThuBop = false;
       job.phase = "greedy";
       job.shapeIdx = 0;
       job.T = 0;
@@ -788,9 +807,55 @@
       }
       greedyDone = true;
     }
+    // Pha bóp: xong tìm kiếm thường mà vẫn dư ô so với cận dưới của cụm đã bóp → thử lại toàn bộ
+    // với mọi con co đều (mỗi con bớt ≤ 1 mm). Trả về false khi không đáng thử.
+    function batDauBop(job) {
+      if (job.daThuBop || !job.best) return false;
+      job.daThuBop = true;
+      var s = heSoBop(job.piecesGoc);
+      if (s >= 1) return false;
+      var bopped = bopPieces(job.piecesGoc, s),
+        lb = lowerBoundOf(bopped);
+      if (lb >= planCells(job.best)) return false; // bóp cũng không thể ít ô hơn
+      job.bestKhongBop = job.best;
+      job.best = null;
+      job.bop = s;
+      job.pieces = bopped;
+      job.lowerBound = lb;
+      job.cands = null;
+      job.candIdx = 0;
+      job.done = 0;
+      job.total = 1;
+      return true;
+    }
+    // Chốt sau pha bóp: chỉ nhận phương án bóp khi thật sự ít ô hơn; không thì trả về như chưa bóp.
+    function chotBop(job) {
+      if (!job.bestKhongBop) return;
+      var cellsBop = job.best ? planCells(job.best) : Infinity,
+        cellsGoc = planCells(job.bestKhongBop);
+      if (cellsBop < cellsGoc) {
+        job.cellsTruocBop = cellsGoc;
+        return;
+      }
+      job.best = job.bestKhongBop;
+      job.bop = 1;
+      job.pieces = job.piecesGoc;
+      job.lowerBound = job.lowerBoundGoc;
+      job.bestKhongBop = null;
+    }
     function stepJob(job) {
       if (!greedyDone) {
         greedyAll();
+        return;
+      }
+      if (job.phase === "greedyBop") {
+        var gb = greedyPlan(job.pieces, shapes, packQuick);
+        if (gb) consider(job, gb);
+        job.phase = "single";
+        job.cands = singleCandidates(job);
+        job.candIdx = 0;
+        job.total = job.cands.length || 1;
+        job.done = 0;
         return;
       }
       if (job.phase === "greedy") {
@@ -820,7 +885,7 @@
       }
       if (job.phase === "multi") {
         if (job.T >= bestCells(job) || !job.partitions.length) {
-          job.phase = "done";
+          job.phase = batDauBop(job) ? "greedyBop" : "done";
           return;
         }
         if (!job.cands) {
@@ -859,6 +924,7 @@
         job;
       for (ji = 0; ji < jobs.length; ji++) {
         job = jobs[ji];
+        chotBop(job);
         if (!job.best) {
           output = { ok: false, error: "Bài " + job.bai + ": không tìm được cách ghép khối nào trong giới hạn tìm." };
           return;
@@ -903,6 +969,17 @@
           names.join(" + ") +
           ", " +
           (proven ? cells + "/" + cells + " ô — không thể ít hơn." : cells + " ô, tối thiểu lý thuyết " + job.lowerBound + ".");
+        if (job.bop < 1)
+          line +=
+            " Đã bóp cả cụm " +
+            (Math.round((1 - job.bop) * 1000) / 10).toString().replace(".", ",") +
+            " % (mỗi con bớt tối đa " +
+            BOP_TOI_DA_MM +
+            " mm) để còn " +
+            cells +
+            " ô thay vì " +
+            job.cellsTruocBop +
+            ".";
         lines.push(line);
         outJobs.push({
           bai: job.bai,
@@ -913,6 +990,7 @@
           lowerBound: job.lowerBound,
           proven: proven,
           pieces: job.pieces.length,
+          bop: job.bop, // 1 = không bóp; < 1 = mọi con trong bài đã co đều theo hệ số này
         });
       }
       var allProven = true;
@@ -940,7 +1018,7 @@
           // Hết giờ: bài nào đã có phương án thì chốt; bài chưa có gì (chưa tới lượt) vẫn phải
           // chạy pha tham lam để có khối — không bao giờ bỏ bài sau vì bài trước tốn hết giờ.
           timedOut = true;
-          for (var k = 0; k < jobs.length; k++) if (jobs[k].best) jobs[k].phase = "done";
+          for (var k = 0; k < jobs.length; k++) if (jobs[k].best || jobs[k].bestKhongBop) jobs[k].phase = "done";
           continue;
         }
         if (Date.now() - t0 >= (maxMs || 0)) break;
@@ -998,6 +1076,8 @@
     MAX_COLS: MAX_COLS,
     MAX_ROWS: MAX_ROWS,
     EPS: EPS,
+    BOP_TOI_DA_MM: BOP_TOI_DA_MM,
+    heSoBop: heSoBop,
     packInto: packInto,
     verify: verify,
     scoreLayout: scoreLayout,
