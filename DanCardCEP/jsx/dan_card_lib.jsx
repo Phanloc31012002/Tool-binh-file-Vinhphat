@@ -114,6 +114,21 @@ function dcKhungThanhPham(item) {
       Math.min(a[3], b[3]),
     ];
   }
+  // Con không có khung thật (bảng Transform của Illustrator bỏ qua): ẩn, guide, khung rỗng
+  // (group không con, path không điểm — Illustrator trả [0,0,0,0] ở gốc toạ độ, hợp vào sẽ
+  // kéo khung ra tới gốc, như voucher 15,2 × 7,2 bị báo "không nằm vừa" ngày 22/10).
+  function lyDoBo(child, frame) {
+    try {
+      if (child.hidden === true) return "ẩn";
+    } catch (hiddenError) {}
+    try {
+      if (child.guides === true) return "guide";
+    } catch (guideError) {}
+    if (!frame) return "không đo được";
+    if (frame[2] - frame[0] <= 0.001 && frame[1] - frame[3] <= 0.001)
+      return "khung rỗng";
+    return "";
+  }
   function frameOf(it, depth) {
     if (!it || depth > 8) return null;
     var typename = null,
@@ -140,17 +155,33 @@ function dcKhungThanhPham(item) {
         if (isMask(children[i])) return boundsOf(children[i]) || boundsOf(it);
       return boundsOf(it);
     }
-    if (count === 0 || count > DC_KHUNG_TOI_DA_CON) return boundsOf(it);
+    if (count === 0) return null; // group rỗng: không có khung
+    if (count > DC_KHUNG_TOI_DA_CON) return boundsOf(it);
     var acc = null;
     for (var j = 0; j < count; j++) {
-      var hidden = false;
-      try {
-        hidden = children[j].hidden === true;
-      } catch (hiddenError) {}
-      if (hidden) continue;
-      acc = union(acc, frameOf(children[j], depth + 1));
+      var frame = frameOf(children[j], depth + 1);
+      if (lyDoBo(children[j], frame)) continue;
+      acc = union(acc, frame);
     }
     return acc || boundsOf(it);
+  }
+  if (item && item.__dcTungCon) {
+    // Nút Đo khung: trả thêm khung từng con cấp 1 của group thường để thấy con nào kéo khung.
+    var list = [];
+    try {
+      if (item.typename === "GroupItem" && item.clipped !== true) {
+        var kids = item.pageItems;
+        for (var k = 0; k < kids.length && k < 30; k++) {
+          var kf = frameOf(kids[k], 1);
+          var ten = "object";
+          try {
+            ten = kids[k].typename;
+          } catch (kidTypeError) {}
+          list.push({ loai: ten, khung: kf, bo: lyDoBo(kids[k], kf) });
+        }
+      }
+    } catch (listError) {}
+    return { khung: frameOf(item, 0), con: list };
   }
   return frameOf(item, 0);
 }
@@ -289,7 +320,9 @@ function dcKhungText(b) {
 }
 
 // Nút "Đo khung" ở header: in khung Transform (cách đo mới) và visibleBounds (cách đo cũ) của
-// từng object đang chọn để đối chiếu với bảng Transform của Illustrator. Không đụng tài liệu.
+// từng object đang chọn để đối chiếu với bảng Transform của Illustrator; group thường liệt kê
+// thêm từng con cấp 1 (con rỗng/guide ghi "bỏ"). Hiện bằng bảng ScriptUI cuộn được, chữ chép
+// được (alert của CEP cắt mất dòng). Không đụng tài liệu.
 function dcDoKhungChon() {
   try {
     if (app.documents.length === 0) return "ERR: Chưa mở tài liệu.";
@@ -309,7 +342,11 @@ function dcDoKhungChon() {
         loai = it.typename;
         if (loai === "GroupItem" && it.clipped === true) loai += " (clip)";
       } catch (typeError) {}
-      var khung = dcKhungThanhPham(it),
+      var chiTiet = null;
+      try {
+        chiTiet = dcKhungThanhPham({ __dcTungCon: true, typename: it.typename, clipped: it.clipped, pageItems: it.pageItems, geometricBounds: it.geometricBounds, visibleBounds: it.visibleBounds });
+      } catch (detailError) {}
+      var khung = chiTiet ? chiTiet.khung : dcKhungThanhPham(it),
         cu = null;
       try {
         cu = it.visibleBounds;
@@ -319,30 +356,58 @@ function dcDoKhungChon() {
         cu &&
         (Math.abs(khung[2] - khung[0] - (cu[2] - cu[0])) > 0.0284 ||
           Math.abs(khung[1] - khung[3] - (cu[1] - cu[3])) > 0.0284);
-      lines.push(
+      var dong =
         i +
-          1 +
-          ". " +
-          loai +
-          "\n   Transform: " +
-          dcKhungText(khung) +
-          "\n   Cách cũ (visibleBounds): " +
-          dcKhungText(cu) +
-          (lech ? "   ← KHÁC" : ""),
-      );
+        1 +
+        ". " +
+        loai +
+        "\n   Transform: " +
+        dcKhungText(khung) +
+        "\n   Cách cũ (visibleBounds): " +
+        dcKhungText(cu) +
+        (lech ? "   ← KHÁC" : "");
+      if (chiTiet && chiTiet.con.length)
+        for (var c = 0; c < chiTiet.con.length; c++) {
+          var con = chiTiet.con[c];
+          dong +=
+            "\n   - con " +
+            (c + 1) +
+            ": " +
+            con.loai +
+            " " +
+            dcKhungText(con.khung) +
+            (con.bo ? " (" + con.bo + " → bỏ)" : "");
+        }
+      lines.push(dong);
     }
     if (sel.length > MAX)
       lines.push("… và " + (sel.length - MAX) + " object nữa.");
-    return (
-      "OK: Đo khung " +
+    var text =
+      "Đo khung " +
       sel.length +
       " object đang chọn (mm, 2 số lẻ). " +
       (previewBounds
         ? "Illustrator đang bật Use Preview Bounds (tính cả nét)."
         : "Use Preview Bounds: tắt.") +
       "\n\n" +
-      lines.join("\n")
-    );
+      lines.join("\n");
+    try {
+      if (typeof Window === "function") {
+        var w = new Window("dialog", "Đo khung — đối chiếu với bảng Transform");
+        var box = w.add("edittext", undefined, text, {
+          multiline: true,
+          readonly: true,
+          scrolling: true,
+        });
+        box.preferredSize = [560, 360];
+        var ok = w.add("button", undefined, "OK", { name: "ok" });
+        ok.onClick = function () {
+          w.close(1);
+        };
+        w.show();
+      }
+    } catch (dialogError) {}
+    return "OK: " + text;
   } catch (e) {
     return "ERR: " + (typeof dcMoTaLoi === "function" ? dcMoTaLoi(e) : e.toString());
   }

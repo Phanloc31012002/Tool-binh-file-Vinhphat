@@ -70,6 +70,20 @@ const text = shape("TextFrame", rect(5 * MM, -5 * MM, 40, 8));
 const cardGroup = group([group([mask, spill], true), text], false);
 cardGroup.geometricBounds = spill.geometricBounds.slice(); // Illustrator "nhìn thấy" cả ảnh tràn
 assert.deepEqual(plain(c.dcKhungThanhPham(cardGroup)), rect(0, 0, 92, 56));
+// Lỗi anh Lộc gặp 22/10 (voucher 15,2 × 7,2 là group thường): con "rỗng" — group không con, path không
+// điểm (khung [0,0,0,0] ở gốc toạ độ), guide — không được kéo khung ra tới gốc toạ độ; khung phải đúng
+// bằng bảng Transform của group.
+{
+  const voucher = group([
+    shape("GroupItem", rect(0, 0, 152, 72), { clipped: true, pageItems: [shape("PathItem", rect(0, 0, 152, 72), { clipping: true }), shape("RasterItem", rect(-20 * MM, 20 * MM, 300, 200))] }),
+    shape("TextFrame", rect(10 * MM, -10 * MM, 60, 8)),
+    shape("GroupItem", [0, 0, 0, 0], { pageItems: [] }), // group rỗng ở gốc toạ độ
+    shape("PathItem", [-900, 700, -900, 700]), // path không điểm
+    shape("PathItem", [-5000, 0, 5000, 0], { guides: true }), // guide ngang
+  ], false);
+  voucher.geometricBounds = rect(0, 0, 152, 72); // Illustrator bỏ qua con rỗng/guide
+  assert.deepEqual(plain(c.dcKhungThanhPham(voucher)), rect(0, 0, 152, 72));
+}
 // Con ẩn không tính; group có quá nhiều con (>200) thì lấy khung group cho nhanh.
 const hiddenKid = shape("PathItem", rect(500, -500, 10, 10), { hidden: true });
 assert.deepEqual(plain(c.dcKhungThanhPham(group([shape("PathItem", rect(0, 0, 10, 10)), hiddenKid], false))), rect(0, 0, 10, 10));
@@ -100,9 +114,32 @@ assert.deepEqual(plain(p.dcKhungThanhPham(simple)), grow(rect(3, -3, 40, 20), 1)
   vm.runInContext(lib, ctx);
   const out = ctx.dcDoKhungChon();
   assert.match(out, /^OK: Đo khung 2 object/);
+  // Có Window (ScriptUI) thì hiện bảng cuộn được, chữ chép được — alert của CEP cắt mất dòng.
+  const shown = [];
+  const ctxWin = vm.createContext({
+    app: { documents: [doc], activeDocument: doc, preferences: { getBooleanPreference: () => false } },
+    Window: function (kind, title) {
+      const w = { kind, title, add(type, _b, text, opts) { const c = { type, text, opts, preferredSize: null, onClick: null }; shown.push(c); return c; }, show() { return 1; }, close() {} };
+      return w;
+    },
+  });
+  vm.runInContext(lib, ctxWin);
+  assert.equal(ctxWin.dcDoKhungChon(), out);
+  const box = shown.find((c) => c.type === "edittext");
+  assert.ok(box && box.opts && box.opts.multiline && box.opts.readonly && box.opts.scrolling, "edittext nhiều dòng, chỉ đọc, cuộn được");
+  assert.ok(box.text.indexOf("Transform: 92,00 × 56,00 mm") >= 0);
   assert.match(out, /1\. GroupItem \(clip\)\n   Transform: 92,00 × 56,00 mm\n   Cách cũ \(visibleBounds\): 120,00 × 80,00 mm   ← KHÁC/);
   assert.match(out, /2\. PathItem\n   Transform: 40,00 × 20,00 mm\n   Cách cũ \(visibleBounds\): 40,71 × 20,71 mm   ← KHÁC/);
   assert.match(out, /Use Preview Bounds: tắt/);
+  // Group thường: liệt kê từng con để thấy con nào kéo khung (con rỗng/guide ghi "bỏ").
+  const voucherDoc = { selection: [group([simple, shape("GroupItem", [0, 0, 0, 0], { pageItems: [] }), shape("PathItem", [-5000, 0, 5000, 0], { guides: true })], false)] };
+  const ctxV = vm.createContext({ app: { documents: [voucherDoc], activeDocument: voucherDoc, preferences: { getBooleanPreference: () => false } } });
+  vm.runInContext(lib, ctxV);
+  const outV = ctxV.dcDoKhungChon();
+  assert.match(outV, /1\. GroupItem\n   Transform: 40,00 × 20,00 mm/);
+  assert.match(outV, /   - con 1: PathItem 40,00 × 20,00 mm/);
+  assert.match(outV, /   - con 2: GroupItem .*bỏ/);
+  assert.match(outV, /   - con 3: PathItem .*guide.*bỏ/);
   assert.equal(ctx.dcDoKhungChon.call(null), out, "không đụng tài liệu, gọi lại cho cùng kết quả");
   doc.selection = [];
   assert.match(ctx.dcDoKhungChon(), /^ERR: Hãy chọn object/);

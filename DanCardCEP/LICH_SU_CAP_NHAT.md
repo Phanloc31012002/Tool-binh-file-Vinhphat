@@ -2,6 +2,13 @@
 
 _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
+## v2.19.1 — Sửa theo test của anh Lộc (bản cài tại máy)
+
+- **Đo khung**: hiện bằng bảng trong Illustrator cuộn được, chữ chép được (alert của panel cắt mất dòng); group thường liệt kê thêm từng con cấp 1 kèm khung, con nào bị bỏ ghi rõ lý do (ẩn / guide / khung rỗng).
+- **Khung Transform của group thường**: bỏ qua con không có khung thật — group rỗng, path không điểm (Illustrator trả khung [0,0,0,0] ở gốc toạ độ), guide, con ẩn. Lỗi anh Lộc gặp: voucher 15,2 × 7,2 là group có con rỗng → khung bị kéo ra tới gốc toạ độ → KTS báo "Bài mẫu không nằm vừa trong vùng in" dù Transform hiện đúng 15,2 × 7,2.
+
+---
+
 ## v2.19.0 — Sửa theo soát mã, đo khổ theo bảng Transform
 
 - **Đo khổ theo khung Transform** (anh Lộc yêu cầu: chọn là phải đúng Transform, không đụng bound của nội dung): mọi lệnh đo khổ — Dàn Card, KTS, Tự trở, Dấu cắt, Catalogue, CTL Đóng ghim/Keo gáy, Học/Áp mẫu, Auto Save, Resize, Clip, Bài của Dàn bế — cùng đi qua một hàm đo chung lấy đúng khung Illustrator hiện trong bảng Transform: object đã clip lấy khung clip (kể cả mask compound), group lấy hợp khung các con (đúng cả khi Illustrator gộp nhầm phần ảnh bị mask che), đang bật "Use Preview Bounds" thì tính cả nét. **Giai đoạn kiểm chứng:** ở header cạnh nút Raster có tick **Transform** (mặc định TẮT — tắt thì mọi lệnh đo y như bản trước) và nút **Đo khung**: bấm là Illustrator liệt kê từng object đang chọn với số đo theo Transform và số đo theo cách cũ để đối chiếu với bảng Transform. Khớp thì tick Transform để mọi lệnh dàn dùng số đó; anh Lộc xác nhận xong, bản sau bỏ tick và làm mặc định. Riêng bước tự sửa khổ của Dàn Card chỉ chạy khi khung Transform sai khổ và luôn phán xét kết quả theo nội dung thật (khung clip vừa tạo không nói lên gì), nên object sai khổ không bao giờ được nhận là đúng.

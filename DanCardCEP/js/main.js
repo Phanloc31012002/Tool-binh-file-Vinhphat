@@ -4192,9 +4192,12 @@
           );
           return;
         }
-        window.alert(
-          res.indexOf("OK:") === 0 ? res.substring(3).replace(/^\s+/, "") : res,
-        );
+        // Kết quả đã hiện bằng bảng ScriptUI trong Illustrator (cuộn được, chép được);
+        // alert của CEP cắt mất dòng nên không dùng nữa.
+        btnDoKhung.textContent = "Đã đo";
+        window.setTimeout(function () {
+          btnDoKhung.textContent = "Đo khung";
+        }, 1600);
       });
     });
 
