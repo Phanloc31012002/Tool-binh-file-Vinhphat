@@ -165,24 +165,6 @@ function dcKhungThanhPham(item) {
     }
     return acc || boundsOf(it);
   }
-  if (item && item.__dcTungCon) {
-    // Nút Đo khung: trả thêm khung từng con cấp 1 của group thường để thấy con nào kéo khung.
-    var list = [];
-    try {
-      if (item.typename === "GroupItem" && item.clipped !== true) {
-        var kids = item.pageItems;
-        for (var k = 0; k < kids.length && k < 30; k++) {
-          var kf = frameOf(kids[k], 1);
-          var ten = "object";
-          try {
-            ten = kids[k].typename;
-          } catch (kidTypeError) {}
-          list.push({ loai: ten, khung: kf, bo: lyDoBo(kids[k], kf) });
-        }
-      }
-    } catch (listError) {}
-    return { khung: frameOf(item, 0), con: list };
-  }
   return frameOf(item, 0);
 }
 
@@ -319,6 +301,88 @@ function dcKhungText(b) {
   return mm(b[2] - b[0]) + " × " + mm(b[1] - b[3]) + " mm";
 }
 
+// Cây khung của một object (cho nút Đo khung): từng con tới 3 cấp, mỗi dòng ghi loại, cờ
+// ([clip] group có mask, [mask] đường clip, [guide], [ẩn], [compound n đường, k mask]), khung
+// Transform tool đọc được, cùng geometricBounds/visibleBounds thô để đối chiếu. Tối đa 80 dòng.
+function dcCayKhung(item, depth, out) {
+  var MAX_DONG = 80;
+  var kids = null,
+    count = 0;
+  try {
+    if (item.typename === "GroupItem") {
+      kids = item.pageItems;
+      count = kids.length;
+    }
+  } catch (kidsError) {}
+  for (var k = 0; k < count; k++) {
+    if (out.length >= MAX_DONG) {
+      out.push("   … (còn nữa, chỉ in " + MAX_DONG + " dòng)");
+      return;
+    }
+    var it = kids[k],
+      ten = "object",
+      co = "";
+    try {
+      ten = it.typename;
+    } catch (typeError) {}
+    try {
+      if (it.clipped === true) co += " [clip]";
+    } catch (clipError) {}
+    try {
+      if (it.clipping === true) co += " [mask]";
+    } catch (maskError) {}
+    try {
+      if (it.guides === true) co += " [guide]";
+    } catch (guideError) {}
+    try {
+      if (it.hidden === true) co += " [ẩn]";
+    } catch (hiddenError) {}
+    try {
+      if (ten === "CompoundPathItem") {
+        var pp = it.pathItems,
+          nMask = 0;
+        for (var q = 0; q < pp.length; q++) if (pp[q].clipping === true) nMask++;
+        co += " [compound " + pp.length + " đường, " + nMask + " mask]";
+      }
+    } catch (compoundError) {}
+    var khung = dcKhungThanhPham(it),
+      geo = null,
+      vis = null;
+    try {
+      geo = it.geometricBounds;
+    } catch (geoError) {}
+    try {
+      vis = it.visibleBounds;
+    } catch (visError) {}
+    var bo = "";
+    if (co.indexOf("[ẩn]") >= 0) bo = "ẩn";
+    else if (co.indexOf("[guide]") >= 0) bo = "guide";
+    else if (!khung) bo = "không đo được";
+    else if (khung[2] - khung[0] <= 0.001 && khung[1] - khung[3] <= 0.001)
+      bo = "khung rỗng";
+    var lui = "";
+    for (var d = 0; d < depth; d++) lui += "  ";
+    out.push(
+      "   " +
+        lui +
+        "- con " +
+        (k + 1) +
+        ": " +
+        ten +
+        " " +
+        dcKhungText(khung) +
+        co +
+        " [geo " +
+        dcKhungText(geo) +
+        " | vis " +
+        dcKhungText(vis) +
+        "]" +
+        (bo ? " (" + bo + " → bỏ)" : ""),
+    );
+    if (depth < 3) dcCayKhung(it, depth + 1, out);
+  }
+}
+
 // Nút "Đo khung" ở header: in khung Transform (cách đo mới) và visibleBounds (cách đo cũ) của
 // từng object đang chọn để đối chiếu với bảng Transform của Illustrator; group thường liệt kê
 // thêm từng con cấp 1 (con rỗng/guide ghi "bỏ"). Hiện bằng bảng ScriptUI cuộn được, chữ chép
@@ -342,12 +406,12 @@ function dcDoKhungChon() {
         loai = it.typename;
         if (loai === "GroupItem" && it.clipped === true) loai += " (clip)";
       } catch (typeError) {}
-      var chiTiet = null;
+      var khung = dcKhungThanhPham(it),
+        cu = null,
+        geoGoc = null;
       try {
-        chiTiet = dcKhungThanhPham({ __dcTungCon: true, typename: it.typename, clipped: it.clipped, pageItems: it.pageItems, geometricBounds: it.geometricBounds, visibleBounds: it.visibleBounds });
-      } catch (detailError) {}
-      var khung = chiTiet ? chiTiet.khung : dcKhungThanhPham(it),
-        cu = null;
+        geoGoc = it.geometricBounds;
+      } catch (geoError) {}
       try {
         cu = it.visibleBounds;
       } catch (boundsError) {}
@@ -365,19 +429,14 @@ function dcDoKhungChon() {
         dcKhungText(khung) +
         "\n   Cách cũ (visibleBounds): " +
         dcKhungText(cu) +
-        (lech ? "   ← KHÁC" : "");
-      if (chiTiet && chiTiet.con.length)
-        for (var c = 0; c < chiTiet.con.length; c++) {
-          var con = chiTiet.con[c];
-          dong +=
-            "\n   - con " +
-            (c + 1) +
-            ": " +
-            con.loai +
-            " " +
-            dcKhungText(con.khung) +
-            (con.bo ? " (" + con.bo + " → bỏ)" : "");
-        }
+        (lech ? "   ← KHÁC" : "") +
+        "\n   geometricBounds thô: " +
+        dcKhungText(geoGoc);
+      var cay = [];
+      try {
+        dcCayKhung(it, 0, cay);
+      } catch (treeError) {}
+      if (cay.length) dong += "\n" + cay.join("\n");
       lines.push(dong);
     }
     if (sel.length > MAX)
@@ -4196,7 +4255,7 @@ function dcDanToiUuV2(pageWidthText, pageHeightText) {
 //  - Artboard moi tu xep theo luoi canvas, trai sang phai roi xuong hang.
 //  - Tach hinh chu nhat de tan dung khoang trong chu L, van cat dao duoc.
 // ============================================================
-var dcDanToiUuVersion = 23;
+var dcDanToiUuVersion = 24;
 // Chỉ gọi sau khi dựng thành công. Chỉ xoá khung, không bao giờ xoá bài bên trong.
 function dcRemoveOldCanvasArtboards(doc, oldCount) {
   var removed = 0;
