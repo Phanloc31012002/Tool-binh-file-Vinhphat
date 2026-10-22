@@ -84,6 +84,24 @@ assert.deepEqual(plain(c.dcKhungThanhPham(cardGroup)), rect(0, 0, 92, 56));
   voucher.geometricBounds = rect(0, 0, 152, 72); // Illustrator bỏ qua con rỗng/guide
   assert.deepEqual(plain(c.dcKhungThanhPham(voucher)), rect(0, 0, 152, 72));
 }
+// File voucher thật của anh Lộc (cây Đo khung 22/10): clip group mà MASK BỌC TRONG MỘT GROUP CON
+// (con đầu tiên là group thường, bên trong mới là path [mask]); nội dung bị che rộng 367 mm.
+// Illustrator (Transform) chỉ tính phần trong mask 18,35 × 18,51; geometric/visibleBounds đều báo 367.
+{
+  const wrappedMask = shape("GroupItem", rect(100 * MM, -20 * MM, 18.35, 18.51), {
+    pageItems: [shape("PathItem", rect(100 * MM, -20 * MM, 18.35, 18.51), { clipping: true })],
+  });
+  const inner = shape("GroupItem", rect(-200 * MM, 0, 367.12, 86.88), { clipped: true, pageItems: [
+    shape("GroupItem", rect(-100 * MM, 0, 140.57, 65.6), { pageItems: [shape("PathItem", rect(-100 * MM, 0, 140.57, 65.6), { clipping: true })] }),
+    shape("RasterItem", rect(-200 * MM, 0, 296.67, 65.62)),
+  ] });
+  const con6 = shape("GroupItem", rect(-200 * MM, 0, 367.12, 86.88), { clipped: true, pageItems: [wrappedMask, inner] });
+  assert.deepEqual(plain(c.dcKhungThanhPham(con6)), rect(100 * MM, -20 * MM, 18.35, 18.51));
+  const nen = shape("RasterItem", rect(0, 0, 152, 72));
+  const voucher = group([shape("GroupItem", rect(10 * MM, -5 * MM, 84.75, 0.15), { pageItems: [shape("PathItem", rect(10 * MM, -5 * MM, 84.75, 0.15))] }), con6, nen], false);
+  voucher.geometricBounds = rect(-200 * MM, 0, 371.94, 86.88); // DOM báo cả phần bị che
+  assert.deepEqual(plain(c.dcKhungThanhPham(voucher)), rect(0, 0, 152, 72));
+}
 // Con ẩn không tính; group có quá nhiều con (>200) thì lấy khung group cho nhanh.
 const hiddenKid = shape("PathItem", rect(500, -500, 10, 10), { hidden: true });
 assert.deepEqual(plain(c.dcKhungThanhPham(group([shape("PathItem", rect(0, 0, 10, 10)), hiddenKid], false))), rect(0, 0, 10, 10));

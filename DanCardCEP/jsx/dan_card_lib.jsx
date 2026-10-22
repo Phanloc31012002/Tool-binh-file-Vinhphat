@@ -129,6 +129,36 @@ function dcKhungThanhPham(item) {
       return "khung rỗng";
     return "";
   }
+  // Mask của clip group không luôn là con trực tiếp: Illustrator hay bọc nó trong một group
+  // thường (file voucher 22/10: clip group → group → path [mask], trong khi geometric/visibleBounds
+  // của clip group báo cả phần ảnh bị che, 367 mm thay vì 18 mm). Tìm mask qua các group thường
+  // lồng nhau; không vào clip group con vì mask trong đó là của nó, không phải của group này.
+  function timMask(group, depth) {
+    if (depth > 4) return null;
+    var children = null,
+      count = 0;
+    try {
+      children = group.pageItems;
+      count = children.length;
+    } catch (childError) {
+      return null;
+    }
+    for (var i = 0; i < count; i++) if (isMask(children[i])) return children[i];
+    for (var j = 0; j < count; j++) {
+      var typename = null,
+        clipped = false;
+      try {
+        typename = children[j].typename;
+        clipped = children[j].clipped === true;
+      } catch (childError2) {
+        continue;
+      }
+      if (typename !== "GroupItem" || clipped) continue;
+      var mask = timMask(children[j], depth + 1);
+      if (mask) return mask;
+    }
+    return null;
+  }
   function frameOf(it, depth) {
     if (!it || depth > 8) return null;
     var typename = null,
@@ -151,9 +181,8 @@ function dcKhungThanhPham(item) {
       return boundsOf(it);
     }
     if (clipped) {
-      for (var i = 0; i < count; i++)
-        if (isMask(children[i])) return boundsOf(children[i]) || boundsOf(it);
-      return boundsOf(it);
+      var mask = timMask(it, 0);
+      return (mask && boundsOf(mask)) || boundsOf(it);
     }
     if (count === 0) return null; // group rỗng: không có khung
     if (count > DC_KHUNG_TOI_DA_CON) return boundsOf(it);

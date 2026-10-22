@@ -5,7 +5,8 @@ _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 ## v2.19.1 — Sửa theo test của anh Lộc (bản cài tại máy)
 
 - **Đo khung**: hiện bằng bảng trong Illustrator cuộn được, chữ chép được (alert của panel cắt mất dòng); group thường liệt kê thêm từng con cấp 1 kèm khung, con nào bị bỏ ghi rõ lý do (ẩn / guide / khung rỗng).
-- **Khung Transform của group thường**: bỏ qua con không có khung thật — group rỗng, path không điểm (Illustrator trả khung [0,0,0,0] ở gốc toạ độ), guide, con ẩn. Lỗi anh Lộc gặp: voucher 15,2 × 7,2 là group có con rỗng → khung bị kéo ra tới gốc toạ độ → KTS báo "Bài mẫu không nằm vừa trong vùng in" dù Transform hiện đúng 15,2 × 7,2.
+- **Khung Transform của group thường**: bỏ qua con không có khung thật — group rỗng, path không điểm (Illustrator trả khung [0,0,0,0] ở gốc toạ độ), guide, con ẩn.
+- **Mask bọc trong group con** (lỗi thật của voucher 15,2 × 7,2 theo cây Đo khung anh Lộc gửi): Illustrator hay đặt mask của clip group bên trong một group thường con (clip group → group → path [mask]) chứ không phải con trực tiếp; bản trước không thấy mask nên rơi về khung clip group — mà khung đó Illustrator báo luôn cả phần ảnh bị che (367 mm). Giờ tìm mask qua các group thường lồng nhau (không vào clip group con), voucher ra đúng 152,00 × 72,00 mm như bảng Transform. Đây là chỗ bound của Illustrator khác Transform; tool đã đi đúng đường Transform.
 
 ---
 
