@@ -131,6 +131,50 @@ function dcDoKhung(item, legacy) {
   return legacy(item);
 }
 
+// Mọi object Dàn Card tạo ra (group kết quả, PON duplicate, ghi chú offset) đều gắn note này;
+// dọn mẻ cũ chỉ xoá object có note, không bao giờ xoá object của người dùng.
+var DC_NOTE_DAN_CARD = "DANCARD_DAN_CARD_OUTPUT";
+
+// So hai tham chiếu object Illustrator (wrapper khác nhau vẫn là một object khi trùng uuid).
+function dcCungObject(a, b) {
+  if (a === b) return true;
+  try {
+    return !!(a && b && a.uuid && a.uuid === b.uuid);
+  } catch (uuidError) {}
+  return false;
+}
+// item có nằm trong protectList, hoặc là tổ tiên (group cha) của một object trong đó không.
+function dcDuocBaoVe(item, protectList) {
+  if (!protectList || !protectList.length) return false;
+  for (var i = 0; i < protectList.length; i++) {
+    var node = protectList[i],
+      depth = 0;
+    while (node && depth++ < 32) {
+      if (dcCungObject(node, item)) return true;
+      var parent = null;
+      try {
+        parent = node.parent;
+        if (parent && parent.typename === "Layer") break;
+      } catch (parentError) {
+        break;
+      }
+      node = parent;
+    }
+  }
+  return false;
+}
+
+// Câu báo số object lạ được giữ lại trong vùng artboard ("" khi không có).
+function dcCauGiuObjectLa(kept, sep) {
+  if (!(kept > 0)) return "";
+  return (
+    sep +
+    "Giữ lại " +
+    kept +
+    " object không do tool tạo trong vùng artboard (kết quả cũ dàn bằng bản trước thì xoá tay)."
+  );
+}
+
 // Số đo pt → chữ mm, một chữ số lẻ, dấu phẩy kiểu Việt ("92,0").
 function dcMmText(pt) {
   return (pt / 2.834645669).toFixed(1).replace(".", ",");
@@ -1210,53 +1254,16 @@ function _dcDanCore(SEL_LAYOUT_KEY, VOUCHER_WITH_CARD_ARG) {
   //  trang 2), rồi xóa artboard đó. Chỉ giữ lại AB1 để dàn 1 mặt.
   // ============================================================
   function removeSecondArtboard(d) {
-    if (!d || d.artboards.length < 2) return;
+    var result = { removed: 0, kept: 0 };
+    if (!d || d.artboards.length < 2) return result;
     var rc = d.artboards[1].artboardRect; // [l, t, r, b]
-    var L = rc[0],
-      T = rc[1],
-      R = rc[2],
-      B = rc[3];
-    // xóa object có tâm trong vùng AB2
-    var toRemove = [];
-    for (var li = 0; li < d.layers.length; li++) {
-      var lay = d.layers[li];
-      var locked = false,
-        hid = false;
-      try {
-        locked = lay.locked;
-        hid = !lay.visible;
-      } catch (e) {}
-      if (locked || hid) continue;
-      var pit = lay.pageItems;
-      for (var p = 0; p < pit.length; p++) {
-        var it = pit[p];
-        var isL = false,
-          isH = false;
-        try {
-          isL = it.locked;
-          isH = it.hidden;
-        } catch (e) {}
-        if (isL || isH) continue;
-        var gb;
-        try {
-          gb = it.geometricBounds;
-        } catch (e) {
-          continue;
-        }
-        var cx = (gb[0] + gb[2]) / 2,
-          cy = (gb[1] + gb[3]) / 2;
-        if (cx >= L && cx <= R && cy <= T && cy >= B) toRemove.push(it);
-      }
-    }
-    for (var r = 0; r < toRemove.length; r++) {
-      try {
-        toRemove[r].remove();
-      } catch (e) {}
-    }
+    // chỉ xoá object DO TOOL TẠO có tâm trong vùng AB2; object lạ giữ lại và đếm
+    result = dcDonObjectTool(d, [rc], null, true);
     // xóa artboard index 1
     try {
       d.artboards.remove(1);
     } catch (e) {}
+    return result;
   }
 
   // ============================================================
@@ -1310,26 +1317,31 @@ function _dcDanCore(SEL_LAYOUT_KEY, VOUCHER_WITH_CARD_ARG) {
   //  mẻ mới dùng để dàn). Mọi thứ ngoài vùng artboard được giữ nguyên.
   // ============================================================
   function clearOldArtboardContent(d, protectList) {
-    if (!d || d.artboards.length === 0) return;
+    if (!d || d.artboards.length === 0) return { removed: 0, kept: 0 };
+    var rects = [];
+    for (var a = 0; a < d.artboards.length; a++)
+      rects.push(d.artboards[a].artboardRect);
+    return dcDonObjectTool(d, rects, protectList, false);
+  }
+
+  // Dọn object cấp trên cùng trên các layer không khoá/ẩn:
+  //  - object có note DC_NOTE_DAN_CARD → xoá (trong vùng rects khi chiVung, bất kể vị trí khi không);
+  //  - object lạ có tâm trong khung bao chung của rects → GIỮ, đếm vào kept để báo;
+  //  - object trong protectList hoặc là group cha của nó → giữ, không đếm.
+  function dcDonObjectTool(d, rects, protectList, chiVung) {
     var L = 1e12,
       T = -1e12,
       R = -1e12,
       B = 1e12;
-    for (var a = 0; a < d.artboards.length; a++) {
-      var rc = d.artboards[a].artboardRect; // [l, t, r, b]
+    for (var ri = 0; ri < rects.length; ri++) {
+      var rc = rects[ri];
       if (rc[0] < L) L = rc[0];
       if (rc[1] > T) T = rc[1];
       if (rc[2] > R) R = rc[2];
       if (rc[3] < B) B = rc[3];
     }
-    // Kiểm object có nằm trong danh sách được bảo vệ (không xóa) không.
-    function isProtected(it) {
-      if (!protectList || protectList.length === 0) return false;
-      for (var s = 0; s < protectList.length; s++)
-        if (protectList[s] === it) return true;
-      return false;
-    }
-    var toRemove = [];
+    var toRemove = [],
+      kept = 0;
     for (var li = 0; li < d.layers.length; li++) {
       var lay = d.layers[li];
       var locked = false,
@@ -1342,7 +1354,7 @@ function _dcDanCore(SEL_LAYOUT_KEY, VOUCHER_WITH_CARD_ARG) {
       var pit = lay.pageItems;
       for (var p = 0; p < pit.length; p++) {
         var it = pit[p];
-        if (isProtected(it)) continue; // giữ object mẻ mới
+        if (dcDuocBaoVe(it, protectList)) continue; // giữ object mẻ mới
         var isLocked = false,
           isHidden = false;
         try {
@@ -1358,7 +1370,13 @@ function _dcDanCore(SEL_LAYOUT_KEY, VOUCHER_WITH_CARD_ARG) {
         }
         var cx = (gb[0] + gb[2]) / 2,
           cy = (gb[1] + gb[3]) / 2;
-        if (cx >= L && cx <= R && cy <= T && cy >= B) toRemove.push(it);
+        var trongVung = cx >= L && cx <= R && cy <= T && cy >= B;
+        var cuaTool = false;
+        try {
+          cuaTool = it.note === DC_NOTE_DAN_CARD;
+        } catch (e) {}
+        if (cuaTool && (trongVung || !chiVung)) toRemove.push(it);
+        else if (!cuaTool && trongVung) kept++;
       }
     }
     for (var r = 0; r < toRemove.length; r++) {
@@ -1366,6 +1384,7 @@ function _dcDanCore(SEL_LAYOUT_KEY, VOUCHER_WITH_CARD_ARG) {
         toRemove[r].remove();
       } catch (e) {}
     }
+    return { removed: toRemove.length, kept: kept };
   }
 
   // ============================================================
@@ -1544,6 +1563,12 @@ function _dcDanCore(SEL_LAYOUT_KEY, VOUCHER_WITH_CARD_ARG) {
             dupped[i].translate(dx, dy);
           } catch (e) {}
         }
+      }
+      // PON là của tool: gắn note để mẻ sau dọn đúng.
+      for (i = 0; i < dupped.length; i++) {
+        try {
+          dupped[i].note = DC_NOTE_DAN_CARD;
+        } catch (e) {}
       }
     }
 
@@ -2060,7 +2085,7 @@ function _dcDanCore(SEL_LAYOUT_KEY, VOUCHER_WITH_CARD_ARG) {
   for (var pri = 0; pri < rows.length; pri++)
     for (var pci = 0; pci < rows[pri].length; pci++)
       protectSel.push(rows[pri][pci].o);
-  clearOldArtboardContent(doc, protectSel);
+  var donCu = clearOldArtboardContent(doc, protectSel);
 
   var models = [];
   var hasDouble = false;
@@ -2310,6 +2335,7 @@ function _dcDanCore(SEL_LAYOUT_KEY, VOUCHER_WITH_CARD_ARG) {
     var grp = doc.groupItems.add();
     for (var i = 0; i < copies.length; i++) copies[i].moveToBeginning(grp);
     grp.translate(abCx - ccx, abCy - ccy);
+    grp.note = DC_NOTE_DAN_CARD; // để mẻ sau nhận ra và dọn đúng object của tool
     return grp;
   }
 
@@ -2329,7 +2355,8 @@ function _dcDanCore(SEL_LAYOUT_KEY, VOUCHER_WITH_CARD_ARG) {
   if (TWO_SIDES) {
     ensureTwoArtboards(doc);
   } else {
-    removeSecondArtboard(doc);
+    var donAb2 = removeSecondArtboard(doc);
+    donCu.kept += donAb2.kept;
   }
 
   var useMixed = hasDouble && LAYOUT.key === "9.2x5.6";
@@ -2367,6 +2394,7 @@ function _dcDanCore(SEL_LAYOUT_KEY, VOUCHER_WITH_CARD_ARG) {
     var lay = doc.activeLayer;
     var tf = lay.textFrames.add();
     tf.contents = NOTE_TEXT;
+    tf.note = DC_NOTE_DAN_CARD;
     try {
       tf.textRange.characterAttributes.size = 14;
     } catch (e) {}
@@ -2392,7 +2420,10 @@ function _dcDanCore(SEL_LAYOUT_KEY, VOUCHER_WITH_CARD_ARG) {
     (TWO_SIDES
       ? "In 2 mặt: mặt trước -> AB1, mặt sau -> AB2."
       : "In 1 mặt: chỉ dàn AB1.") +
-    (IS_OFFSET ? "\n+ Ghi chú cardoffset." : "");
+    (IS_OFFSET ? "\n+ Ghi chú cardoffset." : "") +
+    dcCauGiuObjectLa(donCu.kept, "\n");
+  if (donCu.kept > 0 && LAYOUT.key !== "9.2x5.6")
+    _DC_RESULT += dcCauGiuObjectLa(donCu.kept, " ");
   // Ưu tiên cảnh báo SAI KÍCH THƯỚC (đo trước raster). Có thì báo đỏ, xem kỹ.
   if (badInfo.length > 0) {
     var d0 = badInfo[0];
@@ -2658,7 +2689,7 @@ function _dcDanCore(SEL_LAYOUT_KEY, VOUCHER_WITH_CARD_ARG) {
     // Làm TRƯỚC khi clip (clip/expand sẽ xóa selection).
     var protectSelV = [];
     for (var psv = 0; psv < sel.length; psv++) protectSelV.push(sel[psv]);
-    clearOldArtboardContent(doc, protectSelV);
+    var donCuV = clearOldArtboardContent(doc, protectSelV);
 
     var vModels = [];
     for (i = 0; i < vRows.length; i++)
@@ -2846,6 +2877,8 @@ function _dcDanCore(SEL_LAYOUT_KEY, VOUCHER_WITH_CARD_ARG) {
       msg += "\n+ card 9.2x5.6 (" + nC + " mẫu, " + perCard + " chỗ/mẫu)";
     msg += "\nMặt trước -> AB1, mặt sau -> AB2.";
     if (IS_OFFSET) msg += "\n+ Ghi chú cardoffset.";
+    msg += dcCauGiuObjectLa(donCuV.kept, "\n");
+    if (donCuV.kept > 0) _DC_RESULT += dcCauGiuObjectLa(donCuV.kept, " ");
     if (expandWarnings.length > 0) {
       msg +=
         "\n\n[!] " +
@@ -2871,6 +2904,7 @@ function _dcDanCore(SEL_LAYOUT_KEY, VOUCHER_WITH_CARD_ARG) {
       _DC_RESULT =
         "OK: Đã dàn " + nModels + " con thường (không có con đôi 18.4).";
     }
+    if (donCu.kept > 0) _DC_RESULT += dcCauGiuObjectLa(donCu.kept, " ");
   }
 
   // kết thúc dcDan: trả kết quả OK
