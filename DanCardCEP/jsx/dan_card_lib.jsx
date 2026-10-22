@@ -136,6 +136,37 @@ function dcMmText(pt) {
   return (pt / 2.834645669).toFixed(1).replace(".", ",");
 }
 
+// Thư mục chứa file jsx này (để tìm assets đi kèm extension); null nếu không rõ.
+var dcJsxFolder = null;
+try {
+  dcJsxFolder = new File($.fileName).parent;
+} catch (jsxFolderError) {}
+
+// File icon ghi chú CTL/Keo gáy: ưu tiên DanCardCEP/assets/icon.ai theo thư mục extension
+// (panel truyền dcExtensionRoot, hoặc suy từ vị trí jsx), cuối cùng là đường dẫn cũ trên
+// máy anh Lộc. Không có file nào → null, lệnh dàn bỏ qua icon chứ không dừng.
+var DC_THIEU_ICON_GHI_CHU =
+  " Không có icon ghi chú (thiếu DanCardCEP/assets/icon.ai); ghi chú vẫn được điền.";
+function dcNoteIconFile() {
+  var candidates = [];
+  try {
+    if (typeof dcExtensionRoot === "string" && dcExtensionRoot)
+      candidates.push(dcExtensionRoot + "/assets/icon.ai");
+  } catch (rootError) {}
+  try {
+    if (dcJsxFolder && dcJsxFolder.parent)
+      candidates.push(String(dcJsxFolder.parent.fsName) + "/assets/icon.ai");
+  } catch (folderError) {}
+  candidates.push("C:/Users/ADMIN/Downloads/icon.ai");
+  for (var i = 0; i < candidates.length; i++) {
+    try {
+      var file = new File(candidates[i]);
+      if (file.exists) return file;
+    } catch (fileError) {}
+  }
+  return null;
+}
+
 // dcDan: wrapper bắt mọi lỗi -> trả thông báo rõ ràng cho panel.
 function dcDan(SEL_LAYOUT_KEY, VOUCHER_WITH_CARD_ARG) {
   try {
@@ -21234,10 +21265,10 @@ function dcRunSignature8(wCm, hCm, coBia) {
 
     // Icon duoc duplicate nguyen vector tu file nguon; khong resize o bat ky
     // buoc nao. Template an di, moi ghi chu lay mot ban sao moi tu template.
+    // Thiếu file icon (máy khác, chưa chép assets/icon.ai) → null: ghi chú vẫn điền, không có icon.
     function loadNoteIconTemplate() {
-      var iconFile = new File("C:/Users/ADMIN/Downloads/icon.ai");
-      if (!iconFile.exists)
-        throw new Error("Không tìm thấy icon ghi chú: " + iconFile.fsName);
+      var iconFile = dcNoteIconFile();
+      if (!iconFile) return null;
       var iconDoc = app.open(iconFile);
       var roots = [];
       for (var ii = 0; ii < iconDoc.pageItems.length; ii++) {
@@ -21703,8 +21734,10 @@ function dcRunSignature8(wCm, hCm, coBia) {
     }
 
     var note = showNoteDialog();
+    var noteIconMissing = false;
     if (note) {
       noteIconTemplate = loadNoteIconTemplate();
+      noteIconMissing = !noteIconTemplate;
       for (var ni = 0; ni < numFaces; ni++) {
         var face = faces[ni];
         // AB: chỉ điền MẶT A (label ket thuc " - A"); mặt B bỏ qua.
@@ -21740,7 +21773,7 @@ function dcRunSignature8(wCm, hCm, coBia) {
         else addNote8(txt, abPos[ni], isSpecificRed);
       }
       try {
-        noteIconTemplate.remove();
+        if (noteIconTemplate) noteIconTemplate.remove();
       } catch (iconTemplateRemoveError) {}
       noteIconTemplate = null;
     }
@@ -21769,6 +21802,7 @@ function dcRunSignature8(wCm, hCm, coBia) {
     );
     var ponNote =
       "OK: Đã dàn CTL Offset; đã vẽ " + cutPonCount + " nét PON cắt.";
+    if (noteIconMissing) ponNote += DC_THIEU_ICON_GHI_CHU;
     if (ponClampCount > 0)
       ponNote +=
         " Lưu ý: " +
@@ -23618,10 +23652,10 @@ function dcRunKeoGay(wCm, hCm) {
     }
     // Icon duoc duplicate nguyen vector tu file nguon; khong resize o bat ky
     // buoc nao. Template an di, moi ghi chu lay mot ban sao moi tu template.
+    // Thiếu file icon (máy khác, chưa chép assets/icon.ai) → null: ghi chú vẫn điền, không có icon.
     function loadNoteIconTemplate() {
-      var iconFile = new File("C:/Users/ADMIN/Downloads/icon.ai");
-      if (!iconFile.exists)
-        throw new Error("Không tìm thấy icon ghi chú: " + iconFile.fsName);
+      var iconFile = dcNoteIconFile();
+      if (!iconFile) return null;
       var iconDoc = app.open(iconFile);
       var roots = [];
       for (var ii = 0; ii < iconDoc.pageItems.length; ii++) {
@@ -23796,8 +23830,10 @@ function dcRunKeoGay(wCm, hCm) {
     }
 
     var note = showNoteDialog();
+    var noteIconMissing = false;
     if (note) {
       noteIconTemplate = loadNoteIconTemplate();
+      noteIconMissing = !noteIconTemplate;
       for (var ni = 0; ni < numFaces; ni++) {
         var face = faces[ni];
         useFaceFrame(ni);
@@ -23815,7 +23851,7 @@ function dcRunKeoGay(wCm, hCm) {
         else addNote8(txt, abPos[ni], isSpecificRed);
       }
       try {
-        noteIconTemplate.remove();
+        if (noteIconTemplate) noteIconTemplate.remove();
       } catch (noteIconTemplateRemoveError) {}
       noteIconTemplate = null;
     }
@@ -23850,6 +23886,7 @@ function dcRunKeoGay(wCm, hCm) {
       ? "A5: 32 trang/tờ AB (2 tay 16), AB trước, tự trở sau."
       : "A4: 16 trang/tờ AB, AB trước, tự trở sau.") +
     (keoCleanup.warning ? " " + keoCleanup.warning : "") +
+    (noteIconMissing ? DC_THIEU_ICON_GHI_CHU : "") +
     keoPdfSuffix
   );
 }
