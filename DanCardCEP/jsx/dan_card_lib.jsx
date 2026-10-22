@@ -1979,29 +1979,42 @@ function _dcDanCore(SEL_LAYOUT_KEY, VOUCHER_WITH_CARD_ARG) {
     }
   }
 
-  // sắp hàng theo Y. 2 mặt: ghép cặp 2 object (trước+sau). 1 mặt: mỗi
-  // object là 1 hàng độc lập.
+  // sắp hàng theo Y. 2 mặt: ghép cặp theo HÀNG bằng hàm chung của KTS (trái =
+  // trước, phải = sau; hàng lẻ con thì báo lỗi). 1 mặt: mỗi object là 1 hàng độc lập.
   var items = [];
   for (var i = 0; i < sel.length; i++) {
-    var c = cbC(sel[i]);
-    items.push({ o: sel[i], x: c[0], y: c[1] });
+    var cb = clipBounds(sel[i]);
+    items.push({
+      o: sel[i],
+      x: (cb[0] + cb[2]) / 2,
+      y: (cb[1] + cb[3]) / 2,
+      item: sel[i],
+      bounds: cb,
+      cx: (cb[0] + cb[2]) / 2,
+      cy: (cb[1] + cb[3]) / 2,
+    });
   }
   items.sort(function (a, b) {
     return b.y - a.y;
   });
   var rows = [];
   if (TWO_SIDES) {
-    for (i = 0; i < items.length; i += 2) {
-      if (i + 1 >= items.length) {
-        warn("Số object lẻ - in 2 mặt cần mỗi hàng 2 (trước+sau).");
-        return;
-      }
-      var pair = [items[i], items[i + 1]];
-      pair.sort(function (a, b) {
-        return a.x - b.x;
-      });
-      rows.push(pair);
+    if (items.length % 2 !== 0) {
+      var cauLe = "Số object lẻ - in 2 mặt cần mỗi hàng 2 (trước+sau).";
+      warn(cauLe);
+      return "ERR: " + cauLe;
     }
+    try {
+      var cardPairs = dcKtsPairSourceRecords(items, 0.01);
+    } catch (cardPairError) {
+      warn(cardPairError.message);
+      return "ERR: " + cardPairError.message;
+    }
+    for (i = 0; i < cardPairs.length; i++)
+      rows.push([
+        { o: cardPairs[i].front.item, x: cardPairs[i].front.cx, y: cardPairs[i].front.cy },
+        { o: cardPairs[i].back.item, x: cardPairs[i].back.cx, y: cardPairs[i].back.cy },
+      ]);
   } else {
     // 1 mặt: mỗi object 1 hàng, chỉ có "trước".
     for (i = 0; i < items.length; i++) rows.push([items[i]]);
@@ -6722,34 +6735,6 @@ function dcDanTuTro(
     if (raw.length === 0 || !sourceBounds)
       return "ERR: Selection hiện tại không có artwork hợp lệ để dàn.";
 
-    // Thứ tự ổn định: gom theo từng hàng từ trên xuống, trong hàng từ trái
-    // qua. Gom theo hàng (không so cy tuyệt đối) để chọn cả trăm con một lúc
-    // mà vẫn không bị lệch cặp khi các con trong cùng hàng lệch nhau vài pt.
-    raw.sort(function (a, b) {
-      return b.cy - a.cy;
-    });
-    var rowTolerance = (raw[0].bounds[1] - raw[0].bounds[3]) * 0.5;
-    var ordered = [];
-    var rowItems = [raw[0]];
-    var rowAnchorY = raw[0].cy;
-    function flushRow() {
-      rowItems.sort(function (a, b) {
-        return a.cx - b.cx;
-      });
-      for (var ri = 0; ri < rowItems.length; ri++) ordered.push(rowItems[ri]);
-    }
-    for (var ri2 = 1; ri2 < raw.length; ri2++) {
-      if (rowAnchorY - raw[ri2].cy <= rowTolerance) {
-        rowItems.push(raw[ri2]);
-      } else {
-        flushRow();
-        rowItems = [raw[ri2]];
-        rowAnchorY = raw[ri2].cy;
-      }
-    }
-    flushRow();
-    raw = ordered;
-
     if (raw.length < 2 || raw.length % 2 !== 0) {
       var selectionInfo =
         " Tool nhận " +
@@ -6766,10 +6751,20 @@ function dcDanTuTro(
       );
     }
 
+    // Ghép cặp theo HÀNG bằng hàm chung của KTS (vai trái/phải chốt theo hình
+    // học, hàng lẻ con thì báo lỗi, không ghép chéo hàng).
     var pairs = [];
     var pi;
-    for (pi = 0; pi < raw.length; pi += 2)
-      pairs.push({ front: raw[pi].item, back: raw[pi + 1].item });
+    try {
+      var pairedRecords = dcKtsPairSourceRecords(raw, 0.01);
+    } catch (pairError) {
+      return "ERR: " + pairError.message;
+    }
+    for (pi = 0; pi < pairedRecords.length; pi++)
+      pairs.push({
+        front: pairedRecords[pi].front.item,
+        back: pairedRecords[pi].back.item,
+      });
 
     var referenceBounds = boundsOf(pairs[0].front);
     if (!referenceBounds) return "ERR: Không đo được kích thước bài mẫu.";

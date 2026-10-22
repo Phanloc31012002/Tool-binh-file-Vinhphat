@@ -147,18 +147,29 @@ var dcDanBeJSON = (function () {
   return { stringify: stringify, parse: parse };
 })();
 
-// Xác định bộ ba đang chọn theo hình học, tuyệt đối không theo thứ tự chọn/z-order. Vai trò
-// được khoá cố định cho mọi con và cả hai mặt của tờ kết quả.
-function dcDanBeTripleModels(selection, epsilon) {
+// Gom selection thành từng nhóm `size` object theo HÀNG (hình học, không theo thứ tự chọn/
+// z-order), trong hàng xếp trái → phải. Hàng lẻ con → lỗi rõ, không bao giờ ghép chéo hàng.
+// size 2: Khuôn → Bài (một mặt); size 3: Khuôn → mặt trước → mặt sau (hai mặt).
+function dcDanBeRowGroups(selection, size, epsilon) {
   var EPS = epsilon || 0.01,
     pending = [],
-    models = [],
+    groups = [],
     i,
     bounds;
-  if (!selection || !selection.length || selection.length % 3)
-    throw new Error(
-      "Dàn bế 2 mặt cần chọn đủ bộ 3: Khuôn bên trái → mặt trước → mặt sau, cùng hàng.",
-    );
+  var cauThieu =
+    size === 3
+      ? "Dàn bế 2 mặt cần chọn đủ bộ 3: Khuôn bên trái → mặt trước → mặt sau, cùng hàng."
+      : "Hãy chọn số object chẵn theo hàng: mỗi hàng Khuôn bên trái, Bài bên phải.";
+  var cauHang =
+    size === 3
+      ? "Hàng nguồn chưa đủ Khuôn → mặt trước → mặt sau. Hãy canh hàng và chọn đủ 3 object cho mỗi mẫu."
+      : "Hàng nguồn chưa đủ cặp Khuôn → Bài. Hãy canh hàng và chọn đủ 2 object cho mỗi mẫu.";
+  var cauVai =
+    size === 3
+      ? "Không phân biệt được thứ tự trái/phải. Đặt Khuôn → mặt trước → mặt sau cạnh nhau."
+      : "Không phân biệt được thứ tự trái/phải. Đặt Khuôn bên trái, Bài bên phải, cạnh nhau.";
+  if (!selection || !selection.length || selection.length % size)
+    throw new Error(cauThieu);
   for (i = 0; i < selection.length; i++) {
     bounds = null;
     try {
@@ -169,9 +180,7 @@ function dcDanBeTripleModels(selection, epsilon) {
         bounds = selection[i].visibleBounds.slice(0);
       } catch (visibleError) {}
     if (!bounds || bounds[2] - bounds[0] <= EPS || bounds[1] - bounds[3] <= EPS)
-      throw new Error(
-        "Không đo được object " + (i + 1) + " trong bộ Khuôn/trước/sau.",
-      );
+      throw new Error("Không đo được object " + (i + 1) + " trong bộ đang chọn.");
     pending.push({
       item: selection[i],
       bounds: bounds,
@@ -201,24 +210,25 @@ function dcDanBeTripleModels(selection, epsilon) {
         minHeight = height;
       }
     }
-    if (row.length % 3)
-      throw new Error(
-        "Hàng nguồn chưa đủ Khuôn → mặt trước → mặt sau. Hãy canh hàng và chọn đủ 3 object cho mỗi mẫu.",
-      );
+    if (row.length % size) throw new Error(cauHang);
     row.sort(function (a, b) {
       return a.cx - b.cx;
     });
-    for (i = 0; i < row.length; i += 3) {
-      if (
-        row[i + 1].cx - row[i].cx <= EPS ||
-        row[i + 2].cx - row[i + 1].cx <= EPS
-      )
-        throw new Error(
-          "Không phân biệt được thứ tự trái/phải. Đặt Khuôn → mặt trước → mặt sau cạnh nhau.",
-        );
-      models.push({ khuon: row[i], bai: row[i + 1], sau: row[i + 2] });
+    for (i = 0; i < row.length; i += size) {
+      for (var k = 1; k < size; k++)
+        if (row[i + k].cx - row[i + k - 1].cx <= EPS) throw new Error(cauVai);
+      groups.push(row.slice(i, i + size));
     }
   }
+  return groups;
+}
+
+// Bộ ba hai mặt: Khuôn → mặt trước → mặt sau. Vai trò khoá cố định cho mọi con.
+function dcDanBeTripleModels(selection, epsilon) {
+  var groups = dcDanBeRowGroups(selection, 3, epsilon),
+    models = [];
+  for (var i = 0; i < groups.length; i++)
+    models.push({ khuon: groups[i][0], bai: groups[i][1], sau: groups[i][2] });
   return models;
 }
 
@@ -677,14 +687,16 @@ function dcDanBePrepare(
             n.indexOf("hinh") >= 0)
         )
           return doc.layers[i];
+        // "front"/"back" so nguyên từ: "Background" không phải mặt sau.
+        var words = " " + n.replace(/[^a-z0-9]+/g, " ") + " ";
         if (
           role === "front" &&
-          (n.indexOf("mat truoc") >= 0 || n.indexOf("front") >= 0)
+          (n.indexOf("mat truoc") >= 0 || words.indexOf(" front ") >= 0)
         )
           return doc.layers[i];
         if (
           role === "back" &&
-          (n.indexOf("mat sau") >= 0 || n.indexOf("back") >= 0)
+          (n.indexOf("mat sau") >= 0 || words.indexOf(" back ") >= 0)
         )
           return doc.layers[i];
       }
@@ -778,47 +790,15 @@ function dcDanBePrepare(
         return models;
       }
       if (sel && sel.length >= 2) {
-        var recs = [];
-        for (si = 0; si < sel.length; si++) {
-          sb = geometricBoundsOf(sel[si]);
-          if (!sb || sb[2] - sb[0] <= EPS || sb[1] - sb[3] <= EPS) continue;
-          recs.push({
-            item: sel[si],
-            bounds: sb,
-            cx: (sb[0] + sb[2]) / 2,
-            cy: (sb[1] + sb[3]) / 2,
-            h: sb[1] - sb[3],
-          });
+        // Cùng luật hàng với bộ ba hai mặt: không ghép chéo hàng trong im lặng.
+        var pairs;
+        try {
+          pairs = dcDanBeRowGroups(sel, 2, EPS);
+        } catch (pairError) {
+          fail(pairError.message);
         }
-        if (recs.length < 2 || recs.length % 2)
-          fail(
-            "Hãy chọn số object chẵn: từng cặp Khuôn bên trái, Bài bên phải.",
-          );
-        recs.sort(function (a, b) {
-          return b.cy - a.cy;
-        });
-        var rows = [],
-          row = [recs[0]],
-          anchor = recs[0].cy,
-          r,
-          oi;
-        function flush() {
-          row.sort(function (a, b) {
-            return a.cx - b.cx;
-          });
-          for (var q = 0; q < row.length; q++) rows.push(row[q]);
-        }
-        for (r = 1; r < recs.length; r++) {
-          if (anchor - recs[r].cy <= recs[0].h * 0.5) row.push(recs[r]);
-          else {
-            flush();
-            row = [recs[r]];
-            anchor = recs[r].cy;
-          }
-        }
-        flush();
-        for (oi = 0; oi < rows.length; oi += 2)
-          models.push({ khuon: rows[oi], bai: rows[oi + 1] });
+        for (si = 0; si < pairs.length; si++)
+          models.push({ khuon: pairs[si][0], bai: pairs[si][1] });
         return models;
       }
       var cutLayer = findLayer("cut"),
