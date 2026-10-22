@@ -64,15 +64,22 @@ Toạ độ tính trong vùng dùng được của tờ (đã trừ lề). `s` l
    khoảng `s`, vẫn vừa khung (tìm nhị phân trên `N`). Phần dư lần lượt cho lá có ít con mỗi bài nhất nếu
    thêm được con, rồi tới lá nào thêm được. Xếp hạng các cách theo: tổng con, rồi số con của bài ít nhất,
    rồi ít ranh giới khu hơn, rồi thứ tự sinh ra.
+   _Bổ sung sau soát mã (22/10/2026):_ mỗi cách còn được chấm ở vài mức `N` thấp hơn (tới 80 % mức đều
+   lớn nhất đạt được trên mọi cách, tối đa 6 mức); ở các mức này phần dư cho lá thêm được nhiều con nhất
+   mỗi mm. Nhờ vậy bớt một hàng/cột của mẫu lớn khi mẫu nhỏ nhờ đó chen được nhiều con hơn hẳn, mà
+   không bài nào thiếu quá 20 % so với mức chia đều.
 5. **Dàn thật** `K` cách đứng đầu (`K` = 4 với 2 nhóm khuôn, 6 với 3–4 nhóm, 5 với từ 5 nhóm). Dàn từng
    lá bằng lõi xếp hàng lồng trong đúng khung của nó, có chấm PON thật.
    - **Khép khu:** các phần con xếp nối tiếp. Phần sau được đẩy sát phần trước tới khi đường bế hai bên
      cách đúng `s`. Phép đo dùng biên dạng thật nở thêm `s` (theo từng cột hoặc hàng), nên hai khu được lồng
      vào nhau ở mép mà vẫn đủ `s`. Đẩy xong phải còn né PON và nằm trong lề; nếu không thì đẩy ít lại.
-   - **Mở rộng khu cuối:** khoảng dư dồn về cuối khung nào đủ cho thêm con thì dàn lại lá hưởng phần dư
-     (tối đa 3 vòng).
+   - **Mở rộng khu cuối:** khoảng dư dồn về cuối khung; lá cuối của mỗi nút nhận luôn phần còn lại sau khi
+     các lá trước đã khép, và bước lấp chỗ trống dùng lưới của chính lá đó để lấp phần dư (thay cho dàn lại
+     tối đa 3 vòng như dự kiến ban đầu).
 6. **Lấp chỗ trống.** Thử thêm con vào các kẽ còn lại. Một con mới chỉ được đặt **sát một con cùng nhóm
-   khuôn**: cách con cùng khuôn ≥ `g`, cách khu khác ≥ `s`, né PON, trong lề. Nhờ vậy cụm không bao giờ bị lẫn.
+   khuôn**: cách con cùng khuôn ≥ `g`, cách khu khác ≥ `s`, né PON, trong lề, và **không làm hai nhóm khuôn
+   hết tách được** bằng một đường ngang/dọc qua tâm các con (không bò sang chỗ trống của khu khác). Nhờ vậy
+   cụm không bao giờ bị lẫn.
 7. **Gán bài trong khu.** Chia đôi đệ quy theo cạnh dài hơn của cụm: mỗi lần tách các con theo toạ độ thành
    hai phần, đúng số con dành cho mỗi nửa nhóm bài. Kết quả là các cụm gọn, gần như hình chữ nhật, chênh
    tối đa 1 con. Luật này dùng cho cả trường hợp tất cả cùng một khuôn.
