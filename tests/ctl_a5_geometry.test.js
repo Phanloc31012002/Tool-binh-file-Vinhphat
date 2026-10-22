@@ -44,6 +44,11 @@ function functionText(source, name) {
   }
   throw new Error(`Unbalanced production function ${name}`);
 }
+// Bộ đo khổ dùng chung (khung Transform) mà các hàm đặt bài gọi tới.
+const doKhung = library.slice(
+  library.indexOf("//  ĐO KHỔ DÙNG CHUNG"),
+  library.indexOf("// dcDan: wrapper bắt mọi lỗi"),
+);
 const signature = functionText(library, "dcRunSignature8");
 const helpers = [
   "formSpec",
@@ -190,7 +195,7 @@ function context(widthMm, heightMm, pageCount = 8) {
     ElementPlacement: { PLACEATEND: 1 },
     CMYKColor: function () {},
   });
-  vm.runInContext(constants + "\n" + helpers, c);
+  vm.runInContext(doKhung + "\n" + constants + "\n" + helpers, c);
   return { c, processed };
 }
 function near(actual, expected, message) {

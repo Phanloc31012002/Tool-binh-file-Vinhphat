@@ -110,11 +110,6 @@ function fixture(n, w = 14, h = 20, left = 100, sourceHeight = 60 * h / w) {
     },
   };
   f.doc.selection = f.originals.slice().reverse(); // thứ tự selection của host không phải thứ tự trang
-  f.context.dcFlattenForImposition = (_, item, frame, ppi) => {
-    assert.equal(ppi,500);
-    flatCalls.push(item.identity);
-    return item;
-  };
   f.context.app.redraw = () => {};
   f.context.alert = () => {};
   f.context.Window = function () {
@@ -135,6 +130,13 @@ function fixture(n, w = 14, h = 20, left = 100, sourceHeight = 60 * h / w) {
   };
   const c = vm.createContext(f.context);
   vm.runInContext(cleanup + pdf + canvas + keo, c);
+  // Không raster nữa: ghi lại thứ tự trang được chuẩn bị (phóng theo khung Transform) để kiểm
+  // thứ tự đọc; hàm thật vẫn chạy.
+  const chuanBi = c.dcChuanBiTrangDan;
+  c.dcChuanBiTrangDan = (doc, item, wMm, hMm, canhBao, nhan) => {
+    flatCalls.push(item.identity);
+    return chuanBi(doc, item, wMm, hMm, canhBao, nhan);
+  };
   return {
     ...f,
     c,
@@ -448,7 +450,7 @@ const main = fs.readFileSync(
   require.resolve("../DanCardCEP/js/main.js"),
   "utf8",
 );
-assert.match(main, /dcKeoGayAutoPonVersion < 14/);
+assert.match(main, /dcKeoGayAutoPonVersion < 15/);
 assert.match(main, /TT16: "Tự trở 16 trang"/);
 const squeeze = fixture(4,14,20,100,90);
 assert.match(squeeze.run(),/^OK:/);
@@ -522,20 +524,11 @@ for (const n of [4,8,12,16,20,32,84]) {
     assert.ok(!f.originals.some(item=>{const b=item.geometricBounds;return x>b[0]+.01&&x<b[2]-.01&&y<b[1]-.01&&y>b[3]+.01;}),"Crop intrudes into fitted artwork");
   }
 }
-// Lỗi được báo: ảnh 3722 x 5262 pixel ở chiều rộng 21.2 cm từng bị thành
-// cao 29.971628 cm. Chạy thử đúng phần đo/đặt bài sau bước flatten,
-// với cả khung AB lớn lẫn khung TT4 nhỏ hơn, kể cả bài đã bị xoay sẵn.
+// Trang nguồn đã xoay sẵn (0/90/180/270/17°) vẫn được phóng đúng khổ theo trục tài liệu
+// (không raster; ma trận quanh tâm), với cả khung AB lớn lẫn khung TT4 nhỏ hơn.
 for(const n of [16,20]) {
   const f=fixture(n,21.2,30);
   f.originals.forEach((p,i)=>p.rotate([0,90,180,270,17][i%5]));
-  f.context.dcFlattenForImposition=(_,item,frame,ppi)=>{
-    assert.equal(ppi,500);
-    const b=item.geometricBounds, width=3722*.144, height=5262*.144;
-    item._points=[[b[0],b[1]],[b[0]+width,b[1]],
-      [b[0]+width,b[1]-height],[b[0],b[1]-height]];
-    item._updateBounds();
-    return item;
-  };
   assert.match(f.run(),/^OK:/);
   const plan=plain(f.c.dcKeoGayPlan(n,false));
   plan.forEach(face=>numbers(face).forEach(pn=>{

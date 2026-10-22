@@ -67,12 +67,12 @@ function dcMoTaLoi(e) {
 //  Transform (clip → khung clip, group → khung group), không đo được mới rơi
 //  về cách đo riêng của từng lệnh; cờ tắt thì đo y như các bản trước.
 //  Panel đặt cờ trước mỗi lệnh (tick "Transform" ở header, tiền tố evalJsx).
-//  Giai đoạn kiểm chứng: mặc định TẮT; nút "Đo khung" (dcDoKhungChon) in số đo
-//  để đối chiếu với bảng Transform; đạt rồi mới bật mặc định.
+//  Từ 22/10 (anh Lộc: "toàn bộ dùng Transform để dàn"): mặc định BẬT; tick ở header
+//  tắt được để so với cách cũ. Nút "Đo khung" (dcDoKhungChon) in số đo đối chiếu.
 // ============================================================
 var DC_DUNG_SAI_KHO_MM = 0.5; // dung sai khổ chung (mm)
 if (typeof dcDoTheoKhungTransform === "undefined")
-  var dcDoTheoKhungTransform = false;
+  var dcDoTheoKhungTransform = true;
 
 // Khung đúng như bảng Transform hiện: clip group → khung mask (kể cả compound path, cờ
 // clipping nằm trên path con của compound); group thường → hợp khung các con đang hiện (bằng
@@ -203,6 +203,78 @@ function dcDoKhung(item, legacy) {
     if (khung) return khung;
   }
   return legacy(item);
+}
+
+// Khung Transform của object, dự phòng geometricBounds; null khi không đo được. Dùng ở các lệnh
+// dàn luôn đo theo Transform (CTL Offset, Keo gáy, Catalogue), không phụ thuộc tick.
+function dcKhungHoacBounds(item) {
+  var khung = null;
+  try {
+    khung = dcKhungThanhPham(item);
+  } catch (khungError) {}
+  if (khung) return khung;
+  try {
+    var g = item.geometricBounds;
+    if (g && g.length === 4 && g[2] > g[0] && g[1] > g[3])
+      return [g[0], g[1], g[2], g[3]];
+  } catch (boundsError) {}
+  return null;
+}
+
+// Gom các câu cảnh báo phóng không đều thành một đoạn nối vào kết quả OK ("" khi không có).
+function dcCauCanhBaoPhong(canhBao) {
+  if (!canhBao || !canhBao.length) return "";
+  return " Lưu ý: " + canhBao.join(" | ");
+}
+
+// Chuẩn bị một trang để dàn (CTL Offset, Keo gáy, Catalogue): KHÔNG raster — anh Lộc 22/10:
+// "bỏ auto biến thành hình… toàn bộ dùng Transform để dàn". Đo khung Transform, phóng về đúng
+// khổ nhập bằng ma trận theo trục tài liệu quanh tâm (trang nguồn xoay sẵn vẫn đúng), nét co
+// giãn theo cùng tỉ lệ. Khung đã đúng (lệch ≤ 0,05 mm) thì không đụng. Trả về chính object;
+// phóng không đều quá 0,5 % thì ghi câu cảnh báo vào canhBao (nếu truyền).
+var DC_DUNG_SAI_PHONG_MM = 0.05;
+function dcChuanBiTrangDan(doc, item, rongMm, caoMm, canhBao, nhan) {
+  var MM = 2.834645669;
+  var khung = dcKhungHoacBounds(item);
+  if (!khung) throw new Error("không đo được khung Transform của trang.");
+  var w = (khung[2] - khung[0]) / MM,
+    h = (khung[1] - khung[3]) / MM;
+  if (!(w > 0 && h > 0))
+    throw new Error("không đo được khung Transform của trang.");
+  if (
+    Math.abs(w - rongMm) <= DC_DUNG_SAI_PHONG_MM &&
+    Math.abs(h - caoMm) <= DC_DUNG_SAI_PHONG_MM
+  )
+    return item;
+  var sx = (rongMm / w) * 100,
+    sy = (caoMm / h) * 100;
+  item.transform(
+    app.getScaleMatrix(sx, sy),
+    true,
+    true,
+    true,
+    true,
+    (sx + sy) / 2,
+    Transformation.CENTER,
+  );
+  if (canhBao && Math.abs(sx - sy) > 0.5) {
+    var pct = function (v) {
+      return (Math.round(v * 10) / 10).toFixed(1).replace(".", ",") + " %";
+    };
+    canhBao.push(
+      (nhan ? nhan + ": " : "") +
+        "phóng không đều " +
+        pct(sx) +
+        " × " +
+        pct(sy) +
+        " (nguồn " +
+        dcMmText(w * MM) +
+        " × " +
+        dcMmText(h * MM) +
+        " mm) — chữ/nét có thể méo nhẹ.",
+    );
+  }
+  return item;
 }
 
 // Mọi object Dàn Card tạo ra (group kết quả, PON duplicate, ghi chú offset) đều gắn note này;
@@ -15960,102 +16032,6 @@ function dcRunVariable() {
 //  Moi ham boc IIFE rieng de scope bien/ham noi bo tach biet.
 // ============================================================
 
-// [CATALOGUE] Kiểm tra object "đã là HÌNH" (chỉ ảnh, không vector/text)
-//  -> để BỎ QUA raster. Tính là hình nếu:
-//   - RasterItem / PlacedItem trần, HOẶC
-//   - GroupItem mà mọi thành phần (bỏ mask clip) đều là Raster/Placed.
-function dcIsImageOnly(item) {
-  function isClipRoot(candidate) {
-    var type = "";
-    try {
-      type = candidate.typename;
-    } catch (e) {
-      return false;
-    }
-    if (type === "PathItem") {
-      try {
-        return candidate.clipping === true;
-      } catch (e2) {
-        return false;
-      }
-    }
-    if (type === "CompoundPathItem") {
-      try {
-        for (var pi = 0; pi < candidate.pathItems.length; pi++)
-          if (candidate.pathItems[pi].clipping === true) return true;
-      } catch (e3) {}
-    }
-    return false;
-  }
-  function imageContentOnly(candidate) {
-    var type = "";
-    try {
-      type = candidate.typename;
-    } catch (e) {
-      return false;
-    }
-    if (type === "RasterItem" || type === "PlacedItem") return true;
-    if (type !== "GroupItem") return false;
-
-    var imageCount = 0;
-    try {
-      for (var i = 0; i < candidate.pageItems.length; i++) {
-        var child = candidate.pageItems[i];
-        // pageItems có thể gồm cả phần tử con cháu. Ở đây chỉ xét phần tử con trực tiếp;
-        // group lồng bên trong do lời gọi đệ quy bên dưới xử lý.
-        try {
-          if (child.parent !== candidate) continue;
-        } catch (e2) {
-          return false;
-        }
-        if (isClipRoot(child)) continue;
-        if (!imageContentOnly(child)) return false;
-        imageCount++;
-      }
-    } catch (e3) {
-      return false;
-    }
-    return imageCount > 0;
-  }
-  return imageContentOnly(item);
-}
-
-// Catalogue, CTL Offset và Keo gáy dùng chung đúng quy tắc này: ảnh có sẵn thì
-// giữ nguyên; nội dung vector/chữ chỉ làm phẳng đúng một lần. Lỗi thì throw để
-// lượt dàn không bao giờ lặng lẽ chạy tiếp với một trang chưa làm phẳng.
-function dcFlattenForImposition(doc, item, frame, resolution) {
-  if (dcIsImageOnly(item)) return item;
-  if (
-    !frame ||
-    frame.length !== 4 ||
-    !isFinite(frame[0]) ||
-    !isFinite(frame[1]) ||
-    !isFinite(frame[2]) ||
-    !isFinite(frame[3]) ||
-    frame[2] <= frame[0] ||
-    frame[1] <= frame[3]
-  )
-    throw new Error("Không xác định được khung để raster.");
-  var ro = new RasterizeOptions();
-  try {
-    ro.resolution = 500; // Dùng cho mọi raster dàn mới; giữ tham số cho các chỗ gọi cũ.
-  } catch (e) {}
-  try {
-    ro.transparency = true;
-  } catch (e2) {}
-  try {
-    ro.padding = 0;
-  } catch (e3) {}
-  try {
-    ro.antiAliasingMethod = AntiAliasingMethod.ARTOPTIMIZED;
-  } catch (e4) {}
-  try {
-    ro.convertSpotColors = false;
-  } catch (e5) {}
-  var raster = doc.rasterize(item, frame, ro);
-  if (!raster) throw new Error("Illustrator không tạo được RasterItem.");
-  return raster;
-}
 
 // Catalogue KTS A4 dùng khổ tờ cố định 43 x 32.5 cm. File AI tham chiếu cũ
 // có bốn PON chữ L màu đen. Vẽ trực tiếp đúng các PON đó để lượt dàn
@@ -16345,167 +16321,16 @@ function dcRunCatalogueA4() {
       //  HÀM PHỤ TRỢ
       // ============================================================
 
-      // ===== ĐO KÍCH THƯỚC (copy nguyên từ card, xử lý clip mask kỹ) =====
-      // Nếu object đã CLIP (group clipped) -> trả bounds của ĐƯỜNG MASK
-      // (= khung clip đúng, vd A4). Không đo nội dung tràn bên trong.
-      function clipMaskBounds(item) {
-        try {
-          if (item.typename === "GroupItem" && item.clipped === true) {
-            var pit = item.pageItems;
-            for (var i = 0; i < pit.length; i++) {
-              var isc = false;
-              try {
-                isc = pit[i].clipping === true;
-              } catch (e) {}
-              if (isc) return pit[i].geometricBounds; // khung clip
-            }
-          }
-        } catch (e) {}
-        return null;
-      }
       function sizeMM(item) {
-        // Ưu tiên: nếu đã clip -> đo theo khung mask (kích thước clip thật)
-        var mb = clipMaskBounds(item);
-        if (mb)
-          return { w: (mb[2] - mb[0]) / MM, h: (mb[1] - mb[3]) / MM, b: mb };
-        // Chưa clip -> đo vùng thật
-        var acc = { val: null };
-        visibleUnion(item, acc);
-        var g = acc.val;
-        if (!g) {
-          try {
-            g = item.visibleBounds;
-          } catch (e) {
-            try {
-              g = item.geometricBounds;
-            } catch (e2) {
-              g = null;
-            }
-          }
-        }
+        // Khung Transform (trang đã clip → khung clip; group → khung group), dự phòng geometricBounds.
+        var g = dcKhungHoacBounds(item);
         if (!g) return { w: 0, h: 0, b: [0, 0, 0, 0] };
         return { w: (g[2] - g[0]) / MM, h: (g[1] - g[3]) / MM, b: g };
       }
 
-      function isVisibleLeaf(it) {
-        try {
-          if (it.hidden === true) return false;
-          if (it.guides === true) return false;
-        } catch (e) {}
-        try {
-          if (it.typename === "PathItem")
-            return it.filled === true || it.stroked === true;
-          if (it.typename === "CompoundPathItem") {
-            if (it.pathItems.length > 0) {
-              var p0 = it.pathItems[0];
-              return p0.filled === true || p0.stroked === true;
-            }
-            return false;
-          }
-        } catch (e) {}
-        return true; // text, raster, placed... coi là thấy
-      }
 
-      function visibleUnion(item, acc) {
-        function merge(b) {
-          if (!b) return;
-          if (!acc.val) {
-            acc.val = b.slice(0);
-            return;
-          }
-          var a = acc.val;
-          if (b[0] < a[0]) a[0] = b[0];
-          if (b[1] > a[1]) a[1] = b[1];
-          if (b[2] > a[2]) a[2] = b[2];
-          if (b[3] < a[3]) a[3] = b[3];
-        }
-        // An toàn: object có thể đã bị xóa/không hợp lệ -> bỏ qua, tránh Error 45.
-        var _tn;
-        try {
-          _tn = item.typename;
-        } catch (e) {
-          return;
-        }
-        if (_tn === "GroupItem") {
-          var clipped = false;
-          try {
-            clipped = item.clipped;
-          } catch (e) {}
-          if (clipped) {
-            // Tìm clip mask để lấy VÙNG GIỚI HẠN (không dùng thẳng làm kết quả,
-            // vì mask có thể lớn thừa hơn nội dung thật).
-            var pit = item.pageItems;
-            var maskB = null;
-            for (var i = 0; i < pit.length; i++) {
-              var isc = false;
-              try {
-                isc = pit[i].clipping === true;
-              } catch (e) {}
-              if (isc) {
-                maskB = pit[i].geometricBounds;
-                break;
-              }
-            }
-            // Đo nội dung THẬT (leaf có fill/stroke) bên trong, bỏ qua chính mask.
-            var inner = { val: null };
-            for (i = 0; i < pit.length; i++) {
-              var isMask = false;
-              try {
-                isMask = pit[i].clipping === true;
-              } catch (e) {}
-              if (isMask) continue; // bỏ đường mask
-              visibleUnion(pit[i], inner);
-            }
-            var res = inner.val;
-            // Giao nội dung thật với vùng mask (nội dung tràn ngoài mask bị cắt).
-            if (res && maskB) {
-              var gx0 = Math.max(res[0], maskB[0]);
-              var gy1 = Math.min(res[1], maskB[1]);
-              var gx2 = Math.min(res[2], maskB[2]);
-              var gy3 = Math.max(res[3], maskB[3]);
-              if (gx2 > gx0 && gy1 > gy3) merge([gx0, gy1, gx2, gy3]);
-              else merge(maskB); // giao rỗng -> fallback mask
-            } else if (res) {
-              merge(res);
-            } else if (maskB) {
-              merge(maskB);
-            }
-            return;
-          }
-          var pit2 = item.pageItems;
-          for (var j = 0; j < pit2.length; j++) visibleUnion(pit2[j], acc);
-          return;
-        }
-        if (isVisibleLeaf(item)) {
-          try {
-            merge(item.visibleBounds);
-          } catch (e) {}
-        }
-      }
 
       // Rasterize object (làm phẳng) ở 500ppi
-      function rasterize(item) {
-        var ro = new RasterizeOptions();
-        try {
-          ro.resolution = 500;
-        } catch (e) {}
-        try {
-          ro.transparency = true;
-        } catch (e) {}
-        try {
-          ro.antiAliasingMethod = AntiAliasingMethod.ARTOPTIMIZED;
-        } catch (e) {}
-        try {
-          ro.convertSpotColors = false;
-        } catch (e) {}
-        var b;
-        try {
-          b = item.visibleBounds;
-        } catch (e) {
-          b = item.geometricBounds;
-        }
-        return doc.rasterize(item, b, ro);
-      }
 
       // Kiểm object đã "phẳng" chưa (là 1 RasterItem hoặc PlacedItem)
       function isFlat(item) {
@@ -16548,28 +16373,13 @@ function dcRunCatalogueA4() {
       //  KHÔNG bóp/resize -> không méo.
       // ============================================================
       var processed = [];
+      var canhBaoPhong = []; // phóng không đều > 0,5 % → báo trong kết quả
       var sizeLog = "";
       for (var p = 0; p < pages.length; p++) {
         var item = pages[p];
-        var s0 = sizeMM(item); // KT hiện tại (đã clip -> đọc khung clip)
-
-        // Khung để raster = khung hiện tại của object (đã clip đúng KT)
-        var frame = s0.b.slice(0); // [l,t,r,b]
-
-        // Raster làm phẳng theo đúng khung (KHÔNG clip lại - object đã clip sẵn)
-        var flat = dcFlattenForImposition(doc, item, frame, 500);
-
-        // TĂNG kích thước lên đúng 21.1 x 29.9 (cách A - ép đúng số)
-        var gb = flat.geometricBounds; // [l,t,r,b]
-        var curW = (gb[2] - gb[0]) / MM,
-          curH = (gb[1] - gb[3]) / MM;
-        if (curW > 0 && curH > 0) {
-          var sx = (PAGE_W / curW) * 100;
-          var sy = (PAGE_H / curH) * 100;
-          try {
-            flat.resize(sx, sy);
-          } catch (e) {}
-        }
+        var s0 = sizeMM(item); // khung Transform hiện tại (trang đã clip → khung clip)
+        // Không raster: phóng nguyên vector về đúng PAGE_W x PAGE_H theo khung Transform.
+        var flat = dcChuanBiTrangDan(doc, item, PAGE_W, PAGE_H, canhBaoPhong, "Trang " + (p + 1));
 
         if (p < 4)
           sizeLog +=
@@ -16993,7 +16803,7 @@ function dcRunCatalogueA4() {
         app.redraw();
       }
     })();
-    return "OK: \u0110\u00e3 ch\u1ea1y d\u00e0n catalogue A4.";
+    return "OK: Đã chạy dàn catalogue A4." + dcCauCanhBaoPhong(canhBaoPhong);
   } catch (e) {
     return "ERR: catalogue A4: " + e.toString();
   }
@@ -17136,167 +16946,16 @@ function dcRunCatalogueA5() {
       //  HÀM PHỤ TRỢ
       // ============================================================
 
-      // ===== ĐO KÍCH THƯỚC (copy nguyên từ card, xử lý clip mask kỹ) =====
-      // Nếu object đã CLIP (group clipped) -> trả bounds của ĐƯỜNG MASK
-      // (= khung clip đúng, vd A4). Không đo nội dung tràn bên trong.
-      function clipMaskBounds(item) {
-        try {
-          if (item.typename === "GroupItem" && item.clipped === true) {
-            var pit = item.pageItems;
-            for (var i = 0; i < pit.length; i++) {
-              var isc = false;
-              try {
-                isc = pit[i].clipping === true;
-              } catch (e) {}
-              if (isc) return pit[i].geometricBounds; // khung clip
-            }
-          }
-        } catch (e) {}
-        return null;
-      }
       function sizeMM(item) {
-        // Ưu tiên: nếu đã clip -> đo theo khung mask (kích thước clip thật)
-        var mb = clipMaskBounds(item);
-        if (mb)
-          return { w: (mb[2] - mb[0]) / MM, h: (mb[1] - mb[3]) / MM, b: mb };
-        // Chưa clip -> đo vùng thật
-        var acc = { val: null };
-        visibleUnion(item, acc);
-        var g = acc.val;
-        if (!g) {
-          try {
-            g = item.visibleBounds;
-          } catch (e) {
-            try {
-              g = item.geometricBounds;
-            } catch (e2) {
-              g = null;
-            }
-          }
-        }
+        // Khung Transform (trang đã clip → khung clip; group → khung group), dự phòng geometricBounds.
+        var g = dcKhungHoacBounds(item);
         if (!g) return { w: 0, h: 0, b: [0, 0, 0, 0] };
         return { w: (g[2] - g[0]) / MM, h: (g[1] - g[3]) / MM, b: g };
       }
 
-      function isVisibleLeaf(it) {
-        try {
-          if (it.hidden === true) return false;
-          if (it.guides === true) return false;
-        } catch (e) {}
-        try {
-          if (it.typename === "PathItem")
-            return it.filled === true || it.stroked === true;
-          if (it.typename === "CompoundPathItem") {
-            if (it.pathItems.length > 0) {
-              var p0 = it.pathItems[0];
-              return p0.filled === true || p0.stroked === true;
-            }
-            return false;
-          }
-        } catch (e) {}
-        return true; // text, raster, placed... coi là thấy
-      }
 
-      function visibleUnion(item, acc) {
-        function merge(b) {
-          if (!b) return;
-          if (!acc.val) {
-            acc.val = b.slice(0);
-            return;
-          }
-          var a = acc.val;
-          if (b[0] < a[0]) a[0] = b[0];
-          if (b[1] > a[1]) a[1] = b[1];
-          if (b[2] > a[2]) a[2] = b[2];
-          if (b[3] < a[3]) a[3] = b[3];
-        }
-        // An toàn: object có thể đã bị xóa/không hợp lệ -> bỏ qua, tránh Error 45.
-        var _tn;
-        try {
-          _tn = item.typename;
-        } catch (e) {
-          return;
-        }
-        if (_tn === "GroupItem") {
-          var clipped = false;
-          try {
-            clipped = item.clipped;
-          } catch (e) {}
-          if (clipped) {
-            // Tìm clip mask để lấy VÙNG GIỚI HẠN (không dùng thẳng làm kết quả,
-            // vì mask có thể lớn thừa hơn nội dung thật).
-            var pit = item.pageItems;
-            var maskB = null;
-            for (var i = 0; i < pit.length; i++) {
-              var isc = false;
-              try {
-                isc = pit[i].clipping === true;
-              } catch (e) {}
-              if (isc) {
-                maskB = pit[i].geometricBounds;
-                break;
-              }
-            }
-            // Đo nội dung THẬT (leaf có fill/stroke) bên trong, bỏ qua chính mask.
-            var inner = { val: null };
-            for (i = 0; i < pit.length; i++) {
-              var isMask = false;
-              try {
-                isMask = pit[i].clipping === true;
-              } catch (e) {}
-              if (isMask) continue; // bỏ đường mask
-              visibleUnion(pit[i], inner);
-            }
-            var res = inner.val;
-            // Giao nội dung thật với vùng mask (nội dung tràn ngoài mask bị cắt).
-            if (res && maskB) {
-              var gx0 = Math.max(res[0], maskB[0]);
-              var gy1 = Math.min(res[1], maskB[1]);
-              var gx2 = Math.min(res[2], maskB[2]);
-              var gy3 = Math.max(res[3], maskB[3]);
-              if (gx2 > gx0 && gy1 > gy3) merge([gx0, gy1, gx2, gy3]);
-              else merge(maskB); // giao rỗng -> fallback mask
-            } else if (res) {
-              merge(res);
-            } else if (maskB) {
-              merge(maskB);
-            }
-            return;
-          }
-          var pit2 = item.pageItems;
-          for (var j = 0; j < pit2.length; j++) visibleUnion(pit2[j], acc);
-          return;
-        }
-        if (isVisibleLeaf(item)) {
-          try {
-            merge(item.visibleBounds);
-          } catch (e) {}
-        }
-      }
 
       // Rasterize object (làm phẳng) ở 500ppi
-      function rasterize(item) {
-        var ro = new RasterizeOptions();
-        try {
-          ro.resolution = 500;
-        } catch (e) {}
-        try {
-          ro.transparency = true;
-        } catch (e) {}
-        try {
-          ro.antiAliasingMethod = AntiAliasingMethod.ARTOPTIMIZED;
-        } catch (e) {}
-        try {
-          ro.convertSpotColors = false;
-        } catch (e) {}
-        var b;
-        try {
-          b = item.visibleBounds;
-        } catch (e) {
-          b = item.geometricBounds;
-        }
-        return doc.rasterize(item, b, ro);
-      }
 
       // Kiểm object đã "phẳng" chưa (là 1 RasterItem hoặc PlacedItem)
       function isFlat(item) {
@@ -17339,28 +16998,13 @@ function dcRunCatalogueA5() {
       //  KHÔNG bóp/resize -> không méo.
       // ============================================================
       var processed = [];
+      var canhBaoPhong = []; // phóng không đều > 0,5 % → báo trong kết quả
       var sizeLog = "";
       for (var p = 0; p < pages.length; p++) {
         var item = pages[p];
-        var s0 = sizeMM(item); // KT hiện tại (đã clip -> đọc khung clip)
-
-        // Khung để raster = khung hiện tại của object (đã clip đúng KT)
-        var frame = s0.b.slice(0); // [l,t,r,b]
-
-        // Raster làm phẳng theo đúng khung (KHÔNG clip lại - object đã clip sẵn)
-        var flat = dcFlattenForImposition(doc, item, frame, 500);
-
-        // TĂNG kích thước lên đúng 21.1 x 29.9 (cách A - ép đúng số)
-        var gb = flat.geometricBounds; // [l,t,r,b]
-        var curW = (gb[2] - gb[0]) / MM,
-          curH = (gb[1] - gb[3]) / MM;
-        if (curW > 0 && curH > 0) {
-          var sx = (PAGE_W / curW) * 100;
-          var sy = (PAGE_H / curH) * 100;
-          try {
-            flat.resize(sx, sy);
-          } catch (e) {}
-        }
+        var s0 = sizeMM(item); // khung Transform hiện tại (trang đã clip → khung clip)
+        // Không raster: phóng nguyên vector về đúng PAGE_W x PAGE_H theo khung Transform.
+        var flat = dcChuanBiTrangDan(doc, item, PAGE_W, PAGE_H, canhBaoPhong, "Trang " + (p + 1));
 
         if (p < 4)
           sizeLog +=
@@ -17819,7 +17463,7 @@ function dcRunCatalogueA5() {
         app.redraw();
       }
     })();
-    return "OK: \u0110\u00e3 ch\u1ea1y d\u00e0n catalogue A5.";
+    return "OK: Đã chạy dàn catalogue A5." + dcCauCanhBaoPhong(canhBaoPhong);
   } catch (e) {
     return "ERR: catalogue A5: " + e.toString();
   }
@@ -18063,133 +17707,14 @@ function dcRunCatalogueCustom(wCm, hCm) {
       // ============================================================
       //  HÀM PHỤ TRỢ
       // ============================================================
-      function clipMaskBounds(item) {
-        try {
-          if (item.typename === "GroupItem" && item.clipped === true) {
-            var pit = item.pageItems;
-            for (var i = 0; i < pit.length; i++) {
-              var isc = false;
-              try {
-                isc = pit[i].clipping === true;
-              } catch (e) {}
-              if (isc) return pit[i].geometricBounds;
-            }
-          }
-        } catch (e) {}
-        return null;
-      }
       function sizeMM(item) {
-        var mb = clipMaskBounds(item);
-        if (mb)
-          return { w: (mb[2] - mb[0]) / MM, h: (mb[1] - mb[3]) / MM, b: mb };
-        var acc = { val: null };
-        visibleUnion(item, acc);
-        var g = acc.val;
-        if (!g) {
-          try {
-            g = item.visibleBounds;
-          } catch (e) {
-            try {
-              g = item.geometricBounds;
-            } catch (e2) {
-              g = null;
-            }
-          }
-        }
+        // Khung Transform (trang đã clip → khung clip; group → khung group), dự phòng geometricBounds.
+        var g = dcKhungHoacBounds(item);
         if (!g) return { w: 0, h: 0, b: [0, 0, 0, 0] };
         return { w: (g[2] - g[0]) / MM, h: (g[1] - g[3]) / MM, b: g };
       }
 
-      function isVisibleLeaf(it) {
-        try {
-          if (it.hidden === true) return false;
-          if (it.guides === true) return false;
-        } catch (e) {}
-        try {
-          if (it.typename === "PathItem")
-            return it.filled === true || it.stroked === true;
-          if (it.typename === "CompoundPathItem") {
-            if (it.pathItems.length > 0) {
-              var p0 = it.pathItems[0];
-              return p0.filled === true || p0.stroked === true;
-            }
-            return false;
-          }
-        } catch (e) {}
-        return true;
-      }
 
-      function visibleUnion(item, acc) {
-        function merge(b) {
-          if (!b) return;
-          if (!acc.val) {
-            acc.val = b.slice(0);
-            return;
-          }
-          var a = acc.val;
-          if (b[0] < a[0]) a[0] = b[0];
-          if (b[1] > a[1]) a[1] = b[1];
-          if (b[2] > a[2]) a[2] = b[2];
-          if (b[3] < a[3]) a[3] = b[3];
-        }
-        var _tn;
-        try {
-          _tn = item.typename;
-        } catch (e) {
-          return;
-        }
-        if (_tn === "GroupItem") {
-          var clipped = false;
-          try {
-            clipped = item.clipped;
-          } catch (e) {}
-          if (clipped) {
-            var pit = item.pageItems;
-            var maskB = null;
-            for (var i = 0; i < pit.length; i++) {
-              var isc = false;
-              try {
-                isc = pit[i].clipping === true;
-              } catch (e) {}
-              if (isc) {
-                maskB = pit[i].geometricBounds;
-                break;
-              }
-            }
-            var inner = { val: null };
-            for (i = 0; i < pit.length; i++) {
-              var isMask = false;
-              try {
-                isMask = pit[i].clipping === true;
-              } catch (e) {}
-              if (isMask) continue;
-              visibleUnion(pit[i], inner);
-            }
-            var res = inner.val;
-            if (res && maskB) {
-              var gx0 = Math.max(res[0], maskB[0]);
-              var gy1 = Math.min(res[1], maskB[1]);
-              var gx2 = Math.min(res[2], maskB[2]);
-              var gy3 = Math.max(res[3], maskB[3]);
-              if (gx2 > gx0 && gy1 > gy3) merge([gx0, gy1, gx2, gy3]);
-              else merge(maskB);
-            } else if (res) {
-              merge(res);
-            } else if (maskB) {
-              merge(maskB);
-            }
-            return;
-          }
-          var pit2 = item.pageItems;
-          for (var j = 0; j < pit2.length; j++) visibleUnion(pit2[j], acc);
-          return;
-        }
-        if (isVisibleLeaf(item)) {
-          try {
-            merge(item.visibleBounds);
-          } catch (e) {}
-        }
-      }
 
       function centerAt(item, cxPt, cyPt) {
         var s = sizeMM(item);
@@ -18202,25 +17727,13 @@ function dcRunCatalogueCustom(wCm, hCm) {
       //  BƯỚC 1: XỬ LÝ TỪNG TRANG (raster + phóng về PAGE_W x PAGE_H)
       // ============================================================
       var processed = [];
+      var canhBaoPhong = []; // phóng không đều > 0,5 % → báo trong kết quả
       var sizeLog = "";
       for (var p = 0; p < pages.length; p++) {
         var item = pages[p];
-        var s0 = sizeMM(item);
-        var frame = s0.b.slice(0);
-
-        var flat = dcFlattenForImposition(doc, item, frame, 500);
-
-        // Phóng lên đúng PAGE_W x PAGE_H (cách A - ép đúng số, không méo với raster)
-        var gb = flat.geometricBounds;
-        var curW = (gb[2] - gb[0]) / MM,
-          curH = (gb[1] - gb[3]) / MM;
-        if (curW > 0 && curH > 0) {
-          var sx = (PAGE_W / curW) * 100;
-          var sy = (PAGE_H / curH) * 100;
-          try {
-            flat.resize(sx, sy);
-          } catch (e) {}
-        }
+        var s0 = sizeMM(item); // khung Transform hiện tại (trang đã clip → khung clip)
+        // Không raster: phóng nguyên vector về đúng PAGE_W x PAGE_H theo khung Transform.
+        var flat = dcChuanBiTrangDan(doc, item, PAGE_W, PAGE_H, canhBaoPhong, "Trang " + (p + 1));
 
         if (p < 4)
           sizeLog +=
@@ -18587,7 +18100,7 @@ function dcRunCatalogueCustom(wCm, hCm) {
         app.redraw();
       }
     })(wCm, hCm);
-    return "OK: \u0110\u00e3 ch\u1ea1y d\u00e0n catalogue kh\u1ed5 t\u00f9y ch\u1ec9nh.";
+    return "OK: Đã chạy dàn catalogue khổ tùy chỉnh." + dcCauCanhBaoPhong(canhBaoPhong);
   } catch (e) {
     return "ERR: catalogue custom: " + e.toString();
   }
@@ -18804,130 +18317,11 @@ function dcRunCatalogueCustomA5(wCm, hCm) {
       // ============================================================
       //  HÀM PHỤ TRỢ (giống A4/A5)
       // ============================================================
-      function clipMaskBounds(item) {
-        try {
-          if (item.typename === "GroupItem" && item.clipped === true) {
-            var pit = item.pageItems;
-            for (var i = 0; i < pit.length; i++) {
-              var isc = false;
-              try {
-                isc = pit[i].clipping === true;
-              } catch (e) {}
-              if (isc) return pit[i].geometricBounds;
-            }
-          }
-        } catch (e) {}
-        return null;
-      }
       function sizeMM(item) {
-        var mb = clipMaskBounds(item);
-        if (mb)
-          return { w: (mb[2] - mb[0]) / MM, h: (mb[1] - mb[3]) / MM, b: mb };
-        var acc = { val: null };
-        visibleUnion(item, acc);
-        var g = acc.val;
-        if (!g) {
-          try {
-            g = item.visibleBounds;
-          } catch (e) {
-            try {
-              g = item.geometricBounds;
-            } catch (e2) {
-              g = null;
-            }
-          }
-        }
+        // Khung Transform (trang đã clip → khung clip; group → khung group), dự phòng geometricBounds.
+        var g = dcKhungHoacBounds(item);
         if (!g) return { w: 0, h: 0, b: [0, 0, 0, 0] };
         return { w: (g[2] - g[0]) / MM, h: (g[1] - g[3]) / MM, b: g };
-      }
-      function isVisibleLeaf(it) {
-        try {
-          if (it.hidden === true) return false;
-          if (it.guides === true) return false;
-        } catch (e) {}
-        try {
-          if (it.typename === "PathItem")
-            return it.filled === true || it.stroked === true;
-          if (it.typename === "CompoundPathItem") {
-            if (it.pathItems.length > 0) {
-              var p0 = it.pathItems[0];
-              return p0.filled === true || p0.stroked === true;
-            }
-            return false;
-          }
-        } catch (e) {}
-        return true;
-      }
-      function visibleUnion(item, acc) {
-        function merge(b) {
-          if (!b) return;
-          if (!acc.val) {
-            acc.val = b.slice(0);
-            return;
-          }
-          var a = acc.val;
-          if (b[0] < a[0]) a[0] = b[0];
-          if (b[1] > a[1]) a[1] = b[1];
-          if (b[2] > a[2]) a[2] = b[2];
-          if (b[3] < a[3]) a[3] = b[3];
-        }
-        var _tn;
-        try {
-          _tn = item.typename;
-        } catch (e) {
-          return;
-        }
-        if (_tn === "GroupItem") {
-          var clipped = false;
-          try {
-            clipped = item.clipped;
-          } catch (e) {}
-          if (clipped) {
-            var pit = item.pageItems;
-            var maskB = null;
-            for (var i = 0; i < pit.length; i++) {
-              var isc = false;
-              try {
-                isc = pit[i].clipping === true;
-              } catch (e) {}
-              if (isc) {
-                maskB = pit[i].geometricBounds;
-                break;
-              }
-            }
-            var inner = { val: null };
-            for (i = 0; i < pit.length; i++) {
-              var isMask = false;
-              try {
-                isMask = pit[i].clipping === true;
-              } catch (e) {}
-              if (isMask) continue;
-              visibleUnion(pit[i], inner);
-            }
-            var res = inner.val;
-            if (res && maskB) {
-              var gx0 = Math.max(res[0], maskB[0]);
-              var gy1 = Math.min(res[1], maskB[1]);
-              var gx2 = Math.min(res[2], maskB[2]);
-              var gy3 = Math.max(res[3], maskB[3]);
-              if (gx2 > gx0 && gy1 > gy3) merge([gx0, gy1, gx2, gy3]);
-              else merge(maskB);
-            } else if (res) {
-              merge(res);
-            } else if (maskB) {
-              merge(maskB);
-            }
-            return;
-          }
-          var pit2 = item.pageItems;
-          for (var j = 0; j < pit2.length; j++) visibleUnion(pit2[j], acc);
-          return;
-        }
-        if (isVisibleLeaf(item)) {
-          try {
-            merge(item.visibleBounds);
-          } catch (e) {}
-        }
       }
       function centerAt(item, cxPt, cyPt) {
         var s = sizeMM(item);
@@ -18940,23 +18334,10 @@ function dcRunCatalogueCustomA5(wCm, hCm) {
       //  BƯỚC 1: XỬ LÝ TỪNG TRANG (raster + phóng về PAGE_W x PAGE_H)
       // ============================================================
       var processed = [];
+      var canhBaoPhong = []; // phóng không đều > 0,5 % → báo trong kết quả
       for (var p = 0; p < pages.length; p++) {
         var item = pages[p];
-        var s0 = sizeMM(item);
-        var frame = s0.b.slice(0);
-
-        var flat = dcFlattenForImposition(doc, item, frame, 500);
-
-        var gb = flat.geometricBounds;
-        var curW = (gb[2] - gb[0]) / MM,
-          curH = (gb[1] - gb[3]) / MM;
-        if (curW > 0 && curH > 0) {
-          var sx = (PAGE_W / curW) * 100;
-          var sy = (PAGE_H / curH) * 100;
-          try {
-            flat.resize(sx, sy);
-          } catch (e) {}
-        }
+        var flat = dcChuanBiTrangDan(doc, item, PAGE_W, PAGE_H, canhBaoPhong, "Trang " + (p + 1)); // không raster
         processed.push(flat);
       }
 
@@ -19309,7 +18690,7 @@ function dcRunCatalogueCustomA5(wCm, hCm) {
         app.redraw();
       }
     })(wCm, hCm);
-    return "OK: \u0110\u00e3 ch\u1ea1y d\u00e0n catalogue A5 kh\u1ed5 t\u00f9y ch\u1ec9nh.";
+    return "OK: Đã chạy dàn catalogue A5 khổ tùy chỉnh." + dcCauCanhBaoPhong(canhBaoPhong);
   } catch (e) {
     return "ERR: catalogue custom A5: " + e.toString();
   }
@@ -19349,7 +18730,7 @@ function dcRunCatalogueCustomA5(wCm, hCm) {
 // một cuốn hay hai cuốn giống hệt nhau. Hai cuốn dùng chung
 // đường cắt giữa và dùng PON kiểu A5.
 // ============================================================
-var dcCatalogueAutoVersion = 14;
+var dcCatalogueAutoVersion = 15;
 
 function dcRunCatalogueAuto(wCm, hCm) {
   var MM = 2.834645669;
@@ -19359,19 +18740,9 @@ function dcRunCatalogueAuto(wCm, hCm) {
     return isNaN(n) ? 0 : n;
   }
 
-  // Khung thành phẩm: theo bảng Transform khi cờ bật, không thì visibleBounds như cũ.
+  // Khung thành phẩm = khung Transform (dự phòng geometricBounds), không phụ thuộc tick.
   function getBounds(item) {
-    return dcDoKhung(item, function (it) {
-      try {
-        return it.visibleBounds.slice(0);
-      } catch (e) {
-        try {
-          return it.geometricBounds.slice(0);
-        } catch (e2) {
-          return null;
-        }
-      }
-    });
+    return dcKhungHoacBounds(item);
   }
 
   function centerAt(item, cx, cy) {
@@ -19516,20 +18887,13 @@ function dcRunCatalogueAuto(wCm, hCm) {
     } catch (layerError) {}
 
     var processed = [];
+    var canhBaoPhong = [];
     for (var pi = 0; pi < source.length; pi++) {
-      var frame = getBounds(source[pi].item);
-      var flat = dcFlattenForImposition(doc, source[pi].item, frame, 500);
+      // Không raster: trang nguyên vector, phóng về khổ nhập theo khung Transform.
+      var flat = dcChuanBiTrangDan(doc, source[pi].item, pageW, pageH, canhBaoPhong, "Trang " + (pi + 1));
       try {
         flat.move(layoutLayer, ElementPlacement.PLACEATEND);
       } catch (moveError) {}
-      var flatBounds = getBounds(flat);
-      if (!flatBounds) throw new Error("Không tạo được trang raster.");
-      var currentW = flatBounds[2] - flatBounds[0];
-      var currentH = flatBounds[1] - flatBounds[3];
-      if (currentW <= 0 || currentH <= 0) {
-        throw new Error("Trang có kích thước không hợp lệ.");
-      }
-      flat.resize((pageW * MM * 100) / currentW, (pageH * MM * 100) / currentH);
       processed.push(flat);
     }
 
@@ -19761,7 +19125,8 @@ function dcRunCatalogueAuto(wCm, hCm) {
       (plan.copies === 2 ? "2-cuốn" : "1-cuốn") +
       " đã được vẽ tự động; " +
       numFaces +
-      " artboard trước/sau."
+      " artboard trước/sau." +
+      dcCauCanhBaoPhong(canhBaoPhong)
     );
   } catch (e) {
     return "ERR: Catalogue tự tính: " + e.toString();
@@ -19774,7 +19139,7 @@ function dcRunCatalogueAuto(wCm, hCm) {
 // 65 x 86 đã duyệt; chúng không bao giờ bị ruột đã bóp kéo vào trong.  Lượt
 // bóp 2 trang canh giữa cũng được bù một lượng rất nhỏ ở đáy danh định,
 // cần có để giữ tờ ruột đầu tiên nằm trong artboard cố định của nó.
-var dcSignature8AutoPonVersion = 41;
+var dcSignature8AutoPonVersion = 42;
 
 function dcRunSignature8(wCm, hCm, coBia) {
   var previousSignatureCoordinates = app.coordinateSystem;
@@ -19960,12 +19325,7 @@ function dcRunSignature8(wCm, hCm, coBia) {
     var selectionTop = null;
     for (var i = 0; i < sel.length; i++) {
       var it = sel[i];
-      var b;
-      try {
-        b = it.visibleBounds;
-      } catch (e) {
-        b = it.geometricBounds;
-      }
+      var b = dcKhungHoacBounds(it) || it.geometricBounds;
       arr.push({ item: it, left: b[0], top: b[1] });
       if (selectionLeft === null) {
         selectionLeft = b[0];
@@ -19986,135 +19346,11 @@ function dcRunSignature8(wCm, hCm, coBia) {
     // ============================================================
     //  HÀM PHỤ TRỢ (đo/clip/union giống các hàm catalogue khác)
     // ============================================================
-    function clipMaskBounds(item) {
-      try {
-        if (item.typename === "GroupItem" && item.clipped === true) {
-          var p = item.pageItems;
-          for (var i = 0; i < p.length; i++) {
-            var c = false;
-            try {
-              c = p[i].clipping === true;
-            } catch (e) {}
-            if (c) return p[i].geometricBounds;
-          }
-        }
-      } catch (e) {}
-      return null;
-    }
     function sizeMM(item) {
-      var mb = clipMaskBounds(item);
-      if (mb)
-        return { w: (mb[2] - mb[0]) / MM, h: (mb[1] - mb[3]) / MM, b: mb };
-      var acc = { val: null };
-      visibleUnion(item, acc);
-      var g = acc.val;
-      if (!g) {
-        try {
-          g = item.visibleBounds;
-        } catch (e) {
-          try {
-            g = item.geometricBounds;
-          } catch (e2) {
-            g = null;
-          }
-        }
-      }
+      // Khung Transform (trang đã clip → khung clip; group → khung group), dự phòng geometricBounds.
+      var g = dcKhungHoacBounds(item);
       if (!g) return { w: 0, h: 0, b: [0, 0, 0, 0] };
       return { w: (g[2] - g[0]) / MM, h: (g[1] - g[3]) / MM, b: g };
-    }
-    function isVisibleLeaf(it) {
-      try {
-        if (it.hidden === true) return false;
-        if (it.guides === true) return false;
-      } catch (e) {}
-      try {
-        if (it.typename === "PathItem")
-          return it.filled === true || it.stroked === true;
-        if (it.typename === "CompoundPathItem") {
-          if (it.pathItems.length > 0) {
-            var p0 = it.pathItems[0];
-            return p0.filled === true || p0.stroked === true;
-          }
-          return false;
-        }
-      } catch (e) {}
-      return true;
-    }
-    function visibleUnion(item, acc) {
-      function merge(b) {
-        if (!b) return;
-        if (!acc.val) {
-          acc.val = b.slice(0);
-          return;
-        }
-        var a = acc.val;
-        if (b[0] < a[0]) a[0] = b[0];
-        if (b[1] > a[1]) a[1] = b[1];
-        if (b[2] > a[2]) a[2] = b[2];
-        if (b[3] < a[3]) a[3] = b[3];
-      }
-      // Trang đo theo khung Transform (khung clip của trang), không đo nội dung bên trong.
-      if (dcDoTheoKhungTransform) {
-        var khungTransform = dcKhungThanhPham(item);
-        if (khungTransform) {
-          merge(khungTransform);
-          return;
-        }
-      }
-      var tn;
-      try {
-        tn = item.typename;
-      } catch (e) {
-        return;
-      }
-      if (tn === "GroupItem") {
-        var cl = false;
-        try {
-          cl = item.clipped;
-        } catch (e) {}
-        if (cl) {
-          var p = item.pageItems,
-            mB = null;
-          for (var i = 0; i < p.length; i++) {
-            var c = false;
-            try {
-              c = p[i].clipping === true;
-            } catch (e) {}
-            if (c) {
-              mB = p[i].geometricBounds;
-              break;
-            }
-          }
-          var inn = { val: null };
-          for (i = 0; i < p.length; i++) {
-            var m = false;
-            try {
-              m = p[i].clipping === true;
-            } catch (e) {}
-            if (m) continue;
-            visibleUnion(p[i], inn);
-          }
-          var r = inn.val;
-          if (r && mB) {
-            var x0 = Math.max(r[0], mB[0]),
-              y1 = Math.min(r[1], mB[1]),
-              x2 = Math.min(r[2], mB[2]),
-              y3 = Math.max(r[3], mB[3]);
-            if (x2 > x0 && y1 > y3) merge([x0, y1, x2, y3]);
-            else merge(mB);
-          } else if (r) merge(r);
-          else if (mB) merge(mB);
-          return;
-        }
-        var p2 = item.pageItems;
-        for (var j = 0; j < p2.length; j++) visibleUnion(p2[j], acc);
-        return;
-      }
-      if (isVisibleLeaf(item)) {
-        try {
-          merge(item.visibleBounds);
-        } catch (e) {}
-      }
     }
     function centerAt(item, cx, cy) {
       var s = sizeMM(item);
@@ -20124,38 +19360,23 @@ function dcRunSignature8(wCm, hCm, coBia) {
     }
 
     // ============================================================
-    //  BƯỚC 1: raster từng trang + phóng về PAGE_W x PAGE_H
-    //  Raster tại frame gốc (đo bằng clipMaskBounds/visibleUnion) rồi resize
-    //  về đúng kích thước đích (cách A - ép đúng số, raster không méo).
+    //  BƯỚC 1: phóng từng trang về PAGE_W x PAGE_H theo khung Transform
+    //  Không raster (anh Lộc 22/10): trang giữ nguyên vector, chỉ phóng về khổ nhập.
     // ============================================================
     var processed = [];
+    var canhBaoPhong = []; // phóng không đều > 0,5 % → báo trong kết quả
     function prepareSignaturePages() {
       for (var p = 0; p < pages.length; p++) {
         var item = pages[p];
-        var s0 = sizeMM(item); // do kich thuoc that (xu ly clip neu co)
-        var frame = s0.b.slice(0); // khung để raster
-
-        var flat = dcFlattenForImposition(doc, item, frame, 500);
-
-        // phong ve dung PAGE_W x PAGE_H
-        var gb;
-        try {
-          gb = flat.geometricBounds;
-        } catch (e) {
-          gb = null;
-        }
-        if (gb) {
-          var cw = (gb[2] - gb[0]) / MM,
-            ch = (gb[1] - gb[3]) / MM;
-          if (cw > 0 && ch > 0) {
-            try {
-              flat.resize(
-                (SOURCE_PAGE_W / cw) * 100,
-                (SOURCE_PAGE_H / ch) * 100,
-              );
-            } catch (e) {}
-          }
-        }
+        // Không raster: trang nguyên vector, phóng về khổ nhập theo khung Transform.
+        var flat = dcChuanBiTrangDan(
+          doc,
+          item,
+          SOURCE_PAGE_W,
+          SOURCE_PAGE_H,
+          canhBaoPhong,
+          "Trang " + (p + 1),
+        );
         // Artboard sản xuất A5 đôi khi được nhập thành 21.15 x 15.
         // Chuẩn hoá kiểu nhập nằm ngang đó về lưới A5 khổ đứng để form giấy
         // được chọn không phụ thuộc thứ tự ô nhập trong panel.
@@ -20454,12 +19675,9 @@ function dcRunSignature8(wCm, hCm, coBia) {
     // ba kiểu form không trôi mỗi nơi một kiểu như trước.
     function squeezeAboutCentre(grp, scaleXPercent, scaleYPercent) {
       if (!grp) return;
-      var before, after;
-      try {
-        before = grp.geometricBounds;
-      } catch (readBoundsError) {
-        return;
-      }
+      var before = dcKhungHoacBounds(grp),
+        after;
+      if (!before) return;
       var cx = (before[0] + before[2]) / 2;
       var cy = (before[1] + before[3]) / 2;
       try {
@@ -20468,7 +19686,7 @@ function dcRunSignature8(wCm, hCm, coBia) {
         return;
       }
       try {
-        after = grp.geometricBounds;
+        after = dcKhungHoacBounds(grp) || grp.geometricBounds;
         grp.translate(
           cx - (after[0] + after[2]) / 2,
           cy - (after[1] + after[3]) / 2,
@@ -21257,12 +20475,7 @@ function dcRunSignature8(wCm, hCm, coBia) {
 
     // ---------- đặt trang lên 1 MẶT ----------
     function centerItem(it, cx, cy) {
-      var gb;
-      try {
-        gb = it.geometricBounds;
-      } catch (e) {
-        return;
-      }
+      var gb = dcKhungHoacBounds(it); // khung Transform, không phải bound nội dung
       if (!gb || gb.length < 4) return;
       var ccx = (gb[0] + gb[2]) / 2,
         ccy = (gb[1] + gb[3]) / 2;
@@ -21348,10 +20561,10 @@ function dcRunSignature8(wCm, hCm, coBia) {
         itR = processed[pageR - 1];
       if (!itL || !itR) return null;
       // đặt itR ngay bên phải itL (theo bề rộng trang gốc)
-      var bl = itL.geometricBounds;
+      var bl = dcKhungHoacBounds(itL) || itL.geometricBounds;
       var lcx = (bl[0] + bl[2]) / 2,
         lcy = (bl[1] + bl[3]) / 2;
-      var br = itR.geometricBounds;
+      var br = dcKhungHoacBounds(itR) || itR.geometricBounds;
       var rcx = (br[0] + br[2]) / 2,
         rcy = (br[1] + br[3]) / 2;
       // đưa itR về cùng hàng, cạnh phải itL
@@ -21370,12 +20583,8 @@ function dcRunSignature8(wCm, hCm, coBia) {
     }
     function centerGroupAt(grp, cx, cy) {
       if (!grp) return;
-      var gb;
-      try {
-        gb = grp.geometricBounds;
-      } catch (e) {
-        return;
-      }
+      var gb = dcKhungHoacBounds(grp);
+      if (!gb) return;
       var gcx = (gb[0] + gb[2]) / 2,
         gcy = (gb[1] + gb[3]) / 2;
       try {
@@ -22239,7 +21448,7 @@ function dcRunSignature8(wCm, hCm, coBia) {
         (note ? "Ghi chú đã xử lý." : "Đã bỏ qua ghi chú."),
     );
     var ponNote =
-      "OK: Đã dàn CTL Offset; đã vẽ " + cutPonCount + " nét PON cắt.";
+      "OK: Đã dàn CTL Offset; đã vẽ " + cutPonCount + " nét PON cắt." + dcCauCanhBaoPhong(canhBaoPhong);
     if (noteIconMissing) ponNote += DC_THIEU_ICON_GHI_CHU;
     if (ponClampCount > 0)
       ponNote +=
@@ -23004,7 +22213,7 @@ function dcLuuCtlOffsetFiles(totalText, jobsText, format, suffixText) {
 //   5. Nhập ghi chú (RUỘT N + chữ thêm).
 // ============================================================
 
-var dcKeoGayAutoPonVersion = 14;
+var dcKeoGayAutoPonVersion = 15;
 
 // Toàn bộ dùng mm. Panel giờ chỉ định chính xác CẢ HAI chiều của trang.
 // Co giãn độc lập theo từng trục tài liệu cũng sửa luôn sai số làm tròn
@@ -23279,135 +22488,11 @@ function dcRunKeoGay(wCm, hCm) {
     // ============================================================
     //  HÀM PHỤ TRỢ (đo/clip/union giống các hàm catalogue khác)
     // ============================================================
-    function clipMaskBounds(item) {
-      try {
-        if (item.typename === "GroupItem" && item.clipped === true) {
-          var p = item.pageItems;
-          for (var i = 0; i < p.length; i++) {
-            var c = false;
-            try {
-              c = p[i].clipping === true;
-            } catch (e) {}
-            if (c) return p[i].geometricBounds;
-          }
-        }
-      } catch (e) {}
-      return null;
-    }
     function sizeMM(item) {
-      var mb = clipMaskBounds(item);
-      if (mb)
-        return { w: (mb[2] - mb[0]) / MM, h: (mb[1] - mb[3]) / MM, b: mb };
-      var acc = { val: null };
-      visibleUnion(item, acc);
-      var g = acc.val;
-      if (!g) {
-        try {
-          g = item.visibleBounds;
-        } catch (e) {
-          try {
-            g = item.geometricBounds;
-          } catch (e2) {
-            g = null;
-          }
-        }
-      }
+      // Khung Transform (trang đã clip → khung clip; group → khung group), dự phòng geometricBounds.
+      var g = dcKhungHoacBounds(item);
       if (!g) return { w: 0, h: 0, b: [0, 0, 0, 0] };
       return { w: (g[2] - g[0]) / MM, h: (g[1] - g[3]) / MM, b: g };
-    }
-    function isVisibleLeaf(it) {
-      try {
-        if (it.hidden === true) return false;
-        if (it.guides === true) return false;
-      } catch (e) {}
-      try {
-        if (it.typename === "PathItem")
-          return it.filled === true || it.stroked === true;
-        if (it.typename === "CompoundPathItem") {
-          if (it.pathItems.length > 0) {
-            var p0 = it.pathItems[0];
-            return p0.filled === true || p0.stroked === true;
-          }
-          return false;
-        }
-      } catch (e) {}
-      return true;
-    }
-    function visibleUnion(item, acc) {
-      function merge(b) {
-        if (!b) return;
-        if (!acc.val) {
-          acc.val = b.slice(0);
-          return;
-        }
-        var a = acc.val;
-        if (b[0] < a[0]) a[0] = b[0];
-        if (b[1] > a[1]) a[1] = b[1];
-        if (b[2] > a[2]) a[2] = b[2];
-        if (b[3] < a[3]) a[3] = b[3];
-      }
-      // Trang đo theo khung Transform (khung clip của trang), không đo nội dung bên trong.
-      if (dcDoTheoKhungTransform) {
-        var khungTransform = dcKhungThanhPham(item);
-        if (khungTransform) {
-          merge(khungTransform);
-          return;
-        }
-      }
-      var tn;
-      try {
-        tn = item.typename;
-      } catch (e) {
-        return;
-      }
-      if (tn === "GroupItem") {
-        var cl = false;
-        try {
-          cl = item.clipped;
-        } catch (e) {}
-        if (cl) {
-          var p = item.pageItems,
-            mB = null;
-          for (var i = 0; i < p.length; i++) {
-            var c = false;
-            try {
-              c = p[i].clipping === true;
-            } catch (e) {}
-            if (c) {
-              mB = p[i].geometricBounds;
-              break;
-            }
-          }
-          var inn = { val: null };
-          for (i = 0; i < p.length; i++) {
-            var m = false;
-            try {
-              m = p[i].clipping === true;
-            } catch (e) {}
-            if (m) continue;
-            visibleUnion(p[i], inn);
-          }
-          var r = inn.val;
-          if (r && mB) {
-            var x0 = Math.max(r[0], mB[0]),
-              y1 = Math.min(r[1], mB[1]),
-              x2 = Math.min(r[2], mB[2]),
-              y3 = Math.max(r[3], mB[3]);
-            if (x2 > x0 && y1 > y3) merge([x0, y1, x2, y3]);
-            else merge(mB);
-          } else if (r) merge(r);
-          else if (mB) merge(mB);
-          return;
-        }
-        var p2 = item.pageItems;
-        for (var j = 0; j < p2.length; j++) visibleUnion(p2[j], acc);
-        return;
-      }
-      if (isVisibleLeaf(item)) {
-        try {
-          merge(item.visibleBounds);
-        } catch (e) {}
-      }
     }
 
     // ============================================================
@@ -23415,6 +22500,7 @@ function dcRunKeoGay(wCm, hCm) {
     //  Khớp hai cạnh theo panel; kiểm tra nguồn trước khi thay đổi bài.
     // ============================================================
     var processed = [];
+    var canhBaoPhong = []; // phóng không đều > 0,5 % → báo trong kết quả
     var sourcePageSizes = [];
     for (var checkPage = 0; checkPage < pages.length; checkPage++) {
       var sourceSize = sizeMM(pages[checkPage]);
@@ -23435,35 +22521,25 @@ function dcRunKeoGay(wCm, hCm) {
     function prepareKeoGayPages() {
       for (var p = 0; p < pages.length; p++) {
         var item = pages[p];
-        var s0 = sourcePageSizes[p];
-        var flat = dcFlattenForImposition(doc, item, s0.b.slice(0), 500);
-        var flatSize = sizeMM(flat);
-        var cw = flatSize.w,
-          ch = flatSize.h;
-        if (!(cw > 0 && ch > 0))
-          throw new Error("Không đo được kích thước trang ruột " + (p + 1));
-        // Đo sau khi làm phẳng: pixel bitmap bị làm tròn không được làm đổi
-        // kích thước trang vật lý đã yêu cầu. Áp ma trận theo trục tài liệu thay vì
-        // resize theo trục cục bộ, để raster đã xoay sẵn cũng chạy đúng.
+        // Không raster: trang nguyên vector, phóng về khổ đích theo khung Transform
+        // (ma trận theo trục tài liệu, trang xoay sẵn vẫn đúng).
         var targetFrame = pageFrames[p];
         var targetW = SMALL_SOURCE_IS_LANDSCAPE ? targetFrame.h : targetFrame.w;
         var targetH = SMALL_SOURCE_IS_LANDSCAPE ? targetFrame.w : targetFrame.h;
-        var scales = dcKeoGayPageScales(cw, ch, targetW, targetH);
-        flat.transform(
-          app.getScaleMatrix(scales.x, scales.y),
-          true,
-          true,
-          true,
-          true,
-          100,
-          Transformation.CENTER,
+        var flat = dcChuanBiTrangDan(
+          doc,
+          item,
+          targetW,
+          targetH,
+          canhBaoPhong,
+          "Trang ruột " + (p + 1),
         );
         var exactSize = sizeMM(flat);
         if (
           !isFinite(exactSize.w) ||
           !isFinite(exactSize.h) ||
-          Math.abs(exactSize.w - targetW) > 0.01 ||
-          Math.abs(exactSize.h - targetH) > 0.01
+          Math.abs(exactSize.w - targetW) > DC_DUNG_SAI_PHONG_MM ||
+          Math.abs(exactSize.h - targetH) > DC_DUNG_SAI_PHONG_MM
         )
           throw new Error(
             "Trang ruột " + (p + 1) + ": không khớp kích thước đã nhập.",
@@ -23911,12 +22987,7 @@ function dcRunKeoGay(wCm, hCm) {
 
     // ---------- HÀM ĐẶT TRANG ----------
     function centerItem(it, cx, cy) {
-      var gb;
-      try {
-        gb = it.geometricBounds;
-      } catch (e) {
-        return;
-      }
+      var gb = dcKhungHoacBounds(it); // khung Transform, không phải bound nội dung
       if (!gb || gb.length < 4) return;
       var ccx = (gb[0] + gb[2]) / 2,
         ccy = (gb[1] + gb[3]) / 2;
@@ -24330,6 +23401,7 @@ function dcRunKeoGay(wCm, hCm) {
       : "A4: 16 trang/tờ AB, AB trước, tự trở sau.") +
     (keoCleanup.warning ? " " + keoCleanup.warning : "") +
     (noteIconMissing ? DC_THIEU_ICON_GHI_CHU : "") +
+    dcCauCanhBaoPhong(canhBaoPhong) +
     keoPdfSuffix
   );
 }

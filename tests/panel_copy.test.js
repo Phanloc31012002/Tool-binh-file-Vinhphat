@@ -7,11 +7,11 @@ const path = require("path");
 // việc dời ghi chú theo yêu cầu (v2.15.17), ô tên file CTL/script đóng gói (v2.16.1), script bộ chia khu
 // dan_be_zones.js cùng tick "Chia khu cách nhau" + ô "Khoảng cách khu (mm)" của Dàn bế (v2.18.0),
 // tick "Transform" + nút "Đo khung" ở header cạnh Raster (v2.19.0, giai đoạn kiểm chứng); nút Clip clip theo khung
-// Transform không hỏi kích thước, bỏ nút "Clip 9.2 × 5.6" ở Auto Save (v2.19.1).
+// Transform không hỏi kích thước, bỏ nút "Clip 9.2 × 5.6" ở Auto Save (v2.19.1); tick Transform mặc định bật.
 // Không phụ thuộc vào extension đã cài hay đường dẫn người dùng Windows khi chạy trong CI.
 const baseline = {
   controlHash:
-    "d2aac2d53cca7b158df6fb0477f7dc9d35c22f6f66ffb0dc1a705c822292f2af",
+    "413752453d5524e4f5ef7f9966718f7b2a6d95ec4828e79065e2155df3d6f375",
   navigationHash:
     "d4487d9056941ac67e4b8d77215a663f0be6ad08d8a8f23a4d47da4e7561c3cc",
   controlCount: 114,

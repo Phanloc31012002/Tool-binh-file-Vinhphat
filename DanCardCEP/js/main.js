@@ -1975,13 +1975,14 @@
   // theo khung Transform của Illustrator; tắt thì đo như các bản trước. Nhớ trong localStorage.
   var HDR_TRANSFORM_KEY = "dc.hdrTransform";
   var hdrTransformBox = document.getElementById("hdrTransform");
+  // Mặc định BẬT (anh Lộc 22/10: toàn bộ dùng Transform để dàn); tắt được để so với cách cũ.
   function doTheoTransform() {
-    return hdrTransformBox ? hdrTransformBox.checked : false;
+    return hdrTransformBox ? hdrTransformBox.checked : true;
   }
   if (hdrTransformBox) {
     try {
       hdrTransformBox.checked =
-        window.localStorage.getItem(HDR_TRANSFORM_KEY) === "1";
+        window.localStorage.getItem(HDR_TRANSFORM_KEY) !== "0";
     } catch (storageReadError) {}
     hdrTransformBox.addEventListener("change", function () {
       try {
@@ -2098,7 +2099,7 @@
         .replace(/\\/g, "/");
       var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
       return (
-        "if (typeof dcRunCatalogueAuto !== 'function' || typeof dcCatalogueAutoVersion === 'undefined' || dcCatalogueAutoVersion < 14) { $.evalFile(" +
+        "if (typeof dcRunCatalogueAuto !== 'function' || typeof dcCatalogueAutoVersion === 'undefined' || dcCatalogueAutoVersion < 15) { $.evalFile(" +
         jsStr(jsxPath) +
         "); } "
       );
@@ -2113,7 +2114,7 @@
         .replace(/\\/g, "/");
       var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
       return (
-        "if (typeof dcRunSignature8 !== 'function' || typeof dcSignature8AutoPonVersion === 'undefined' || dcSignature8AutoPonVersion < 41) { $.evalFile(" +
+        "if (typeof dcRunSignature8 !== 'function' || typeof dcSignature8AutoPonVersion === 'undefined' || dcSignature8AutoPonVersion < 42) { $.evalFile(" +
         jsStr(jsxPath) +
         "); } "
       );
@@ -2128,7 +2129,7 @@
         .replace(/\\/g, "/");
       var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
       return (
-        "if (typeof dcRunKeoGay !== 'function' || typeof dcKeoGayAutoPonVersion === 'undefined' || dcKeoGayAutoPonVersion < 14) { $.evalFile(" +
+        "if (typeof dcRunKeoGay !== 'function' || typeof dcKeoGayAutoPonVersion === 'undefined' || dcKeoGayAutoPonVersion < 15) { $.evalFile(" +
         jsStr(jsxPath) +
         "); } "
       );

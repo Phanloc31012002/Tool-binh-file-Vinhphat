@@ -34,12 +34,12 @@ function group(children, clipped) {
 const c = load(false);
 assert.equal(typeof c.dcKhungThanhPham, "function");
 assert.equal(c.DC_DUNG_SAI_KHO_MM, 0.5);
-// Giai đoạn kiểm chứng: mặc định TẮT (đo như bản trước); tick "Transform" ở header bật qua tiền tố.
-assert.equal(c.dcDoTheoKhungTransform, false, "Mặc định tắt cho tới khi anh Lộc kiểm chứng xong");
+// Từ 22/10: mặc định BẬT (anh Lộc: toàn bộ dùng Transform để dàn); panel đặt cờ qua tiền tố, lib không ghi đè.
+assert.equal(c.dcDoTheoKhungTransform, true, "Mặc định bật");
 {
-  const pre = vm.createContext({ dcDoTheoKhungTransform: true, app: { preferences: { getBooleanPreference: () => false } } });
+  const pre = vm.createContext({ dcDoTheoKhungTransform: false, app: { preferences: { getBooleanPreference: () => false } } });
   vm.runInContext(lib, pre);
-  assert.equal(pre.dcDoTheoKhungTransform, true, "lib không ghi đè cờ panel đã đặt trước khi nạp");
+  assert.equal(pre.dcDoTheoKhungTransform, false, "lib không ghi đè cờ panel đã đặt trước khi nạp");
 }
 c.dcDoTheoKhungTransform = true;
 
@@ -178,9 +178,8 @@ assert.match(main, /function evalJsx\(/);
 assert.match(main, /function jsxPrelude\(/);
 assert.match(main, /dcDoTheoKhungTransform = /);
 assert.match(main, /dcExtensionRoot = /);
-// Tick "Transform" + nút "Đo khung" nằm ở header cạnh Raster; tick mặc định tắt (không checked).
-assert.match(html, /id="hdrTransform"/);
-assert.ok(!/id="hdrTransform"[^>]*checked/.test(html), "mặc định tắt");
+// Tick "Transform" + nút "Đo khung" nằm ở header cạnh Raster; tick mặc định BẬT (checked), tắt được.
+assert.match(html, /id="hdrTransform"[^>]*checked/, "mặc định bật");
 assert.match(html, /id="btnDoKhung"/);
 assert.ok(html.indexOf('id="btnDoKhung"') > html.indexOf('id="btnRaster"') && html.indexOf('id="btnDoKhung"') < html.indexOf("tabbar"), "nằm trong header");
 assert.match(main, /dcDoKhungChon\(\)/);
@@ -193,6 +192,6 @@ for (const fn of ["function _dcDanCore(", "function dcDanToiUu(", "function dcDa
   assert.ok(start >= 0, fn);
   const next = lib.slice(start + fn.length).search(/\n(function |var dc\w+Version)/);
   const body = lib.slice(start, next < 0 ? lib.length : start + fn.length + next);
-  assert.ok(/dcDoKhung\(|dcKhungThanhPham\(/.test(body), fn + " phải đo qua hàm Transform chung");
+  assert.ok(/dcDoKhung\(|dcKhungThanhPham\(|dcKhungHoacBounds\(|dcChuanBiTrangDan\(/.test(body), fn + " phải đo qua hàm Transform chung");
 }
 console.log("do_khung_transform: ok");

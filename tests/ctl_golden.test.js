@@ -35,9 +35,7 @@ function functionText(source, name) {
   }
   throw new Error(`hàm ${name} không cân ngoặc`);
 }
-const sharedStart = library.indexOf("//  ĐO KHỔ DÙNG CHUNG");
-const sharedEnd = library.indexOf("function dcDoKhung(");
-const shared = library.slice(library.lastIndexOf("\n// ====", sharedStart), sharedEnd);
+const shared = library.slice(library.indexOf("//  ĐO KHỔ DÙNG CHUNG"), library.indexOf("// dcDan: wrapper bắt mọi lỗi"));
 const signature = functionText(library, "dcRunSignature8");
 const helperNames = ["formSpec", "nominalGridFor", "centerItem", "placeRow8", "placeFace8", "buildPairGroup",
   "centerGroupAt", "placeFace4", "placeSmallPanel", "placeSmallFace16", "placeFace", "squeezeAboutCentre",

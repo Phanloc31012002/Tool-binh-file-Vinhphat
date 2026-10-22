@@ -17,45 +17,11 @@ for (const source of [lib, main]) {
     assert.equal(m[1].trim(), "500", "every processing raster must be 500ppi"),
   );
 }
-const calls = [...lib.matchAll(/dcFlattenForImposition\([^;\n]+,\s*(\d+)\)/g)];
-assert.equal(calls.length, 7);
-calls.forEach((m) => assert.equal(m[1], "500"));
+// Từ 22/10 (anh Lộc): không còn raster trước khi dàn ở CTL Offset/Keo gáy/Catalogue — trang đặt
+// nguyên vector theo khung Transform. Hàm raster-trước-khi-dàn đã bỏ hẳn; raster chỉ còn ở nút
+// Raster header (dcRasterizeSelection) và bước tự sửa khổ của Dàn Card, đều 500 ppi (kiểm ở trên).
+assert.equal(lib.indexOf("dcFlattenForImposition"), -1, "không còn raster trước khi dàn");
 assert(!/\b(?:300|400|450)\s*ppi/.test(main + lib));
-const from = lib.indexOf("function dcFlattenForImposition("),
-  to = lib.indexOf("// Catalogue KTS A4 uses", from);
-const context = vm.createContext({
-  dcIsImageOnly: (i) => i.imageOnly,
-  RasterizeOptions: function () {},
-  AntiAliasingMethod: { ARTOPTIMIZED: "ART" },
-});
-vm.runInContext(lib.slice(from, to), context);
-const item = {};
-let ppi;
-const doc = {
-  rasterize(i, b, ro) {
-    assert.equal(i, item);
-    ppi = ro.resolution;
-    assert.equal(ro.transparency, true);
-    return { raster: true };
-  },
-};
-for (const oldCallerPpi of [undefined, 0, 300, 400, 450, 500]) {
-  assert(
-    context.dcFlattenForImposition(doc, item, [0, 10, 10, 0], oldCallerPpi)
-      .raster,
-  );
-  assert.equal(
-    ppi,
-    500,
-    "cached/legacy caller cannot lower the shared raster resolution",
-  );
-}
-const image = { imageOnly: true };
-assert.equal(
-  context.dcFlattenForImposition(doc, image, [0, 10, 10, 0], 300),
-  image,
-  "existing bitmap is not pointlessly upsampled",
-);
 const html = fs.readFileSync(
   require.resolve("../DanCardCEP/index.html"),
   "utf8",
