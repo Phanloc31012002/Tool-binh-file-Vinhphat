@@ -1086,20 +1086,27 @@ function _dcDanCore(SEL_LAYOUT_KEY, VOUCHER_WITH_CARD_ARG) {
   gBtn.alignment = "right";
   gBtn.add("button", undefined, "Hủy", { name: "cancel" });
   gBtn.add("button", undefined, "Dàn", { name: "ok" });
-  if (dlg.show() !== 1) return;
+  if (dlg.show() !== 1) return "OK: Đã hủy, chưa thay đổi gì.";
 
-  // Ép chuỗi thành số; lỗi thì trả giá trị mặc định d.
+  // Ép chuỗi thành số (nhận cả dấu phẩy "9,2"); lỗi thì trả giá trị mặc định d.
   function num(t, d) {
-    var v = parseFloat(t);
+    var v = parseFloat(String(t).replace(",", "."));
     return isNaN(v) ? d : v;
   }
   var W = num(inW.text, LAYOUT.w) * MM,
     H = num(inH.text, LAYOUT.h) * MM;
-  // Nếu layout khai báo blockGap thì ép dùng số đó, bỏ qua ô nhập khe.
+  // Nếu layout khai báo blockGap thì ép dùng số đó, bỏ qua ô nhập khe (có báo lại).
   var G =
     typeof LAYOUT.blockGap === "number"
       ? LAYOUT.blockGap * MM
       : num(inG.text, 2) * MM;
+  var kheBiBoQua =
+    typeof LAYOUT.blockGap === "number" &&
+    Math.abs(num(inG.text, LAYOUT.blockGap) - LAYOUT.blockGap) > 0.001
+      ? " Khe giữa khối theo layout: " +
+        LAYOUT.blockGap +
+        " mm (ô nhập bị bỏ qua)."
+      : "";
   var ROT = r90.value ? 90 : -90;
   var IS_OFFSET = tOffset.value;
   var NOTE_TEXT = inNote.text;
@@ -2182,7 +2189,7 @@ function _dcDanCore(SEL_LAYOUT_KEY, VOUCHER_WITH_CARD_ARG) {
   if (models.length !== nModels) {
     prog.done();
     warn("Số hàng (" + models.length + ") != số mẫu.");
-    return;
+    return "ERR: Số hàng (" + models.length + ") != số mẫu.";
   }
 
   // Nhân bản object src, đặt tâm vào (cx,cy), xoay rotateDeg độ.
@@ -2478,7 +2485,9 @@ function _dcDanCore(SEL_LAYOUT_KEY, VOUCHER_WITH_CARD_ARG) {
       ? "In 2 mặt: mặt trước -> AB1, mặt sau -> AB2."
       : "In 1 mặt: chỉ dàn AB1.") +
     (IS_OFFSET ? "\n+ Ghi chú cardoffset." : "") +
+    (kheBiBoQua ? "\n" + kheBiBoQua.replace(/^ /, "") : "") +
     dcCauGiuObjectLa(donCu.kept, "\n");
+  if (kheBiBoQua) _DC_RESULT += kheBiBoQua;
   if (donCu.kept > 0 && LAYOUT.key !== "9.2x5.6")
     _DC_RESULT += dcCauGiuObjectLa(donCu.kept, " ");
   // Ưu tiên cảnh báo SAI KÍCH THƯỚC (đo trước raster). Có thì báo đỏ, xem kỹ.
@@ -2558,7 +2567,10 @@ function _dcDanCore(SEL_LAYOUT_KEY, VOUCHER_WITH_CARD_ARG) {
     gBtn.alignment = "right";
     gBtn.add("button", undefined, "Hủy", { name: "cancel" });
     gBtn.add("button", undefined, "Dàn", { name: "ok" });
-    if (dlg.show() !== 1) return;
+    if (dlg.show() !== 1) {
+      _DC_RESULT = "OK: Đã hủy, chưa thay đổi gì.";
+      return;
+    }
     var IS_OFFSET = tOffset.value;
     var NOTE_TEXT = inNote.text;
 
@@ -19550,8 +19562,7 @@ function dcRunSignature8(wCm, hCm, coBia) {
     var TOP_GAP = 23 * MM; // mép trên bài dàn cách mép trên artboard 2.3cm
 
     if (app.documents.length === 0) {
-      alert("Chưa mở tài liệu.");
-      return "OK: (dừng)";
+      return "ERR: Chưa mở tài liệu.";
     }
     var doc = app.activeDocument;
 
@@ -19621,29 +19632,23 @@ function dcRunSignature8(wCm, hCm, coBia) {
       if (!isOldPon) sel.push(selectedPage);
     }
     if (!sel || sel.length === 0) {
-      alert("Chưa chọn trang ruột.");
-      return "OK: (dừng)";
+      return "ERR: Chưa chọn trang ruột.";
     }
 
     var N = sel.length;
     if (N % 4 !== 0) {
-      alert("Số trang phải là BỘI SỐ CỦA 4.\nĐang chọn: " + N);
-      return "OK: (dừng)";
+      return "ERR: Số trang phải là BỘI SỐ CỦA 4. Đang chọn: " + N;
     }
     // Nếu có bìa, 4 trang ngoài cùng làm TT4 bìa -> phần ruột còn lại = N-4.
     var _nRuot = CO_BIA ? N - 4 : N;
     if (_nRuot < 0) {
-      alert("Số trang quá ít.");
-      return "OK: (dừng)";
+      return "ERR: Số trang quá ít.";
     }
     var _du16 = _nRuot % 16;
     if (_du16 !== 0 && _du16 !== 4 && _du16 !== 8 && _du16 !== 12) {
-      alert(
-        "Số trang không hợp lệ (phần ruột dư " +
+      return "ERR: Số trang không hợp lệ (phần ruột dư " +
           _du16 +
-          " khi chia 16).\nChỉ hỗ trợ dư 0/4/8/12.",
-      );
-      return "OK: (dừng)";
+          " khi chia 16). Chỉ hỗ trợ dư 0/4/8/12.";
     }
 
     // ---------- Gom + sắp theo VỊ TRÍ (thứ tự đọc) ----------
@@ -22917,20 +22922,17 @@ function dcRunKeoGay(wCm, hCm) {
     // PON được vẽ theo các form tờ ruột 65x43 và 65x86 được cung cấp.
 
     if (app.documents.length === 0) {
-      alert("Chưa mở tài liệu.");
-      return "OK: (dừng)";
+      return "ERR: Chưa mở tài liệu.";
     }
     var doc = app.activeDocument;
     var sel = doc.selection;
     if (!sel || sel.length === 0) {
-      alert("Chưa chọn trang ruột.");
-      return "OK: (dừng)";
+      return "ERR: Chưa chọn trang ruột.";
     }
 
     var N = sel.length;
     if (N % 4 !== 0) {
-      alert("Số trang phải là BỘI SỐ CỦA 4.\nĐang chọn: " + N);
-      return "OK: (dừng)";
+      return "ERR: Số trang phải là BỘI SỐ CỦA 4. Đang chọn: " + N;
     }
     var faces = dcKeoGayPlan(N, IS_SMALL_A5);
 
@@ -28278,10 +28280,13 @@ function _dcClipToCardStyleCore(wText, hText, unit) {
     return item;
   }
 
+  var keptClipCount = 0; // clip group sẵn có: giữ nguyên, không tính là "đã clip"
   function clipLikeDanCard(item) {
     try {
-      if (item.typename === "GroupItem" && item.clipped === true)
+      if (item.typename === "GroupItem" && item.clipped === true) {
+        keptClipCount++;
         return expandAppearanceLikeDanCard(item);
+      }
     } catch (alreadyClipError) {}
 
     var acc = { val: null };
@@ -28333,9 +28338,10 @@ function _dcClipToCardStyleCore(wText, hText, unit) {
     app.redraw();
   } catch (selectionError) {}
 
+  var clippedCount = results.length - keptClipCount;
   var message =
     "Đã clip " +
-    results.length +
+    clippedCount +
     "/" +
     snapshot.length +
     " object thành " +
@@ -28344,7 +28350,10 @@ function _dcClipToCardStyleCore(wText, hText, unit) {
     hText +
     " " +
     unit +
-    " theo logic Dàn Card.";
+    " theo logic Dàn Card" +
+    (keptClipCount
+      ? "; " + keptClipCount + " object đã có clip, giữ nguyên."
+      : ".");
   if (errors.length)
     return (
       (results.length ? "OK: " : "ERR: ") + message + "\n" + errors.join("\n")
