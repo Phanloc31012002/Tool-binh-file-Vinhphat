@@ -1654,50 +1654,84 @@ function _dcDanCore(SEL_LAYOUT_KEY, VOUCHER_WITH_CARD_ARG) {
   //     (cắt sạch phần tràn) -> ra đúng KT.
   //  B) KHÔNG có background -> rasterize CẢ object thành ảnh, rồi CLIP về
   //     W×H tại TÂM ARTBOARD (mốc do người dùng chọn).
-  // Trả về {ok, item}. ok=false nếu cả 2 đều lỗi.
+  // Luôn làm trên BẢN SAO: đo lại đạt khổ mới xoá nguồn và trả bản mới;
+  // không đạt thì xoá hết bản sao/raster thử, nguồn vector còn nguyên.
+  // Trả về {ok, item}. ok=false nếu cả 2 đều không ra đúng khổ.
   function autoFixByBackground(item, wantWmm, wantHmm) {
     var Wmm = wantWmm * MM,
       Hmm = wantHmm * MM;
+    var wantHi = Math.max(wantWmm, wantHmm),
+      wantLo = Math.min(wantWmm, wantHmm);
+    var tol = DC_DUNG_SAI_KHO_MM;
+
+    function dungKho(candidate) {
+      var s = visSizeMM(candidate);
+      var hi = Math.max(s.w, s.h),
+        lo = Math.min(s.w, s.h);
+      return Math.abs(hi - wantHi) <= tol && Math.abs(lo - wantLo) <= tol;
+    }
+    function xoaNhe(o) {
+      try {
+        if (o) o.remove();
+      } catch (e) {}
+    }
+    // Chạy một chiến lược trên bản sao mới; trả object kết quả hoặc null (đã dọn rác).
+    function thu(strategy) {
+      var copy = null,
+        result = null;
+      try {
+        copy = item.duplicate();
+        result = strategy(copy);
+      } catch (e) {
+        result = null;
+      }
+      if (result && dungKho(result)) return result;
+      xoaNhe(result);
+      // Chiến lược A/B có thể đã raster xong bản sao (copy không còn); xoá nếu còn.
+      if (copy && copy !== result) xoaNhe(copy);
+      return null;
+    }
 
     // --- Chiến lược A: theo background ---
     var frame = findFrameBounds(item, wantWmm, wantHmm, 2.0);
-    if (frame) {
-      try {
-        var ra = doc.rasterize(item, frame, makeRasterOptions());
-        return { ok: true, item: ra };
-      } catch (e) {}
-    }
+    var fixed = null;
+    if (frame)
+      fixed = thu(function (copy) {
+        return doc.rasterize(copy, frame, makeRasterOptions());
+      });
 
     // --- Chiến lược B: raster cả object rồi clip tại tâm artboard ---
-    try {
-      var raAll = doc.rasterize(item, undefined, makeRasterOptions());
-      // tâm artboard hiện hành
-      var abIdx = doc.artboards.getActiveArtboardIndex();
-      var rect = doc.artboards[abIdx].artboardRect; // [l,t,r,b]
-      var acx = (rect[0] + rect[2]) / 2,
-        acy = (rect[1] + rect[3]) / 2;
-      var lay = raAll.layer;
-      // khung W×H tại tâm artboard
-      var mrect = lay.pathItems.rectangle(
-        acy + Hmm / 2,
-        acx - Wmm / 2,
-        Wmm,
-        Hmm,
-      );
-      // di chuyển ảnh sao cho tâm ảnh trùng tâm artboard trước khi clip
-      var rb = raAll.geometricBounds;
-      var rcx = (rb[0] + rb[2]) / 2,
-        rcy = (rb[1] + rb[3]) / 2;
-      raAll.translate(acx - rcx, acy - rcy);
-      var grp = lay.groupItems.add();
-      mrect.move(grp, ElementPlacement.PLACEATBEGINNING);
-      raAll.move(grp, ElementPlacement.PLACEATEND);
-      mrect.clipping = true;
-      grp.clipped = true;
-      return { ok: true, item: grp };
-    } catch (e) {
-      return { ok: false, item: item };
-    }
+    if (!fixed)
+      fixed = thu(function (copy) {
+        var raAll = doc.rasterize(copy, undefined, makeRasterOptions());
+        var abIdx = doc.artboards.getActiveArtboardIndex();
+        var rect = doc.artboards[abIdx].artboardRect; // [l,t,r,b]
+        var acx = (rect[0] + rect[2]) / 2,
+          acy = (rect[1] + rect[3]) / 2;
+        var lay = raAll.layer;
+        // khung W×H tại tâm artboard
+        var mrect = lay.pathItems.rectangle(
+          acy + Hmm / 2,
+          acx - Wmm / 2,
+          Wmm,
+          Hmm,
+        );
+        // di chuyển ảnh sao cho tâm ảnh trùng tâm artboard trước khi clip
+        var rb = raAll.geometricBounds;
+        var rcx = (rb[0] + rb[2]) / 2,
+          rcy = (rb[1] + rb[3]) / 2;
+        raAll.translate(acx - rcx, acy - rcy);
+        var grp = lay.groupItems.add();
+        mrect.move(grp, ElementPlacement.PLACEATBEGINNING);
+        raAll.move(grp, ElementPlacement.PLACEATEND);
+        mrect.clipping = true;
+        grp.clipped = true;
+        return grp;
+      });
+
+    if (!fixed) return { ok: false, item: item };
+    xoaNhe(item);
+    return { ok: true, item: fixed };
   }
 
   // Phá hiệu ứng/appearance của object (Object > Expand Appearance).
@@ -1959,7 +1993,7 @@ function _dcDanCore(SEL_LAYOUT_KEY, VOUCHER_WITH_CARD_ARG) {
 
   // ----- KIỂM TRA KÍCH THƯỚC (dung sai +-0.5mm) -----
   // Luồng bản dàn card ok: đúng khổ chỉ clip; sai khổ mới auto-fix/raster.
-  var TOL = 0.5;
+  var TOL = DC_DUNG_SAI_KHO_MM;
   var curW = W / MM,
     curH = H / MM;
   var badInfo = [];
@@ -1984,15 +2018,11 @@ function _dcDanCore(SEL_LAYOUT_KEY, VOUCHER_WITH_CARD_ARG) {
       if (Math.abs(hi - wantHi) <= TOL && Math.abs(lo - wantLo) <= TOL)
         continue;
 
+      // Tự sửa trên bản sao: ok thì nguồn đã được thay, không thì nguồn còn nguyên.
       var fix = autoFixByBackground(it, targetW, targetH);
       if (fix.ok) {
-        var s2 = visSizeMM(fix.item);
-        var hi2 = Math.max(s2.w, s2.h),
-          lo2 = Math.min(s2.w, s2.h);
-        if (Math.abs(hi2 - wantHi) <= TOL && Math.abs(lo2 - wantLo) <= TOL) {
-          rows[ri][ci].o = fix.item;
-          continue;
-        }
+        rows[ri][ci].o = fix.item;
+        continue;
       }
       badInfo.push({ w: s.w, h: s.h });
     }
@@ -2025,8 +2055,11 @@ function _dcDanCore(SEL_LAYOUT_KEY, VOUCHER_WITH_CARD_ARG) {
   // các object đang chọn (sel) dù chúng ở đâu. Làm TRƯỚC khi clip vì
   // clip/expand sẽ xóa selection hiện hành.
   prog.step("Dọn nội dung artboard cũ...");
+  // Bảo vệ object HIỆN TẠI của từng hàng (sau tự sửa, có thể là bản mới thay nguồn).
   var protectSel = [];
-  for (var pi = 0; pi < sel.length; pi++) protectSel.push(sel[pi]);
+  for (var pri = 0; pri < rows.length; pri++)
+    for (var pci = 0; pci < rows[pri].length; pci++)
+      protectSel.push(rows[pri][pci].o);
   clearOldArtboardContent(doc, protectSel);
 
   var models = [];
