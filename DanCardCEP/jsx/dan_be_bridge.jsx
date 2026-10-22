@@ -369,7 +369,7 @@ function dcDanBeOutputPositions(
       }
       if (candidateTop - paperH < bottom - EPS)
         throw new Error(
-          "Không còn chỗ trong canvas để tạo đủ tờ. Hãy bớt artboard cũ hoặc mở Large Canvas.",
+          "Không còn chỗ trong canvas để tạo đủ tờ. Hãy bớt artboard cũ hoặc bài cũ còn trên canvas, hoặc mở Large Canvas.",
         );
       var bundle = [
           candidateLeft,

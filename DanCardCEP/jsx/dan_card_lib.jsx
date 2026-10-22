@@ -6173,7 +6173,7 @@ function dcDanToiUu(
         }
         if (candidateTop - bundleH < layoutBottom - EPS)
           throw new Error(
-            "Không còn chỗ trong canvas để tạo tờ mới. Hãy xóa/bớt artboard cũ hoặc mở tài liệu Large Canvas.",
+            "Không còn chỗ trong canvas để tạo tờ mới. Hãy xóa/bớt artboard cũ hoặc bài cũ còn trên canvas, hoặc mở tài liệu Large Canvas.",
           );
 
         var bundleRect = [
@@ -7417,7 +7417,7 @@ function dcDanTuTro(
         }
         if (candidateTop - paperH < layoutBottom - EPS)
           throw new Error(
-            "Không còn chỗ trống trong canvas để tạo tờ mới. Hãy xoá bớt artboard cũ hoặc mở tài liệu Large Canvas.",
+            "Không còn chỗ trống trong canvas để tạo tờ mới. Hãy xoá bớt artboard cũ hoặc bài cũ còn trên canvas, hoặc mở tài liệu Large Canvas.",
           );
 
         var sheetRect = [
@@ -8496,7 +8496,7 @@ function dcDanTuTroNhieuKho(
         }
         if (candidateTop - paperH < bottomLimit - EPS)
           throw new Error(
-            "Không còn chỗ trong canvas để tạo tờ mới. Hãy bớt artboard cũ hoặc mở Large Canvas.",
+            "Không còn chỗ trong canvas để tạo tờ mới. Hãy bớt artboard cũ hoặc bài cũ còn trên canvas, hoặc mở Large Canvas.",
           );
         var rect = [
           candidateLeft,
@@ -25068,7 +25068,7 @@ function dcDanTheoMauOutputPositions(
       }
       if (y - bundleH < bottom - EPS)
         throw new Error(
-          "Không còn chỗ trong canvas để tạo đủ tờ. Hãy bớt artboard cũ hoặc mở Large Canvas.",
+          "Không còn chỗ trong canvas để tạo đủ tờ. Hãy bớt artboard cũ hoặc bài cũ còn trên canvas, hoặc mở Large Canvas.",
         );
       var bundle = [x, y, x + bundleW, y - bundleH],
         blocker = null;
