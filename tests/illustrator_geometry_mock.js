@@ -16,6 +16,9 @@ function illustrator(options = {}) {
       parent: layer,
       angle: 0,
       reflected: false,
+      // Nét 0,5 pt như khuôn bế/viền chữ thật. Illustrator nhân nét với tham số thứ 6 của
+      // transform() (hệ số, 1 = giữ nguyên; đưa 100 là nét phình ×100 — lỗi đã gặp ở Dàn tag BD).
+      strokeWidth: 0.5,
       typename: "RasterItem",
       _bounds: bounds.slice(),
       _points: [
@@ -67,6 +70,8 @@ function illustrator(options = {}) {
           throw new Error("Injected reflection failure");
         if (anchor !== "center")
           throw new Error("Unsupported mock transformation anchor");
+        if (typeof lineWidths !== "number" || !(lineWidths > 0))
+          throw new Error("transform(): tham số nét phải là số dương (hệ số nhân)");
         const [l, t, r, b] = this._bounds,
           cx = (l + r) / 2,
           cy = (t + b) / 2;
@@ -75,6 +80,7 @@ function illustrator(options = {}) {
           cy + (y - cy) * matrix.scaleY,
         ]);
         this.reflected = matrix.scaleX * matrix.scaleY < 0;
+        this.strokeWidth *= lineWidths; // y như Illustrator: hệ số nhân, không phải phần trăm
         this._updateBounds();
       },
       duplicate(target) {
@@ -84,6 +90,7 @@ function illustrator(options = {}) {
         copy._points = this._points.map((p) => p.slice());
         copy.angle = this.angle;
         copy.reflected = this.reflected;
+        copy.strokeWidth = this.strokeWidth;
         target.pageItems.push(copy);
         duplicates.push(copy);
         return copy;

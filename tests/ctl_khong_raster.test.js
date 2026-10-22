@@ -71,6 +71,8 @@ function item(bounds, extra) {
 const c = load();
 assert.equal(typeof c.dcChuanBiTrangDan, "function");
 // (a) Trang 100 × 140 mm nhập 148 × 210 → ma trận 148 % / 150 % theo trục tài liệu, giữ tâm, nét co giãn theo.
+// Tham số nét của transform() là HỆ SỐ NHÂN (1 = giữ nguyên), không phải phần trăm như resize():
+// đưa 149 là nét phình ×149. Co giãn theo trang → hệ số = trung bình (sx + sy) / 200 = 1,49.
 {
   const it = item(rect(0, 0, 100, 140));
   const canhBao = [];
@@ -78,7 +80,7 @@ assert.equal(typeof c.dcChuanBiTrangDan, "function");
   assert.equal(out, it, "trả về chính object vector, không tạo RasterItem");
   assert.equal(it.transforms.length, 1);
   const t0 = it.transforms[0];
-  assert.ok(Math.abs(t0.m.sx - 148) < 1e-9 && Math.abs(t0.m.sy - 150) < 1e-9 && Math.abs(t0.lineWidths - 149) < 1e-9 && t0.about === "center", JSON.stringify(t0));
+  assert.ok(Math.abs(t0.m.sx - 148) < 1e-9 && Math.abs(t0.m.sy - 150) < 1e-9 && Math.abs(t0.lineWidths - 1.49) < 1e-9 && t0.about === "center", JSON.stringify(t0));
   const g = it.geometricBounds;
   assert.ok(Math.abs((g[2] - g[0]) / MM - 148) < 1e-6 && Math.abs((g[1] - g[3]) / MM - 210) < 1e-6);
   assert.equal(canhBao.length, 1, "phóng không đều > 0,5 % thì báo");
@@ -90,13 +92,13 @@ assert.equal(typeof c.dcChuanBiTrangDan, "function");
   c.dcChuanBiTrangDan({}, it, 148, 210, []);
   assert.equal(it.transforms.length, 0);
 }
-// (c) Phóng đều 2× → không cảnh báo; nét 200 %.
+// (c) Phóng đều 2× → không cảnh báo; nét ×2 (hệ số 2, không phải 200).
 {
   const it = item(rect(0, 0, 74, 105));
   const canhBao = [];
   c.dcChuanBiTrangDan({}, it, 148, 210, canhBao);
   assert.deepEqual(canhBao, []);
-  assert.equal(it.transforms[0].lineWidths, 200);
+  assert.equal(it.transforms[0].lineWidths, 2);
 }
 // (d) Group clip có nội dung tràn: khung = mask (Transform), không phải geometricBounds gộp.
 {

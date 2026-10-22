@@ -248,13 +248,15 @@ function dcChuanBiTrangDan(doc, item, rongMm, caoMm, canhBao, nhan) {
     return item;
   var sx = (rongMm / w) * 100,
     sy = (caoMm / h) * 100;
+  // Tham số thứ 6 của transform() là HỆ SỐ nhân nét (1 = giữ nguyên), không phải phần trăm như
+  // resize(): nét co giãn cùng trang → (sx + sy) / 200. Đưa (sx + sy) / 2 là nét phình ×100.
   item.transform(
     app.getScaleMatrix(sx, sy),
     true,
     true,
     true,
     true,
-    (sx + sy) / 2,
+    (sx + sy) / 200,
     Transformation.CENTER,
   );
   if (canhBao && Math.abs(sx - sy) > 0.5) {
@@ -18730,7 +18732,7 @@ function dcRunCatalogueCustomA5(wCm, hCm) {
 // một cuốn hay hai cuốn giống hệt nhau. Hai cuốn dùng chung
 // đường cắt giữa và dùng PON kiểu A5.
 // ============================================================
-var dcCatalogueAutoVersion = 15;
+var dcCatalogueAutoVersion = 16;
 
 function dcRunCatalogueAuto(wCm, hCm) {
   var MM = 2.834645669;
@@ -19139,7 +19141,7 @@ function dcRunCatalogueAuto(wCm, hCm) {
 // 65 x 86 đã duyệt; chúng không bao giờ bị ruột đã bóp kéo vào trong.  Lượt
 // bóp 2 trang canh giữa cũng được bù một lượng rất nhỏ ở đáy danh định,
 // cần có để giữ tờ ruột đầu tiên nằm trong artboard cố định của nó.
-var dcSignature8AutoPonVersion = 42;
+var dcSignature8AutoPonVersion = 43;
 
 function dcRunSignature8(wCm, hCm, coBia) {
   var previousSignatureCoordinates = app.coordinateSystem;
@@ -22213,7 +22215,7 @@ function dcLuuCtlOffsetFiles(totalText, jobsText, format, suffixText) {
 //   5. Nhập ghi chú (RUỘT N + chữ thêm).
 // ============================================================
 
-var dcKeoGayAutoPonVersion = 15;
+var dcKeoGayAutoPonVersion = 16;
 
 // Toàn bộ dùng mm. Panel giờ chỉ định chính xác CẢ HAI chiều của trang.
 // Co giãn độc lập theo từng trục tài liệu cũng sửa luôn sai số làm tròn

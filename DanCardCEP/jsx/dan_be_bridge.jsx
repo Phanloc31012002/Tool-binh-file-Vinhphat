@@ -4,7 +4,7 @@
 // ExtendScript đọc path, tự tạo PON và render. Phần tối ưu hình học chạy ở
 // Chromium của CEP để Illustrator không bị treo khi thử nhiều bố cục.
 // ============================================================
-var dcDanBeNestingVersion = 13;
+var dcDanBeNestingVersion = 14;
 if (typeof dcDanBeJobs === "undefined") var dcDanBeJobs = {};
 if (typeof dcDanBeJobCounter === "undefined") var dcDanBeJobCounter = 1;
 
@@ -1294,13 +1294,14 @@ function dcDanBeRender(jobId, slotsText, reportText) {
             backFace.cut,
             ElementPlacement.PLACEATEND,
           );
+          // Tham số nét của transform() là hệ số nhân (1 = giữ nguyên nét khuôn), không phải %.
           kCopy.transform(
             reflection,
             true,
             true,
             true,
             true,
-            100,
+            1,
             Transformation.CENTER,
           );
           kb = geometricBoundsOf(kCopy);

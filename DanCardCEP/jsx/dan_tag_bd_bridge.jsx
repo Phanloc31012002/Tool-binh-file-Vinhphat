@@ -6,7 +6,7 @@
 // 2 trang. Phần ghép khối chạy ở Chromium của CEP (dan_tag_bd.js).
 // Luật chốt với anh Lộc 22/10/2026: docs/THIET_KE_DAN_TAG_BD.md
 // ============================================================
-var dcDanTagBdVersion = 2;
+var dcDanTagBdVersion = 3;
 if (typeof dcDanTagBdNguon === "undefined") var dcDanTagBdNguon = {};
 if (typeof dcDanTagBdNguonDem === "undefined") var dcDanTagBdNguonDem = 1;
 
@@ -643,9 +643,10 @@ function dcDanTagBdVe(planText) {
       } catch (copyNoteError) {}
       if (angle) copy.rotate(angle);
       // Bóp: co bản sao quanh tâm theo từng chiều (sau khi xoay, theo trục tài liệu), nét giữ nguyên;
-      // nguồn không đụng.
+      // nguồn không đụng. Tham số thứ 6 của transform() là HỆ SỐ nhân nét (1 = giữ nguyên), khác
+      // resize() nhận phần trăm — đưa 100 là mọi nét phình ×100, viền đen của chữ phủ kín cả ô.
       if ((bopX && bopX < 1 - 1e-9) || (bopY && bopY < 1 - 1e-9))
-        copy.transform(app.getScaleMatrix((bopX || 1) * 100, (bopY || 1) * 100), true, true, true, true, 100, Transformation.CENTER);
+        copy.transform(app.getScaleMatrix((bopX || 1) * 100, (bopY || 1) * 100), true, true, true, true, 1, Transformation.CENTER);
       var kb = dcDanTagBdKhung(copy);
       if (!kb) fail("Không đo được bản sao tag sau khi xoay.");
       if (centre) copy.translate(leftPt + wPt / 2 - (kb[0] + kb[2]) / 2, topPt - hPt / 2 - (kb[1] + kb[3]) / 2);

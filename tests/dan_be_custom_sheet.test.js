@@ -165,7 +165,7 @@ function assertBezierAccuracy(groups, maximumErrorMm) {
 {
   const f = fixture(),
     { payload, job } = prepared(f);
-  assert.equal(f.c.dcDanBeNestingVersion, 13);
+  assert.equal(f.c.dcDanBeNestingVersion, 14);
   near(payload.sheet.widthMm, 330);
   near(payload.sheet.heightMm, 354);
   const expected = [

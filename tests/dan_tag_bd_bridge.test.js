@@ -26,7 +26,7 @@ function parseOk(text) {
 // ---------- dcDanTagBdDocTag ----------
 {
   const { mock, c } = load();
-  assert.equal(c.dcDanTagBdVersion, 2);
+  assert.equal(c.dcDanTagBdVersion, 3);
   // Hàng 1: trước 112 × 72 (trái) + sau (phải). Hàng 2: tag 1 mặt 56 × 91. Hàng 3: trước + sau 92 × 40, mặt sau lệch 0,3 mm.
   const f1 = box(mock, 0, 300, 112, 72, "f1");
   const b1 = box(mock, 150, 300, 112, 72, "b1");
@@ -476,6 +476,9 @@ const OPTS = { prefix: "1088", start: "1", pad: "2", canMang: "cm", ngay: "22", 
   const f3c = layers[2].pageItems.find((it) => it.identity === "f3");
   near(f3c.geometricBounds[2] - f3c.geometricBounds[0], 39.5 * MM, "con xoay bóp bề rộng");
   near(f3c.geometricBounds[1] - f3c.geometricBounds[3], 92 * MM, "con xoay giữ chiều cao");
+  // Nét của bản sao đã bóp phải giữ nguyên (0,5 pt): transform() nhận HỆ SỐ nét, đưa 100 là nét
+  // phình ×100 — viền đen của chữ phủ kín cả ô (lỗi thật 22/10 trên card Thành Phát / Chic Nails).
+  for (const it of [a1, b1, f3c]) near(it.strokeWidth, 0.5, "nét bản sao bóp giữ nguyên 0,5 pt (" + it.identity + ")");
   // Nguồn không bị bóp.
   near(c.dcDanTagBdNguon.tag_1.front.geometricBounds[1] - c.dcDanTagBdNguon.tag_1.front.geometricBounds[3], 72 * MM, "nguồn nguyên");
   // Hệ số sai (ngoài 0,9…1) → ERR, không tạo gì.

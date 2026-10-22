@@ -450,7 +450,7 @@ const main = fs.readFileSync(
   require.resolve("../DanCardCEP/js/main.js"),
   "utf8",
 );
-assert.match(main, /dcKeoGayAutoPonVersion < 15/);
+assert.match(main, /dcKeoGayAutoPonVersion < 16/);
 assert.match(main, /TT16: "Tự trở 16 trang"/);
 const squeeze = fixture(4,14,20,100,90);
 assert.match(squeeze.run(),/^OK:/);

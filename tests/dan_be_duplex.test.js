@@ -137,6 +137,8 @@ for (const separate of [false, true]) {
         "Do not mirror text/image content.",
       );
       assert.strictEqual(backCuts[i].reflected, true);
+      // Lật khuôn bằng transform(): tham số nét là hệ số nhân — khuôn mặt sau phải giữ nét 0,5 pt.
+      near(backCuts[i].strokeWidth, 0.5);
       near(fc[0] - fr[0] + bc[0] - br[0], f.paperW);
       near(fc[1] - fr[3], bc[1] - br[3]);
       const fa = centre(fronts[i].visibleBounds),
