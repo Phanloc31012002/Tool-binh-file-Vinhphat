@@ -232,6 +232,55 @@ function dcDanBeTripleModels(selection, epsilon) {
   return models;
 }
 
+// Khung bao bài cũ còn trên canvas (object cấp trên cùng của layer đang hiện), bỏ nguồn đang
+// chọn và object phủ gần hết canvas. Thuần hình học, không đụng tài liệu.
+function dcDanBeOldArtworkRects(doc, canvasRect, skipItems) {
+  var rects = [],
+    canvasW = canvasRect[2] - canvasRect[0],
+    canvasH = canvasRect[1] - canvasRect[3],
+    layerCount = 0;
+  try {
+    layerCount = doc.layers.length;
+  } catch (layersError) {
+    return rects;
+  }
+  function same(a, b) {
+    if (a === b) return true;
+    try {
+      return !!(a && b && a.uuid && a.uuid === b.uuid);
+    } catch (uuidError) {}
+    return false;
+  }
+  for (var li = 0; li < layerCount; li++) {
+    var items = null,
+      count = 0;
+    try {
+      if (doc.layers[li].visible === false) continue;
+      items = doc.layers[li].pageItems;
+      count = items.length;
+    } catch (layerError) {
+      continue;
+    }
+    for (var i = 0; i < count; i++) {
+      var it = items[i],
+        b = null;
+      try {
+        if (it.hidden === true) continue;
+        b = it.geometricBounds;
+      } catch (itemError) {
+        continue;
+      }
+      if (!b || !(b[2] > b[0]) || !(b[1] > b[3])) continue;
+      if (b[2] - b[0] >= canvasW * 0.92 && b[1] - b[3] >= canvasH * 0.92) continue;
+      var skip = false;
+      for (var k = 0; skipItems && k < skipItems.length && !skip; k++)
+        if (same(skipItems[k], it)) skip = true;
+      if (!skip) rects.push([b[0], b[1], b[2], b[3]]);
+    }
+  }
+  return rects;
+}
+
 // Cấp chỗ trên canvas từ góc trên trái, trái sang phải, giống Dàn KTS. Giữ chỗ cho mọi
 // tờ (hoặc cặp hai mặt) trước khi ghi bất cứ thứ gì vào tài liệu nguồn.
 function dcDanBeOutputPositions(
@@ -1084,15 +1133,32 @@ function dcDanBeRender(jobId, slotsText, reportText) {
           Math.min(sourceBounds[3], b[3]),
         ];
     }
+    var sourceItems = [];
     for (i = 0; i < job.models.length; i++) {
       includeSource(job.models[i].khuon.item);
       includeSource(job.models[i].bai.item);
-      if (twoSided) includeSource(job.models[i].sau.item);
+      sourceItems.push(job.models[i].khuon.item, job.models[i].bai.item);
+      if (twoSided) {
+        includeSource(job.models[i].sau.item);
+        sourceItems.push(job.models[i].sau.item);
+      }
     }
     var scaleFactor = 1;
     try {
       scaleFactor = doc.scaleFactor;
     } catch (scaleError) {}
+    // Bài cũ còn trên canvas (khung đã xoá ở lượt trước) cũng là vùng bận, giống KTS.
+    var canvasHalf =
+      isFinite(scaleFactor) && scaleFactor > 0 && scaleFactor < 1
+        ? 7200 / scaleFactor
+        : 7200;
+    existingRects = existingRects.concat(
+      dcDanBeOldArtworkRects(
+        doc,
+        [-canvasHalf, canvasHalf, canvasHalf, -canvasHalf],
+        sourceItems,
+      ),
+    );
     var positions = dcDanBeOutputPositions(
       paperW,
       paperH,

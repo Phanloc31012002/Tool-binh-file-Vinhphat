@@ -175,6 +175,50 @@ function dcCauGiuObjectLa(kept, sep) {
   );
 }
 
+// Khung bao của bài cũ còn trên canvas (object cấp trên cùng của mọi layer đang hiện, kể cả
+// layer khoá), bỏ object trong skipItems (nguồn đang chọn) và object phủ gần hết canvas (nền làm
+// việc). Dùng để tờ mới né cả bài cũ đã bị xoá khung ở lượt trước, không chỉ né artboard.
+function dcVungBaiCu(doc, canvasRect, skipItems) {
+  var rects = [];
+  var canvasW = canvasRect[2] - canvasRect[0],
+    canvasH = canvasRect[1] - canvasRect[3];
+  var layerCount = 0;
+  try {
+    layerCount = doc.layers.length;
+  } catch (layersError) {
+    return rects;
+  }
+  for (var li = 0; li < layerCount; li++) {
+    var layer = doc.layers[li],
+      items = null,
+      count = 0;
+    try {
+      if (layer.visible === false) continue;
+      items = layer.pageItems;
+      count = items.length;
+    } catch (layerError) {
+      continue;
+    }
+    for (var i = 0; i < count; i++) {
+      var it = items[i],
+        b = null;
+      try {
+        if (it.hidden === true) continue;
+        b = it.geometricBounds;
+      } catch (itemError) {
+        continue;
+      }
+      if (!b || !(b[2] > b[0]) || !(b[1] > b[3])) continue;
+      if (b[2] - b[0] >= canvasW * 0.92 && b[1] - b[3] >= canvasH * 0.92) continue;
+      var skip = false;
+      for (var k = 0; skipItems && k < skipItems.length && !skip; k++)
+        if (dcCungObject(skipItems[k], it)) skip = true;
+      if (!skip) rects.push([b[0], b[1], b[2], b[3]]);
+    }
+  }
+  return rects;
+}
+
 // Số đo pt → chữ mm, một chữ số lẻ, dấu phẩy kiểu Việt ("92,0").
 function dcMmText(pt) {
   return (pt / 2.834645669).toFixed(1).replace(".", ",");
@@ -6081,6 +6125,12 @@ function dcDanToiUu(
         occupiedRects.push(existingRect);
       } catch (e) {}
     }
+    // Bài cũ còn trên canvas (khung đã xoá ở lượt trước) cũng là vùng bận.
+    var sourceItemsKts = [];
+    for (var sk = 0; sk < raw.length; sk++) sourceItemsKts.push(raw[sk].item);
+    occupiedRects = occupiedRects.concat(
+      dcVungBaiCu(doc, canvasRect, sourceItemsKts),
+    );
     var sourceAlreadyCovered = false;
     for (var oi = 0; oi < occupiedRects.length; oi++) {
       if (rectContains(occupiedRects[oi], sourceBounds)) {
@@ -7320,6 +7370,13 @@ function dcDanTuTro(
         occupiedRects.push(existingRect);
       } catch (e) {}
     }
+    // Bài cũ còn trên canvas (khung đã xoá ở lượt trước) cũng là vùng bận.
+    var sourceItemsTuTro = [];
+    for (var sk = 0; sk < pairs.length; sk++)
+      sourceItemsTuTro.push(pairs[sk].front, pairs[sk].back);
+    occupiedRects = occupiedRects.concat(
+      dcVungBaiCu(doc, canvasRect, sourceItemsTuTro),
+    );
     var sourceAlreadyCovered = false;
     for (var oi = 0; oi < occupiedRects.length; oi++) {
       if (rectContains(occupiedRects[oi], sourceBounds)) {
@@ -8397,6 +8454,11 @@ function dcDanTuTroNhieuKho(
         occupied.push(existing);
       } catch (e) {}
     }
+    // Bài cũ còn trên canvas (khung đã xoá ở lượt trước) cũng là vùng bận.
+    var sourceItemsNk = [];
+    for (var sk = 0; sk < pairs.length; sk++)
+      sourceItemsNk.push(pairs[sk].front, pairs[sk].back);
+    occupied = occupied.concat(dcVungBaiCu(doc, canvasRect, sourceItemsNk));
     var sourceCovered = false;
     for (var occ = 0; occ < occupied.length; occ++) {
       if (rectContains(occupied[occ], sourceBounds)) {
