@@ -44,6 +44,8 @@ for (const msg of ["Chưa chọn trang ruột.", "Số trang phải là BỘI S�
 const danCard = lib.slice(lib.indexOf("function _dcDanCore("), lib.indexOf("function dcDanToiUu("));
 assert.ok(!/warn\([^;]*\);\s*return;\s*\n/.test(danCard), "warn(...); return; → return ERR");
 assert.ok(danCard.indexOf("Khe giữa khối theo layout") >= 0, "báo khi ô nhập khe bị bỏ qua");
+// Layout khai báo blockGap: ô khe điền sẵn đúng số và khoá lại, không để người dùng gõ số vô nghĩa.
+assert.ok(/inG\.text = "" \+ LAYOUT\.blockGap/.test(danCard) && /inG\.enabled = false/.test(danCard), "ô khe điền sẵn blockGap và khoá");
 
 // Clip header: báo đúng số object thật sự được clip và số đã có clip giữ nguyên.
 assert.ok(lib.indexOf("đã có clip, giữ nguyên") >= 0);

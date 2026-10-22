@@ -4,7 +4,7 @@
 // ExtendScript đọc path, tự tạo PON và render. Phần tối ưu hình học chạy ở
 // Chromium của CEP để Illustrator không bị treo khi thử nhiều bố cục.
 // ============================================================
-var dcDanBeNestingVersion = 12;
+var dcDanBeNestingVersion = 13;
 if (typeof dcDanBeJobs === "undefined") var dcDanBeJobs = {};
 if (typeof dcDanBeJobCounter === "undefined") var dcDanBeJobCounter = 1;
 
@@ -740,12 +740,12 @@ function dcDanBePrepare(
         var words = " " + n.replace(/[^a-z0-9]+/g, " ") + " ";
         if (
           role === "front" &&
-          (n.indexOf("mat truoc") >= 0 || words.indexOf(" front ") >= 0)
+          (n.indexOf("mat truoc") >= 0 || /\sfront\d*\s/.test(words))
         )
           return doc.layers[i];
         if (
           role === "back" &&
-          (n.indexOf("mat sau") >= 0 || words.indexOf(" back ") >= 0)
+          (n.indexOf("mat sau") >= 0 || /\sback\d*\s/.test(words))
         )
           return doc.layers[i];
       }

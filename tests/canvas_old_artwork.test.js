@@ -33,6 +33,18 @@ const union = (rects) => [
   const rects = JSON.parse(JSON.stringify(c.dcVungBaiCu(doc, [-7200, 7200, 7200, -7200], [source])));
   assert.deepEqual(rects, [[500, 400, 900, 100], [1000, 50, 1100, 0]]);
 }
+// Tài liệu lớn: tra object bỏ qua bằng bảng uuid dựng một lần — số lần đọc uuid cỡ N + M, không N × M.
+{
+  const c = vm.createContext({});
+  vm.runInContext(lib, c);
+  let reads = 0;
+  const mk = (i) => ({ get uuid() { reads++; return "u" + i; }, geometricBounds: [i, 10, i + 5, 0] });
+  const items = Array.from({ length: 300 }, (_, i) => mk(i));
+  const skip = items.slice(0, 50);
+  const rects = c.dcVungBaiCu({ layers: [{ visible: true, pageItems: items }] }, [-7200, 7200, 7200, -7200], skip);
+  assert.equal(rects.length, 250);
+  assert.ok(reads <= 300 + 50 + 10, "đọc uuid " + reads + " lần cho 300 object × 50 nguồn");
+}
 {
   const b = vm.createContext({});
   vm.runInContext(bridge, b);

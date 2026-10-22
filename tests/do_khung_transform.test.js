@@ -44,15 +44,31 @@ assert.deepEqual(plain(c.dcKhungThanhPham(group([mask, content], true))), rect(0
 const spill = shape("RasterItem", rect(-5 * MM, 5 * MM, 120, 80));
 assert.deepEqual(plain(c.dcKhungThanhPham(group([mask, spill], true))), rect(0, 0, 92, 56));
 
-// (b) Mask là compound path.
-const compoundMask = shape("CompoundPathItem", rect(10, -10, 50, 30), { clipping: true });
+// (b) Mask là compound path: Illustrator chỉ lộ cờ clipping trên path con (compound.pathItems[k].clipping),
+//     không có trên chính CompoundPathItem (như clippingBounds/clippingRoot trong lib).
+const compoundMask = shape("CompoundPathItem", rect(10, -10, 50, 30), {
+  pathItems: [shape("PathItem", rect(10, -10, 50, 30), { clipping: true }), shape("PathItem", rect(20, -15, 10, 10), { clipping: true })],
+});
+assert.equal(compoundMask.clipping, undefined);
 assert.deepEqual(plain(c.dcKhungThanhPham(group([compoundMask, content], true))), rect(10, -10, 50, 30));
 
 // (c) Group thường bọc đúng một clip group → khung mask bên trong.
 assert.deepEqual(plain(c.dcKhungThanhPham(group([group([mask, spill], true)], false))), rect(0, 0, 92, 56));
-// Group thường có nhiều con → khung bao của group.
+// Group thường có nhiều con → hợp các khung con (bằng khung group khi Illustrator tính đúng).
 const two = group([shape("PathItem", rect(0, 0, 10, 10)), shape("PathItem", rect(100, -100, 10, 10))], false);
 assert.deepEqual(plain(c.dcKhungThanhPham(two)), two.geometricBounds);
+// Group{clip group, chữ} mà Illustrator báo khung group gồm cả phần ảnh bị mask che (lỗi đã ghi ở :8671):
+// khung đúng = hợp(mask, chữ), không phải khung group.
+const text = shape("TextFrame", rect(5 * MM, -5 * MM, 40, 8));
+const cardGroup = group([group([mask, spill], true), text], false);
+cardGroup.geometricBounds = spill.geometricBounds.slice(); // Illustrator "nhìn thấy" cả ảnh tràn
+assert.deepEqual(plain(c.dcKhungThanhPham(cardGroup)), rect(0, 0, 92, 56));
+// Con ẩn không tính; group có quá nhiều con (>200) thì lấy khung group cho nhanh.
+const hiddenKid = shape("PathItem", rect(500, -500, 10, 10), { hidden: true });
+assert.deepEqual(plain(c.dcKhungThanhPham(group([shape("PathItem", rect(0, 0, 10, 10)), hiddenKid], false))), rect(0, 0, 10, 10));
+const many = group(Array.from({ length: 201 }, (_, i) => shape("PathItem", rect(i, 0, 1, 1))), false);
+many.geometricBounds = [0, 0, 999, -1];
+assert.deepEqual(plain(c.dcKhungThanhPham(many)), [0, 0, 999, -1]);
 
 // (d) Hình thường → geometricBounds; clip group không tìm thấy mask → geometricBounds của group.
 const simple = shape("PathItem", rect(3, -3, 40, 20));

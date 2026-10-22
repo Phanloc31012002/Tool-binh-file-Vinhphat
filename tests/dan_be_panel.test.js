@@ -92,8 +92,9 @@ function panel(options = {}) {
     dcDanToiUu() {},
     dcCopyToiUuNoteToOddArtboards() {},
     dcCopyToiUuNoteToAllArtboards() {},
-    dcDanToiUuVersion: 22,
-    dcDanBeNestingVersion: 12,
+    // Khớp mốc nạp nóng hiện tại trong main.js (v2.19.0: lõi 23, cầu nối 13).
+    dcDanToiUuVersion: 23,
+    dcDanBeNestingVersion: 13,
     dcDanBePrepare(...args) {
       context.prepareArguments = args;
     },
@@ -552,8 +553,10 @@ for (const scenario of [
   { remove: [], bridgeVersion: 9, expected: ["dan_be_bridge.jsx"] },
   { remove: [], bridgeVersion: 10, expected: ["dan_be_bridge.jsx"] },
   { remove: [], bridgeVersion: 11, expected: ["dan_be_bridge.jsx"] },
+  { remove: [], bridgeVersion: 12, expected: ["dan_be_bridge.jsx"] },
   { remove: [], libraryVersion: 15, expected: ["dan_card_lib.jsx"] },
   { remove: [], libraryVersion: 21, expected: ["dan_card_lib.jsx"] },
+  { remove: [], libraryVersion: 22, expected: ["dan_card_lib.jsx"] },
 ]) {
   const p = panel();
   const loaded = [];

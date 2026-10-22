@@ -70,10 +70,12 @@ function dcMoTaLoi(e) {
 var DC_DUNG_SAI_KHO_MM = 0.5; // dung sai khổ chung (mm)
 if (typeof dcDoTheoKhungTransform === "undefined") var dcDoTheoKhungTransform = true;
 
-// Khung đúng như bảng Transform hiện: clip group → khung mask (kể cả compound
-// path); group thường bọc đúng một con → khung của con; còn lại → khung hình.
-// Illustrator đang bật "Use Preview Bounds" thì lấy visibleBounds ở mọi nhánh.
+// Khung đúng như bảng Transform hiện: clip group → khung mask (kể cả compound path, cờ
+// clipping nằm trên path con của compound); group thường → hợp khung các con đang hiện (bằng
+// khung group khi Illustrator tính đúng, và vẫn đúng khi Illustrator gộp cả phần ảnh bị mask
+// che); còn lại → khung hình. Illustrator đang bật "Use Preview Bounds" thì lấy visibleBounds.
 // Trả [l,t,r,b] hoặc null khi object hỏng/không đo được. Không ném lỗi.
+var DC_KHUNG_TOI_DA_CON = 200; // group đông con hơn thì lấy thẳng khung group cho nhanh
 function dcKhungThanhPham(item) {
   var previewBounds = false;
   try {
@@ -87,6 +89,27 @@ function dcKhungThanhPham(item) {
     } catch (boundsError) {}
     return null;
   }
+  function isMask(child) {
+    try {
+      if (child.clipping === true) return true;
+      if (child.typename === "CompoundPathItem") {
+        var paths = child.pathItems;
+        for (var k = 0; k < paths.length; k++)
+          if (paths[k].clipping === true) return true;
+      }
+    } catch (maskError) {}
+    return false;
+  }
+  function union(a, b) {
+    if (!a) return b;
+    if (!b) return a;
+    return [
+      Math.min(a[0], b[0]),
+      Math.max(a[1], b[1]),
+      Math.max(a[2], b[2]),
+      Math.min(a[3], b[3]),
+    ];
+  }
   function frameOf(it, depth) {
     if (!it || depth > 8) return null;
     var typename = null,
@@ -96,29 +119,34 @@ function dcKhungThanhPham(item) {
     } catch (typeError) {
       return null;
     }
-    if (typename === "GroupItem") {
-      try {
-        clipped = it.clipped === true;
-      } catch (clipError) {}
-      var children = null,
-        count = 0;
-      try {
-        children = it.pageItems;
-        count = children.length;
-      } catch (childError) {}
-      if (clipped) {
-        for (var i = 0; i < count; i++) {
-          var isMask = false;
-          try {
-            isMask = children[i].clipping === true;
-          } catch (maskError) {}
-          if (isMask) return boundsOf(children[i]) || boundsOf(it);
-        }
-        return boundsOf(it);
-      }
-      if (count === 1) return frameOf(children[0], depth + 1) || boundsOf(it);
+    if (typename !== "GroupItem") return boundsOf(it);
+    try {
+      clipped = it.clipped === true;
+    } catch (clipError) {}
+    var children = null,
+      count = 0;
+    try {
+      children = it.pageItems;
+      count = children.length;
+    } catch (childError) {
+      return boundsOf(it);
     }
-    return boundsOf(it);
+    if (clipped) {
+      for (var i = 0; i < count; i++)
+        if (isMask(children[i])) return boundsOf(children[i]) || boundsOf(it);
+      return boundsOf(it);
+    }
+    if (count === 0 || count > DC_KHUNG_TOI_DA_CON) return boundsOf(it);
+    var acc = null;
+    for (var j = 0; j < count; j++) {
+      var hidden = false;
+      try {
+        hidden = children[j].hidden === true;
+      } catch (hiddenError) {}
+      if (hidden) continue;
+      acc = union(acc, frameOf(children[j], depth + 1));
+    }
+    return acc || boundsOf(it);
   }
   return frameOf(item, 0);
 }
@@ -143,25 +171,50 @@ function dcCungObject(a, b) {
   } catch (uuidError) {}
   return false;
 }
-// item có nằm trong protectList, hoặc là tổ tiên (group cha) của một object trong đó không.
-function dcDuocBaoVe(item, protectList) {
-  if (!protectList || !protectList.length) return false;
-  for (var i = 0; i < protectList.length; i++) {
-    var node = protectList[i],
+// uuid của object (chuỗi) hoặc null khi Illustrator không có.
+function dcUuidCua(item) {
+  try {
+    var id = item.uuid;
+    if (id) return String(id);
+  } catch (uuidError) {}
+  return null;
+}
+// Tập object cần giữ, dựng MỘT lần: gồm từng object trong danh sách và các group cha của nó
+// (tới layer). Tra bằng uuid khi có, so tham chiếu khi không — tránh N×M lần đọc DOM.
+function dcTapObject(items, keToTien) {
+  var tap = { uuids: {}, refs: [], rong: true };
+  if (!items) return tap;
+  for (var i = 0; i < items.length; i++) {
+    var node = items[i],
       depth = 0;
     while (node && depth++ < 32) {
-      if (dcCungObject(node, item)) return true;
+      tap.rong = false;
+      var id = dcUuidCua(node);
+      if (id) tap.uuids[id] = true;
+      else tap.refs.push(node);
+      if (!keToTien) break;
       var parent = null;
       try {
         parent = node.parent;
-        if (parent && parent.typename === "Layer") break;
+        if (!parent || parent.typename === "Layer") break;
       } catch (parentError) {
         break;
       }
       node = parent;
     }
   }
+  return tap;
+}
+function dcTrongTap(tap, item) {
+  if (!tap || tap.rong) return false;
+  var id = dcUuidCua(item);
+  if (id && tap.uuids[id]) return true;
+  for (var i = 0; i < tap.refs.length; i++) if (tap.refs[i] === item) return true;
   return false;
+}
+// item có nằm trong protectList, hoặc là tổ tiên (group cha) của một object trong đó không.
+function dcDuocBaoVe(item, protectList) {
+  return dcTrongTap(dcTapObject(protectList, true), item);
 }
 
 // Câu báo số object lạ được giữ lại trong vùng artboard ("" khi không có).
@@ -182,6 +235,7 @@ function dcVungBaiCu(doc, canvasRect, skipItems) {
   var rects = [];
   var canvasW = canvasRect[2] - canvasRect[0],
     canvasH = canvasRect[1] - canvasRect[3];
+  var boQua = dcTapObject(skipItems, false); // dựng một lần, tra bằng uuid
   var layerCount = 0;
   try {
     layerCount = doc.layers.length;
@@ -210,10 +264,7 @@ function dcVungBaiCu(doc, canvasRect, skipItems) {
       }
       if (!b || !(b[2] > b[0]) || !(b[1] > b[3])) continue;
       if (b[2] - b[0] >= canvasW * 0.92 && b[1] - b[3] >= canvasH * 0.92) continue;
-      var skip = false;
-      for (var k = 0; skipItems && k < skipItems.length && !skip; k++)
-        if (dcCungObject(skipItems[k], it)) skip = true;
-      if (!skip) rects.push([b[0], b[1], b[2], b[3]]);
+      if (!dcTrongTap(boQua, it)) rects.push([b[0], b[1], b[2], b[3]]);
     }
   }
   return rects;
@@ -1062,6 +1113,11 @@ function _dcDanCore(SEL_LAYOUT_KEY, VOUCHER_WITH_CARD_ARG) {
   g3.add("statictext", undefined, "Khe giữa khối (mm):");
   var inG = g3.add("edittext", undefined, "2");
   inG.characters = 6;
+  if (typeof LAYOUT.blockGap === "number") {
+    // Layout tự quy định khe giữa khối: điền sẵn và khoá ô, không để gõ số vô nghĩa.
+    inG.text = "" + LAYOUT.blockGap;
+    inG.enabled = false;
+  }
   var pRot = dlg.add("panel", undefined, "Chiều xoay thẻ dọc");
   pRot.orientation = "row";
   pRot.margins = 10;
@@ -1304,12 +1360,12 @@ function _dcDanCore(SEL_LAYOUT_KEY, VOUCHER_WITH_CARD_ARG) {
   //  Xóa mọi object có tâm nằm trong vùng AB index 1 (pon thừa của
   //  trang 2), rồi xóa artboard đó. Chỉ giữ lại AB1 để dàn 1 mặt.
   // ============================================================
-  function removeSecondArtboard(d) {
+  function removeSecondArtboard(d, protectList) {
     var result = { removed: 0, kept: 0 };
     if (!d || d.artboards.length < 2) return result;
     var rc = d.artboards[1].artboardRect; // [l, t, r, b]
     // chỉ xoá object DO TOOL TẠO có tâm trong vùng AB2; object lạ giữ lại và đếm
-    result = dcDonObjectTool(d, [rc], null, true);
+    result = dcDonObjectTool(d, [rc], protectList);
     // xóa artboard index 1
     try {
       d.artboards.remove(1);
@@ -1372,14 +1428,15 @@ function _dcDanCore(SEL_LAYOUT_KEY, VOUCHER_WITH_CARD_ARG) {
     var rects = [];
     for (var a = 0; a < d.artboards.length; a++)
       rects.push(d.artboards[a].artboardRect);
-    return dcDonObjectTool(d, rects, protectList, false);
+    return dcDonObjectTool(d, rects, protectList);
   }
 
-  // Dọn object cấp trên cùng trên các layer không khoá/ẩn:
-  //  - object có note DC_NOTE_DAN_CARD → xoá (trong vùng rects khi chiVung, bất kể vị trí khi không);
-  //  - object lạ có tâm trong khung bao chung của rects → GIỮ, đếm vào kept để báo;
+  // Dọn object cấp trên cùng trên các layer không khoá/ẩn, CHỈ trong khung bao chung của rects
+  // (ngoài vùng không đụng, như bản 2.18):
+  //  - object có note DC_NOTE_DAN_CARD → xoá;
+  //  - object lạ → GIỮ, đếm vào kept để báo;
   //  - object trong protectList hoặc là group cha của nó → giữ, không đếm.
-  function dcDonObjectTool(d, rects, protectList, chiVung) {
+  function dcDonObjectTool(d, rects, protectList) {
     var L = 1e12,
       T = -1e12,
       R = -1e12,
@@ -1391,6 +1448,7 @@ function _dcDanCore(SEL_LAYOUT_KEY, VOUCHER_WITH_CARD_ARG) {
       if (rc[2] > R) R = rc[2];
       if (rc[3] < B) B = rc[3];
     }
+    var baoVe = dcTapObject(protectList, true);
     var toRemove = [],
       kept = 0;
     for (var li = 0; li < d.layers.length; li++) {
@@ -1405,14 +1463,6 @@ function _dcDanCore(SEL_LAYOUT_KEY, VOUCHER_WITH_CARD_ARG) {
       var pit = lay.pageItems;
       for (var p = 0; p < pit.length; p++) {
         var it = pit[p];
-        if (dcDuocBaoVe(it, protectList)) continue; // giữ object mẻ mới
-        var isLocked = false,
-          isHidden = false;
-        try {
-          isLocked = it.locked;
-          isHidden = it.hidden;
-        } catch (e) {}
-        if (isLocked || isHidden) continue;
         var gb;
         try {
           gb = it.geometricBounds;
@@ -1421,13 +1471,21 @@ function _dcDanCore(SEL_LAYOUT_KEY, VOUCHER_WITH_CARD_ARG) {
         }
         var cx = (gb[0] + gb[2]) / 2,
           cy = (gb[1] + gb[3]) / 2;
-        var trongVung = cx >= L && cx <= R && cy <= T && cy >= B;
+        if (!(cx >= L && cx <= R && cy <= T && cy >= B)) continue; // ngoài vùng: không đụng
+        var isLocked = false,
+          isHidden = false;
+        try {
+          isLocked = it.locked;
+          isHidden = it.hidden;
+        } catch (e) {}
+        if (isLocked || isHidden) continue;
+        if (dcTrongTap(baoVe, it)) continue; // giữ object mẻ mới và group cha của nó
         var cuaTool = false;
         try {
           cuaTool = it.note === DC_NOTE_DAN_CARD;
         } catch (e) {}
-        if (cuaTool && (trongVung || !chiVung)) toRemove.push(it);
-        else if (!cuaTool && trongVung) kept++;
+        if (cuaTool) toRemove.push(it);
+        else kept++;
       }
     }
     for (var r = 0; r < toRemove.length; r++) {
@@ -1650,9 +1708,11 @@ function _dcDanCore(SEL_LAYOUT_KEY, VOUCHER_WITH_CARD_ARG) {
 
   // Đo kích thước bằng visibleUnion (nội dung thật, đã giao clip mask,
   // bỏ mask thừa). Đây là cách đo dùng cho kiểm tra + clip.
-  function visSizeMM(item) {
+  // theoNoiDung = true: đo nội dung thật dù cờ Transform đang bật (dùng khi
+  // phán xét kết quả tự sửa khổ — khung clip vừa tạo luôn "đúng", chỉ nội dung mới nói thật).
+  function visSizeMM(item, theoNoiDung) {
     var acc = { val: null };
-    visibleUnion(item, acc);
+    visibleUnion(item, acc, theoNoiDung === true);
     var g = acc.val;
     if (!g) {
       try {
@@ -1741,7 +1801,8 @@ function _dcDanCore(SEL_LAYOUT_KEY, VOUCHER_WITH_CARD_ARG) {
     var tol = DC_DUNG_SAI_KHO_MM;
 
     function dungKho(candidate) {
-      var s = visSizeMM(candidate);
+      // Đo theo NỘI DUNG: khung clip vừa tạo luôn đúng W×H, không nói lên gì cả.
+      var s = visSizeMM(candidate, true);
       var hi = Math.max(s.w, s.h),
         lo = Math.min(s.w, s.h);
       return Math.abs(hi - wantHi) <= tol && Math.abs(lo - wantLo) <= tol;
@@ -1752,17 +1813,21 @@ function _dcDanCore(SEL_LAYOUT_KEY, VOUCHER_WITH_CARD_ARG) {
       } catch (e) {}
     }
     // Chạy một chiến lược trên bản sao mới; trả object kết quả hoặc null (đã dọn rác).
+    // Mọi object chiến lược tạo ra được ghi vào `tao` để dọn khi lỗi giữa chừng.
     function thu(strategy) {
       var copy = null,
-        result = null;
+        result = null,
+        tao = [];
       try {
         copy = item.duplicate();
-        result = strategy(copy);
+        result = strategy(copy, tao);
       } catch (e) {
         result = null;
       }
       if (result && dungKho(result)) return result;
       xoaNhe(result);
+      for (var ti = tao.length - 1; ti >= 0; ti--)
+        if (tao[ti] !== result) xoaNhe(tao[ti]);
       // Chiến lược A/B có thể đã raster xong bản sao (copy không còn); xoá nếu còn.
       if (copy && copy !== result) xoaNhe(copy);
       return null;
@@ -1772,14 +1837,17 @@ function _dcDanCore(SEL_LAYOUT_KEY, VOUCHER_WITH_CARD_ARG) {
     var frame = findFrameBounds(item, wantWmm, wantHmm, 2.0);
     var fixed = null;
     if (frame)
-      fixed = thu(function (copy) {
-        return doc.rasterize(copy, frame, makeRasterOptions());
+      fixed = thu(function (copy, tao) {
+        var ra = doc.rasterize(copy, frame, makeRasterOptions());
+        tao.push(ra);
+        return ra;
       });
 
     // --- Chiến lược B: raster cả object rồi clip tại tâm artboard ---
     if (!fixed)
-      fixed = thu(function (copy) {
+      fixed = thu(function (copy, tao) {
         var raAll = doc.rasterize(copy, undefined, makeRasterOptions());
+        tao.push(raAll);
         var abIdx = doc.artboards.getActiveArtboardIndex();
         var rect = doc.artboards[abIdx].artboardRect; // [l,t,r,b]
         var acx = (rect[0] + rect[2]) / 2,
@@ -1792,12 +1860,14 @@ function _dcDanCore(SEL_LAYOUT_KEY, VOUCHER_WITH_CARD_ARG) {
           Wmm,
           Hmm,
         );
+        tao.push(mrect);
         // di chuyển ảnh sao cho tâm ảnh trùng tâm artboard trước khi clip
         var rb = raAll.geometricBounds;
         var rcx = (rb[0] + rb[2]) / 2,
           rcy = (rb[1] + rb[3]) / 2;
         raAll.translate(acx - rcx, acy - rcy);
         var grp = lay.groupItems.add();
+        tao.push(grp);
         mrect.move(grp, ElementPlacement.PLACEATBEGINNING);
         raAll.move(grp, ElementPlacement.PLACEATEND);
         mrect.clipping = true;
@@ -1946,7 +2016,7 @@ function _dcDanCore(SEL_LAYOUT_KEY, VOUCHER_WITH_CARD_ARG) {
   // Đo vùng bao THẬT của object (gộp mọi phần nhìn thấy, bỏ vùng trong suốt,
   // xử lý cả group có clip mask). Kết quả gộp vào acc.val.
   // Bật "Đo khổ theo bảng Transform" thì lấy thẳng khung Transform (khung clip).
-  function visibleUnion(item, acc) {
+  function visibleUnion(item, acc, theoNoiDung) {
     function merge(b) {
       if (!b) return;
       if (!acc.val) {
@@ -1959,7 +2029,7 @@ function _dcDanCore(SEL_LAYOUT_KEY, VOUCHER_WITH_CARD_ARG) {
       if (b[2] > a[2]) a[2] = b[2];
       if (b[3] < a[3]) a[3] = b[3];
     }
-    if (dcDoTheoKhungTransform) {
+    if (dcDoTheoKhungTransform && !theoNoiDung) {
       var khungTransform = dcKhungThanhPham(item);
       if (khungTransform) {
         merge(khungTransform);
@@ -2001,7 +2071,7 @@ function _dcDanCore(SEL_LAYOUT_KEY, VOUCHER_WITH_CARD_ARG) {
             isMask = pit[i].clipping === true;
           } catch (e) {}
           if (isMask) continue; // bỏ đường mask
-          visibleUnion(pit[i], inner);
+          visibleUnion(pit[i], inner, true);
         }
         var res = inner.val;
         // Giao nội dung thật với vùng mask (nội dung tràn ngoài mask bị cắt).
@@ -2020,7 +2090,7 @@ function _dcDanCore(SEL_LAYOUT_KEY, VOUCHER_WITH_CARD_ARG) {
         return;
       }
       var pit2 = item.pageItems;
-      for (var j = 0; j < pit2.length; j++) visibleUnion(pit2[j], acc);
+      for (var j = 0; j < pit2.length; j++) visibleUnion(pit2[j], acc, true);
       return;
     }
     if (isVisibleLeaf(item)) {
@@ -2419,8 +2489,8 @@ function _dcDanCore(SEL_LAYOUT_KEY, VOUCHER_WITH_CARD_ARG) {
   if (TWO_SIDES) {
     ensureTwoArtboards(doc);
   } else {
-    var donAb2 = removeSecondArtboard(doc);
-    donCu.kept += donAb2.kept;
+    // AB2 nằm trong vùng chung đã đếm ở clearOldArtboardContent → không cộng dồn kept.
+    removeSecondArtboard(doc, protectSel);
   }
 
   var useMixed = hasDouble && LAYOUT.key === "9.2x5.6";
@@ -2914,6 +2984,7 @@ function _dcDanCore(SEL_LAYOUT_KEY, VOUCHER_WITH_CARD_ARG) {
       var grp = doc.groupItems.add();
       for (j = 0; j < copies.length; j++) copies[j].moveToBeginning(grp);
       grp.translate(abCx - ccx, abCy - ccy);
+      grp.note = DC_NOTE_DAN_CARD; // để mẻ sau nhận ra và dọn đúng object của tool
       return grp;
     }
 
@@ -2930,6 +3001,7 @@ function _dcDanCore(SEL_LAYOUT_KEY, VOUCHER_WITH_CARD_ARG) {
       var lay = doc.activeLayer;
       var tf = lay.textFrames.add();
       tf.contents = NOTE_TEXT;
+      tf.note = DC_NOTE_DAN_CARD;
       try {
         tf.textRange.characterAttributes.size = 14;
       } catch (e) {}
@@ -2984,7 +3056,7 @@ function _dcDanCore(SEL_LAYOUT_KEY, VOUCHER_WITH_CARD_ARG) {
 //  TAB DẤU CẮT: chạy độc lập với các luồng dàn hiện có.
 //  Chọn từng bài, hoặc chọn group dàn mà các bài con là clipping group.
 // ============================================================
-var dcAutoCutMarksVersion = 1;
+var dcAutoCutMarksVersion = 2;
 function dcThemDauCatTuDong(lengthText, edgeText, gapText) {
   var doc = null,
     markLayer = null,
@@ -3983,7 +4055,7 @@ function dcDanToiUuV2(pageWidthText, pageHeightText) {
 //  - Artboard moi tu xep theo luoi canvas, trai sang phai roi xuong hang.
 //  - Tach hinh chu nhat de tan dung khoang trong chu L, van cat dao duoc.
 // ============================================================
-var dcDanToiUuVersion = 22;
+var dcDanToiUuVersion = 23;
 // Chỉ gọi sau khi dựng thành công. Chỉ xoá khung, không bao giờ xoá bài bên trong.
 function dcRemoveOldCanvasArtboards(doc, oldCount) {
   var removed = 0;
@@ -6684,7 +6756,7 @@ function dcDanToiUu(
 //  Tool tự thử xoay 90°, tự thử bóp bài tối đa N mm mỗi chiều
 //  nếu nhờ vậy dàn thêm được con, và không đánh pon.
 // ============================================================
-var dcDanTuTroVersion = 11;
+var dcDanTuTroVersion = 12;
 
 function dcDanTuTro(
   pageWidthText,
@@ -19048,7 +19120,7 @@ function dcRunCatalogueCustomA5(wCm, hCm) {
 // một cuốn hay hai cuốn giống hệt nhau. Hai cuốn dùng chung
 // đường cắt giữa và dùng PON kiểu A5.
 // ============================================================
-var dcCatalogueAutoVersion = 13;
+var dcCatalogueAutoVersion = 14;
 
 function dcRunCatalogueAuto(wCm, hCm) {
   var MM = 2.834645669;
@@ -19473,7 +19545,7 @@ function dcRunCatalogueAuto(wCm, hCm) {
 // 65 x 86 đã duyệt; chúng không bao giờ bị ruột đã bóp kéo vào trong.  Lượt
 // bóp 2 trang canh giữa cũng được bù một lượng rất nhỏ ở đáy danh định,
 // cần có để giữ tờ ruột đầu tiên nằm trong artboard cố định của nó.
-var dcSignature8AutoPonVersion = 40;
+var dcSignature8AutoPonVersion = 41;
 
 function dcRunSignature8(wCm, hCm, coBia) {
   var previousSignatureCoordinates = app.coordinateSystem;
@@ -21962,7 +22034,7 @@ function dcRunSignature8(wCm, hCm, coBia) {
 //  liệu tạm rồi lưu AI (entry PDF cũ vẫn dùng chung cơ chế an toàn).
 //  Không group/undo hay mở khoá trong tài liệu nguồn.
 // ============================================================
-var dcCtlOffsetPdfVersion = 5;
+var dcCtlOffsetPdfVersion = 6;
 
 // Action Export As native, không phải bộ xuất script Save-for-Web chỉ có RGB.
 // Trường raw của JPEG: quality/method/scans/AA/DPI fixed-point/color/map/profile.
@@ -22695,7 +22767,7 @@ function dcLuuCtlOffsetFiles(totalText, jobsText, format, suffixText) {
 //   5. Nhập ghi chú (RUỘT N + chữ thêm).
 // ============================================================
 
-var dcKeoGayAutoPonVersion = 13;
+var dcKeoGayAutoPonVersion = 14;
 
 // Toàn bộ dùng mm. Panel giờ chỉ định chính xác CẢ HAI chiều của trang.
 // Co giãn độc lập theo từng trục tài liệu cũng sửa luôn sai số làm tròn
@@ -24911,7 +24983,7 @@ function dcXoaPreviewMau(pathsText) {
 }
 
 // ---------- FILE 2: ÁP MẪU ----------
-var dcDanTheoMauVersion = 2;
+var dcDanTheoMauVersion = 3;
 // Chỉ đọc đoạn metadata nhỏ ở đầu file AI: không bao giờ dò giới hạn bằng cách tạo
 // hay đổi kích thước artboard trong tài liệu của người dùng. Chỉnh gốc canvas đã lưu
 // theo thước tài liệu đã đổi, vẫn giữ khoảng 14400 pt thận trọng của KTS.
@@ -28123,7 +28195,7 @@ function dcPickFolder() {
 //    unit     : "cm" | "mm" | "in" | "pt"  (mặc định "cm")
 //  Trả về "OK: ..." hoặc "ERR: ...".
 // ============================================================
-var dcClipToSizeVersion = 7;
+var dcClipToSizeVersion = 8;
 
 function dcClipToSize(wCm, hCm, unit) {
   try {

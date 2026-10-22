@@ -2016,7 +2016,7 @@
         .replace(/\\/g, "/");
       var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
       return (
-        "if (typeof dcThemDauCatTuDong !== 'function' || typeof dcAutoCutMarksVersion === 'undefined' || dcAutoCutMarksVersion < 1) { $.evalFile(" +
+        "if (typeof dcThemDauCatTuDong !== 'function' || typeof dcAutoCutMarksVersion === 'undefined' || dcAutoCutMarksVersion < 2) { $.evalFile(" +
         jsStr(jsxPath) +
         "); } "
       );
@@ -2031,7 +2031,7 @@
         .replace(/\\/g, "/");
       var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
       return (
-        "if (typeof dcApMau !== 'function' || typeof dcDanTheoMauVersion === 'undefined' || dcDanTheoMauVersion < 2) { $.evalFile(" +
+        "if (typeof dcApMau !== 'function' || typeof dcDanTheoMauVersion === 'undefined' || dcDanTheoMauVersion < 3) { $.evalFile(" +
         jsStr(jsxPath) +
         "); } "
       );
@@ -2049,10 +2049,10 @@
       var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
       var danBeBridgePath = extensionRoot + "/jsx/dan_be_bridge.jsx";
       return (
-        "if (typeof dcDanToiUu !== 'function' || typeof dcCopyToiUuNoteToAllArtboards !== 'function' || typeof dcCopyToiUuNoteToOddArtboards !== 'function' || typeof dcDanToiUuVersion === 'undefined' || dcDanToiUuVersion < 22) { $.evalFile(" +
+        "if (typeof dcDanToiUu !== 'function' || typeof dcCopyToiUuNoteToAllArtboards !== 'function' || typeof dcCopyToiUuNoteToOddArtboards !== 'function' || typeof dcDanToiUuVersion === 'undefined' || dcDanToiUuVersion < 23) { $.evalFile(" +
         jsStr(jsxPath) +
         "); } " +
-        "if (typeof dcDanBePrepare !== 'function' || typeof dcDanBeRender !== 'function' || typeof dcDanBeNestingVersion === 'undefined' || dcDanBeNestingVersion < 12) { $.evalFile(" +
+        "if (typeof dcDanBePrepare !== 'function' || typeof dcDanBeRender !== 'function' || typeof dcDanBeNestingVersion === 'undefined' || dcDanBeNestingVersion < 13) { $.evalFile(" +
         jsStr(danBeBridgePath) +
         "); } "
       );
@@ -2082,7 +2082,7 @@
         .replace(/\\/g, "/");
       var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
       return (
-        "if (typeof dcClipToSize !== 'function' || typeof dcClipToSizeVersion === 'undefined' || dcClipToSizeVersion < 7 || typeof dcClipCard926Version === 'undefined' || dcClipCard926Version < 2) { $.evalFile(" +
+        "if (typeof dcClipToSize !== 'function' || typeof dcClipToSizeVersion === 'undefined' || dcClipToSizeVersion < 8 || typeof dcClipCard926Version === 'undefined' || dcClipCard926Version < 2) { $.evalFile(" +
         jsStr(jsxPath) +
         "); } "
       );
@@ -2097,7 +2097,7 @@
         .replace(/\\/g, "/");
       var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
       return (
-        "if (typeof dcRunCatalogueAuto !== 'function' || typeof dcCatalogueAutoVersion === 'undefined' || dcCatalogueAutoVersion < 13) { $.evalFile(" +
+        "if (typeof dcRunCatalogueAuto !== 'function' || typeof dcCatalogueAutoVersion === 'undefined' || dcCatalogueAutoVersion < 14) { $.evalFile(" +
         jsStr(jsxPath) +
         "); } "
       );
@@ -2112,7 +2112,7 @@
         .replace(/\\/g, "/");
       var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
       return (
-        "if (typeof dcRunSignature8 !== 'function' || typeof dcSignature8AutoPonVersion === 'undefined' || dcSignature8AutoPonVersion < 40) { $.evalFile(" +
+        "if (typeof dcRunSignature8 !== 'function' || typeof dcSignature8AutoPonVersion === 'undefined' || dcSignature8AutoPonVersion < 41) { $.evalFile(" +
         jsStr(jsxPath) +
         "); } "
       );
@@ -2127,7 +2127,7 @@
         .replace(/\\/g, "/");
       var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
       return (
-        "if (typeof dcRunKeoGay !== 'function' || typeof dcKeoGayAutoPonVersion === 'undefined' || dcKeoGayAutoPonVersion < 13) { $.evalFile(" +
+        "if (typeof dcRunKeoGay !== 'function' || typeof dcKeoGayAutoPonVersion === 'undefined' || dcKeoGayAutoPonVersion < 14) { $.evalFile(" +
         jsStr(jsxPath) +
         "); } "
       );
@@ -2142,7 +2142,7 @@
         .replace(/\\/g, "/");
       var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
       return (
-        "if (typeof dcLuuCtlOffsetAIPackage !== 'function' || typeof dcCtlOffsetPdfVersion === 'undefined' || dcCtlOffsetPdfVersion < 5) { $.evalFile(" +
+        "if (typeof dcLuuCtlOffsetAIPackage !== 'function' || typeof dcCtlOffsetPdfVersion === 'undefined' || dcCtlOffsetPdfVersion < 6) { $.evalFile(" +
         jsStr(jsxPath) +
         "); } "
       );
@@ -2157,7 +2157,7 @@
         .replace(/\\/g, "/");
       var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
       return (
-        "if (typeof dcDanTuTro !== 'function' || typeof dcDanTuTroVersion === 'undefined' || dcDanTuTroVersion < 11) { $.evalFile(" +
+        "if (typeof dcDanTuTro !== 'function' || typeof dcDanTuTroVersion === 'undefined' || dcDanTuTroVersion < 12) { $.evalFile(" +
         jsStr(jsxPath) +
         "); } "
       );

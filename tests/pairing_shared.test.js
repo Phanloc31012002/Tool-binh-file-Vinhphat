@@ -52,6 +52,11 @@ assert.throws(() => b.dcDanBeRowGroups([box("a", 0, 0), box("b", 0, 0)], 2, 0.01
   ctx.doc.layers = layers("Khuôn bế", "front");
   assert.equal(ctx.findLayer("front").name, "front");
   assert.equal(ctx.findLayer("cut").name, "Khuôn bế");
+  // Tên có số dính liền vẫn nhận ("back2", "front 1"), nhưng "backside"/"Background" thì không.
+  ctx.doc.layers = layers("Background", "backside", "back2");
+  assert.equal(ctx.findLayer("back").name, "back2");
+  ctx.doc.layers = layers("front 1", "Frontal");
+  assert.equal(ctx.findLayer("front").name, "front 1");
 }
 
 // Lib: Tự trở và Dàn Card không còn tự gom hàng riêng; dùng dcKtsPairSourceRecords.

@@ -242,7 +242,7 @@ panel.dcThemDauCatTuDong = () => {
 panel.$ = {
   evalFile() {
     reloads++;
-    panel.dcAutoCutMarksVersion = 1;
+    panel.dcAutoCutMarksVersion = 2;
   },
 };
 vm.runInContext(expressions[0], panel);

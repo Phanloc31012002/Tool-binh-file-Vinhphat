@@ -24,7 +24,7 @@ const loader = main.slice(
   main.indexOf("function ", main.indexOf("function loadOffsetPdfJsx()") + 10),
 );
 assert.ok(loader.includes("typeof dcLuuCtlOffsetAIPackage"));
-assert.ok(loader.includes("dcCtlOffsetPdfVersion < 5"));
+assert.ok(loader.includes("dcCtlOffsetPdfVersion < 6"));
 const nodes = {};
 for (const id of [
   "btnOffset",
