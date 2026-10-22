@@ -50,7 +50,7 @@ Xem các thay đổi của từng bản tại
 
 ## Tính năng
 
-Panel gồm 9 tab:
+Panel gồm 10 tab:
 
 | Tab              | Chức năng                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -62,6 +62,7 @@ Panel gồm 9 tab:
 | **CTL Offset**   | Dàn bình cho in offset khổ lớn 65×86: **Đóng ghim giữa** (bìa TT4 + ruột AB tự trở) và **Keo gáy** (mỗi tay 16 trang, dàn AB tuần tự).                                                                                                                                                                                                                                                                                                     |
 | **Đổi tên**      | Đổi tên hàng loạt object: tiền tố, số/chữ thường/HOA, vị trí bắt đầu, đệm số 0, hướng đếm trên/dưới, lặp nhãn.                                                                                                                                                                                                                                                                                                                             |
 | **Variable**     | Mở công cụ Variable Importer — nhập dữ liệu CSV/TXT (giữ dấu tiếng Việt) để tạo nhiều bản từ 1 template.                                                                                                                                                                                                                                                                                                                                   |
+| **Dàn tag BD**   | Ghép tag (khổ đã tràn, 1 hoặc 2 mặt) vào **khối bội số ô card 9,2 × 5,6 cm** cho xưởng Bình Dương: nhập số lượng (500 → bài 500; 1000, 2000… → bài 1000, nhân con theo số nghìn), tool tìm cách ghép **ít ô nhất**, nhát cắt thẳng xuyên suốt, khe 0 mm, xoay 0/90; đóng artboard trước/sau kèm dấu cắt, rồi **Xuất PDF** 2 trang đặt tên như Auto Save (`1088 - 01 - 10 hop 110 x 458 - cm - 22.pdf`). Thiết kế: `docs/THIET_KE_DAN_TAG_BD.md`. |
 | **Auto Save**    | Rà các hàng từ trên xuống: hàng có 2 object là trước/sau và xuất PDF 2 trang; hàng có 1 object là card một mặt, tên file thêm ` - 1 mat` trước `cm/km`. Tool kiểm tra trùng tên file trước khi xuất. Kèm nút **Clip 9.2 × 5.6 (tự xoay)** để cắt khung nhanh.                                                                                                                                                                              |
 
 Nút **Raster** trên header: raster nhanh object đang chọn (CMYK, 500 ppi, nền
@@ -94,8 +95,10 @@ DanCard_Setup_23/
 │   ├── js/main.js                  # Logic giao diện (gọi ExtendScript qua CSInterface)
 │   ├── js/dan_be_nester.js           # Lõi tối ưu Dàn bế theo biên khuôn (CEP)
 │   ├── js/dan_be_zones.js            # Bộ chia khu: dàn trộn nhiều mẫu khác khuôn
+│   ├── js/dan_tag_bd.js              # Lõi Dàn tag BD: ghép tag vào khối ô card ít ô nhất (guillotine)
 │   ├── js/ctl_package.js             # Đóng gói AI + JPG + ZIP cho CTL Offset
 │   ├── jsx/dan_be_bridge.jsx         # Đọc khuôn, tạo PON và vẽ kết quả Dàn bế
+│   ├── jsx/dan_tag_bd_bridge.jsx     # Dàn tag BD: đọc tag, đóng artboard trước/sau, xuất PDF
 │   ├── jsx/dan_card_lib.jsx          # Thư viện các chức năng dàn bình còn lại
 │   ├── assets/, fonts/                # Ảnh & font dùng trong panel
 │   └── LICH_SU_CAP_NHAT.md             # Changelog chi tiết từng bản
@@ -103,6 +106,7 @@ DanCard_Setup_23/
 ├── docs/THIET_KE_DAN_BE_CHIA_KHU.md  # Thiết kế bộ chia khu: dàn trộn nhiều mẫu (v2.18.0)
 ├── docs/THIET_KE_DAN_BE_TOI_UU.md    # Thiết kế dàn bế duyệt hết phương án (kế tiếp)
 ├── docs/SOAT_MA_2026-10-22.md        # Soát mã toàn bộ thư mục + trạng thái sửa (v2.19.0)
+├── docs/THIET_KE_DAN_TAG_BD.md       # Thiết kế tab Dàn tag BD (v2.20.0)
 ├── online/                     # Gói bản phát hành + latest.json
 └── updater/                    # Script cập nhật tự động (dùng khi cài qua bộ cài đóng gói)
 ```
@@ -130,7 +134,12 @@ node tests/dan_be_custom_sheet.test.js
 node tests/dan_be_canvas.test.js
 node tests/kts_pairing.test.js
 node tests/kts_mixed_sizes.test.js
+node tests/dan_tag_bd_engine.test.js
+node tests/dan_tag_bd_bridge.test.js
+node tests/dan_tag_bd_panel.test.js
 ```
+
+`node tests/dan_tag_bd_preview.js` vẽ bố cục Dàn tag BD của các ca mẫu ra `tmp/tagbd_*.svg` để xem bằng mắt.
 
 Dàn KTS: chọn các mẫu và tick **Dàn nhiều mẫu vào một tờ** để ghép chung
 các kích thước khác nhau, tự nhân bản với số con chênh tối đa 1. Giữ nguyên

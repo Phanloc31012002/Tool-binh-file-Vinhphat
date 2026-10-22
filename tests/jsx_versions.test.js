@@ -4,7 +4,10 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const lib = fs.readFileSync(require.resolve("../DanCardCEP/jsx/dan_card_lib.jsx"), "utf8");
-const bridge = fs.readFileSync(require.resolve("../DanCardCEP/jsx/dan_be_bridge.jsx"), "utf8");
+const bridge =
+  fs.readFileSync(require.resolve("../DanCardCEP/jsx/dan_be_bridge.jsx"), "utf8") +
+  "\n" +
+  fs.readFileSync(require.resolve("../DanCardCEP/jsx/dan_tag_bd_bridge.jsx"), "utf8");
 const main = fs.readFileSync(require.resolve("../DanCardCEP/js/main.js"), "utf8");
 
 function defined(name) {
@@ -23,7 +26,7 @@ for (const [name, want] of Object.entries(thresholds))
 for (const [name, min] of Object.entries({
   dcDanToiUuVersion: 23, dcDanTuTroVersion: 12, dcDanBeNestingVersion: 13, dcSignature8AutoPonVersion: 41,
   dcKeoGayAutoPonVersion: 14, dcCatalogueAutoVersion: 14, dcClipToSizeVersion: 9, dcAutoCutMarksVersion: 2,
-  dcDanTheoMauVersion: 3, dcCtlOffsetPdfVersion: 6,
+  dcDanTheoMauVersion: 3, dcCtlOffsetPdfVersion: 6, dcDanTagBdVersion: 1,
 }))
   assert.ok(defined(name) >= min, name + " phải ≥ " + min + " (đang " + defined(name) + ")");
 console.log("jsx_versions: ok");

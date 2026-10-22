@@ -1866,3 +1866,35 @@ html, body {
 ::-webkit-scrollbar-corner {
   background: transparent;
 }
+
+/* ---- Dàn tag BD: bảng danh sách tag ---- */
+.tagbd-list table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+.tagbd-list th,
+.tagbd-list td {
+  padding: 3px 4px;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+.tagbd-list th {
+  color: var(--ink-dim);
+  font-weight: 600;
+}
+.tagbd-list td.tagbd-name {
+  max-width: 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tagbd-list button.tagbd-remove {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: #ff5a5a;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0 4px;
+}

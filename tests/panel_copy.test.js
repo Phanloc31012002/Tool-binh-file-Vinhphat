@@ -7,14 +7,15 @@ const path = require("path");
 // việc dời ghi chú theo yêu cầu (v2.15.17), ô tên file CTL/script đóng gói (v2.16.1), script bộ chia khu
 // dan_be_zones.js cùng tick "Chia khu cách nhau" + ô "Khoảng cách khu (mm)" của Dàn bế (v2.18.0),
 // tick "Transform" + nút "Đo khung" ở header cạnh Raster (v2.19.0, giai đoạn kiểm chứng); nút Clip clip theo khung
-// Transform không hỏi kích thước, bỏ nút "Clip 9.2 × 5.6" ở Auto Save (v2.19.1); tick Transform mặc định bật.
+// Transform không hỏi kích thước, bỏ nút "Clip 9.2 × 5.6" ở Auto Save (v2.19.1); tick Transform mặc định bật;
+// tab "Dàn tag BD" (v2.20.0): ô số lượng, danh sách, Dàn tag, khối xuất PDF + script js/dan_tag_bd.js.
 // Không phụ thuộc vào extension đã cài hay đường dẫn người dùng Windows khi chạy trong CI.
 const baseline = {
   controlHash:
-    "413752453d5524e4f5ef7f9966718f7b2a6d95ec4828e79065e2155df3d6f375",
+    "ed07c95b9a024f0bee772f10f1d8d618d8d1ed8848733def8827f84a3e7eefc0",
   navigationHash:
-    "d4487d9056941ac67e4b8d77215a663f0be6ad08d8a8f23a4d47da4e7561c3cc",
-  controlCount: 114,
+    "d40dc511749146197cd7ae80532d9cffe9c0234545325fcd108593027d998a77",
+  controlCount: 131,
   staticHintWords: 1293,
 };
 

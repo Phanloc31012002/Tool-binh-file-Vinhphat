@@ -2,6 +2,18 @@
 
 _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
+## v2.20.0 — Tab Dàn tag BD: ghép tag vào khối ô card cho xưởng Bình Dương
+
+- **Tab mới "Dàn tag BD"** (yêu cầu của anh hai, chốt với anh Lộc 22/10): chọn tag đã tràn (cột trái = mặt trước, cột phải = mặt sau, hàng 1 object = tag 1 mặt), nhập số lượng rồi **Thêm vào danh sách**; làm nhiều lượt cho nhiều số lượng; bấm **Dàn tag** là tool ghép tất cả thành các **khối bội số ô card 9,2 × 5,6 cm đã tràn** (khối `a × b` ô = artboard 56a × 92b mm, tối đa 18 × 7 ô theo tờ 64,4 × 100,8).
+- **Số lượng nào đi bài đó**: 500 → bài 500 (1 con); 1000, 2000, 3000… → bài 1000, nhân con theo số nghìn (2000 = 2 con, 10 000 = 10 con). Hai bài không bao giờ chung khối. Số khác (1500, 300…) báo lỗi, không dàn.
+- **Ghép ít ô nhất, dao lớn cắt được**: lõi mới `js/dan_tag_bd.js` thử mọi khổ khối và cách chia 2–3 khối, xoay 0°/90°, khe 0 mm; mọi nhát cắt là nhát thẳng chạy suốt tờ con (guillotine), có kiểm độc lập trước khi vẽ. Kết quả ghi rõ "10/10 ô — không thể ít hơn" khi bằng cận dưới diện tích, hoặc "11 ô, tối thiểu lý thuyết 10" khi chưa chứng minh được. Bằng ô thì chọn ít khối → ít nhát cắt → ít con phải xoay → con cùng tag kề nhau. Panel hiện "Đang suy nghĩ… x/y"; mỗi lượt vài chục ms tới ~4 s (50 con).
+- **Đóng artboard trước/sau** cho từng khối ngay dưới mọi thứ đang có trên canvas (không xoá gì cũ, dàn bài 500 trước rồi bài 1000 sau vẫn ở chung tài liệu): tên `TagBD k - bai 1000 - 110 x 458 - truoc/sau`, layer riêng `Tag BD k - trước/sau`. Mặt sau lật ngang vị trí và xoay ngược (như KTS/Dàn bế 2 mặt); tag 1 mặt để trống mặt sau. **Dấu cắt** 3 mm, 0,5 pt đen ở hai đầu mỗi nhát cắt, nằm trên đường cắt, mặt sau lật theo — đúng kiểu 5 file mẫu của xưởng.
+- **Xuất PDF các khối**: mỗi khối một PDF 2 trang (trước/sau), tên như Auto Save: `1088 - 01 - 10 hop 110 x 458 - cm - 22.pdf` (hộp = 10 cho bài 1000, 5 cho bài 500; khổ ghi = khổ tràn − 2 mm). Kiểm trùng tên và file đã có trước khi lưu file nào; lỗi một file thì xoá file dở và báo rõ. Khối xuất chỉ hiện khi tài liệu đã có artboard TagBD.
+- Soát mã độc lập xong, đã sửa: hết giờ tìm ở bài 500 thì bài 1000 vẫn có khối (mọi bài có khối cơ bản trước khi tìm sâu; 40 tag khác nhau ≈ 4 s, không treo); mặt sau phải cùng khổ mặt trước (lệch > 0,5 mm hoặc object lạ ở cột phải → báo rõ hàng và hai khổ); tag bị đổi khổ sau khi Thêm → báo, không vẽ chồng; mặt sau canh tâm ô lật; xuất PDF đặt artboard theo chỗ bản sao rơi xuống trong tài liệu tạm như Auto Save (không ép toạ độ tuyệt đối); khoá Thêm/Xoá/✕ trong lúc đang dàn.
+- Thêm 3 bộ test (58 bộ, tất cả qua) + `tests/dan_tag_bd_preview.js` vẽ bố cục mẫu ra `tmp/`. Bản này cài thử tại máy; cập nhật xong cần đóng hẳn Illustrator rồi mở lại.
+
+---
+
 ## v2.19.1 — Sửa theo test của anh Lộc (bản cài tại máy)
 
 - **Đo khung**: hiện bằng bảng trong Illustrator cuộn được, chữ chép được (alert của panel cắt mất dòng); group thường liệt kê thêm từng con cấp 1 kèm khung, con nào bị bỏ ghi rõ lý do (ẩn / guide / khung rỗng).

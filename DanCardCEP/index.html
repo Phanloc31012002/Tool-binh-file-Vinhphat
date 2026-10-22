@@ -176,6 +176,7 @@
         <button class="tab" data-tab="offset">CTL Offset</button>
         <button class="tab" data-tab="rename">Đổi tên</button>
         <button class="tab" data-tab="variable">Variable</button>
+        <button class="tab" data-tab="tagbd">Dàn tag BD</button>
         <button class="tab" data-tab="autosave">Auto Save</button>
       </div>
 
@@ -723,6 +724,93 @@
         <div id="outVariable" class="out">Bấm để mở công cụ.</div>
       </main>
 
+      <!-- TAB: DÀN TAG BD (xưởng Bình Dương: ghép tag vào khối ô card 9,2 × 5,6 đã tràn) -->
+      <main class="body tabpane" id="pane-tagbd">
+        <div class="field">
+          <p class="hint">
+            Chọn tag đã tràn: cột trái = mặt trước, cột phải = mặt sau; hàng 1 object = tag 1 mặt.
+            Ô card 9,2 × 5,6 đã tràn, khe 0 mm.
+          </p>
+        </div>
+
+        <div class="field">
+          <div class="label">Số lượng (500, hoặc 1000, 2000, 3000…)</div>
+          <div class="size-row">
+            <input type="text" id="tbQty" class="num" value="1000" style="text-align:left" />
+            <button id="btnTagBdThem" class="btn" type="button" style="white-space:nowrap;padding:8px 12px">
+              Thêm vào danh sách
+            </button>
+          </div>
+          <div class="hint">500 đi bài 500; từ 1000 đi bài 1000, 2000 = 2 con, 3000 = 3 con…</div>
+        </div>
+
+        <div class="field">
+          <div class="label">Danh sách tag</div>
+          <div id="tagBdList" class="out tagbd-list">Chưa có tag nào.</div>
+          <div id="tagBdTotal" class="hint"></div>
+        </div>
+
+        <div class="size-row">
+          <button id="btnTagBdXoa" class="btn" type="button" style="white-space:nowrap;padding:8px 12px">Xoá danh sách</button>
+          <button id="btnTagBdDan" class="btn btn-primary" type="button">
+            <span class="btn-label">Dàn tag</span>
+          </button>
+        </div>
+        <div id="outTagBd" class="out">Thêm tag rồi bấm Dàn tag.</div>
+
+        <div id="tagBdExport" class="hidden">
+          <div class="field" style="margin-top: 12px">
+            <div class="label">Xuất PDF các khối (mỗi khối 2 trang trước/sau)</div>
+          </div>
+          <div class="field-row">
+            <div class="field half">
+              <div class="label">Mã bắt buộc</div>
+              <input type="text" id="tbPrefix" class="inp inp-locked" value="1088" readonly />
+            </div>
+            <div class="field half">
+              <div class="label">STT bắt đầu</div>
+              <input type="text" id="tbStart" class="inp" value="1" />
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field half">
+              <div class="label">Đệm số 0</div>
+              <input type="text" id="tbPad" class="inp" value="2" />
+            </div>
+            <div class="field half">
+              <div class="label">Ngày đặt in</div>
+              <input type="text" id="tbNgay" class="inp" value="" />
+            </div>
+          </div>
+          <div class="field">
+            <div class="label">Cán màng</div>
+            <select id="tbCanMang" class="select">
+              <option value="cm">cm — cán màng</option>
+              <option value="km">km — không màng</option>
+            </select>
+          </div>
+          <div class="field">
+            <div class="label">Ghi chú (tuỳ chọn)</div>
+            <input type="text" id="tbNote" class="inp" value="" placeholder="để trống nếu không cần" />
+          </div>
+          <div class="field">
+            <div class="label">Thư mục lưu (bỏ trống = hỏi khi chạy)</div>
+            <div class="size-row">
+              <input type="text" id="tbFolder" class="inp" value="" placeholder="vd: D:\\PDF\\1088" />
+              <button id="btnTagBdPickFolder" class="btn" type="button" style="white-space:nowrap;padding:8px 12px">Chọn…</button>
+            </div>
+          </div>
+          <div class="field">
+            <div class="label">Xem trước tên file</div>
+            <div id="tbPreview" class="out" style="font-family:monospace"></div>
+          </div>
+          <button id="btnTagBdXuat" class="btn btn-primary" type="button">
+            <span class="btn-label">Xuất PDF các khối</span>
+          </button>
+          <div id="outTagBdXuat" class="out">Kiểm tra artboard rồi bấm xuất.</div>
+        </div>
+      </main>
+
       <!-- TAB: AUTO SAVE PDF -->
       <main class="body tabpane" id="pane-autosave">
         <div class="field">
@@ -805,7 +893,7 @@
       </main>
 
       <footer class="foot">
-          <span class="ver">v2.19.1</span>
+          <span class="ver">v2.20.0</span>
       </footer>
     </div>
 
@@ -813,6 +901,7 @@
     <script src="./js/dan_be_zones.js"></script>
     <script src="./js/dan_be_nester.js"></script>
     <script src="./js/ctl_package.js"></script>
+    <script src="./js/dan_tag_bd.js"></script>
     <script src="./js/main.js"></script>
   </body>
 </html>

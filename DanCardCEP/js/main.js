@@ -325,6 +325,7 @@
     offset: document.getElementById("pane-offset"),
     rename: document.getElementById("pane-rename"),
     variable: document.getElementById("pane-variable"),
+    tagbd: document.getElementById("pane-tagbd"),
     autosave: document.getElementById("pane-autosave"),
   };
   // Tester hiển thị ở header: mặc định "Tân 1 cú"; tab CTL Offset -> "Duẫn".
@@ -4671,6 +4672,312 @@
       handleRes(outVariable, res);
     });
   });
+
+  // ---- Dàn tag BD (xưởng Bình Dương: ghép tag vào khối ô card 9,2 × 5,6 đã tràn) ----
+  // Luật chốt với anh Lộc 22/10/2026 (docs/THIET_KE_DAN_TAG_BD.md). Lõi ghép khối chạy ở
+  // Chromium (js/dan_tag_bd.js), Illustrator chỉ đọc tag, đóng artboard và xuất PDF.
+  function loadDanTagBdJsx() {
+    try {
+      var extensionRoot = cs
+        .getSystemPath(SystemPath.EXTENSION)
+        .replace(/\\/g, "/");
+      var libPath = extensionRoot + "/jsx/dan_card_lib.jsx";
+      var bridgePath = extensionRoot + "/jsx/dan_tag_bd_bridge.jsx";
+      return (
+        "if (typeof dcKhungThanhPham !== 'function' || typeof dcPickFolder !== 'function') { $.evalFile(" +
+        jsStr(libPath) +
+        "); } " +
+        "if (typeof dcDanTagBdVe !== 'function' || typeof dcDanTagBdXuatPdf !== 'function' || typeof dcDanTagBdVersion === 'undefined' || dcDanTagBdVersion < 1) { $.evalFile(" +
+        jsStr(bridgePath) +
+        "); } "
+      );
+    } catch (e) {
+      return "";
+    }
+  }
+  // Danh sách tag đã thêm (giữ trong bộ nhớ panel): { id, name, w, h, twoSided, qty }.
+  var tagBdDanhSach = [];
+  var tagBdKhoiCuoi = null; // kết quả lõi của lượt Dàn gần nhất (để xem trước tên file)
+  var tagBdDangDan = false; // đang tìm/đóng artboard: khoá Thêm/Xoá/✕ để danh sách không đổi giữa chừng
+  function tagBdKhoa(dang) {
+    tagBdDangDan = dang;
+    if (btnTagBdDan) btnTagBdDan.disabled = dang;
+    if (btnTagBdThem) btnTagBdThem.disabled = dang;
+    if (btnTagBdXoa) btnTagBdXoa.disabled = dang;
+  }
+  // "500", "2 000", "2.000" -> số; chỉ nhận 500 hoặc bội của 1000, sai trả null.
+  function tagBdSoLuongHopLe(text) {
+    var t = String(text === undefined || text === null ? "" : text).replace(/[\s.,]/g, "");
+    if (!/^\d+$/.test(t)) return null;
+    var n = parseInt(t, 10);
+    if (n === 500) return 500;
+    if (n >= 1000 && n % 1000 === 0) return n;
+    return null;
+  }
+  function tagBdBai(qty) {
+    return qty === 500 ? 500 : 1000;
+  }
+  function tagBdSoCon(qty) {
+    return qty === 500 ? 1 : qty / 1000;
+  }
+  function tagBdEscape(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+  function tagBdSo(mm) {
+    return String(Math.round(mm * 10) / 10);
+  }
+  var tagBdList = document.getElementById("tagBdList");
+  var tagBdTotal = document.getElementById("tagBdTotal");
+  var outTagBd = document.getElementById("outTagBd");
+  var btnTagBdThem = document.getElementById("btnTagBdThem");
+  var btnTagBdXoa = document.getElementById("btnTagBdXoa");
+  var btnTagBdDan = document.getElementById("btnTagBdDan");
+  var tagBdExport = document.getElementById("tagBdExport");
+  var btnTagBdXuat = document.getElementById("btnTagBdXuat");
+  var outTagBdXuat = document.getElementById("outTagBdXuat");
+  var tbPreview = document.getElementById("tbPreview");
+  var btnTagBdPickFolder = document.getElementById("btnTagBdPickFolder");
+  function tagBdVeDanhSach() {
+    if (!tagBdList || !tagBdTotal) return;
+    if (!tagBdDanhSach.length) {
+      tagBdList.innerHTML = "Chưa có tag nào.";
+      tagBdTotal.textContent = "";
+      return;
+    }
+    var rows = [],
+      i,
+      t,
+      tong = { 500: { tag: 0, con: 0 }, 1000: { tag: 0, con: 0 } };
+    for (i = 0; i < tagBdDanhSach.length; i++) {
+      t = tagBdDanhSach[i];
+      var bai = tagBdBai(t.qty),
+        con = tagBdSoCon(t.qty);
+      tong[bai].tag++;
+      tong[bai].con += con;
+      rows.push(
+        "<tr><td>" +
+          (i + 1) +
+          '</td><td class="tagbd-name" title="' +
+          tagBdEscape(t.name) +
+          '">' +
+          tagBdEscape(t.name) +
+          "</td><td>" +
+          tagBdSo(t.w) +
+          " × " +
+          tagBdSo(t.h) +
+          "</td><td>" +
+          (t.twoSided ? "2 mặt" : "1 mặt") +
+          "</td><td>" +
+          t.qty +
+          "</td><td>" +
+          bai +
+          "</td><td>" +
+          con +
+          '</td><td><button type="button" class="tagbd-remove" data-remove="' +
+          i +
+          '" title="Bỏ tag này">✕</button></td></tr>',
+      );
+    }
+    tagBdList.innerHTML =
+      "<table><tr><th>#</th><th>Tag</th><th>Khổ (mm)</th><th>Mặt</th><th>SL</th><th>Bài</th><th>Con</th><th></th></tr>" +
+      rows.join("") +
+      "</table>";
+    var parts = [];
+    if (tong[500].tag) parts.push("Bài 500: " + tong[500].tag + " tag = " + tong[500].con + " con");
+    if (tong[1000].tag) parts.push("Bài 1000: " + tong[1000].tag + " tag = " + tong[1000].con + " con");
+    tagBdTotal.textContent = parts.join(" · ");
+  }
+  if (tagBdList) {
+    tagBdList.addEventListener("click", function (ev) {
+      if (tagBdDangDan) return;
+      var target = ev && ev.target ? ev.target : null;
+      var idx = target && target.getAttribute ? target.getAttribute("data-remove") : null;
+      if (idx === null || idx === undefined) return;
+      idx = parseInt(idx, 10);
+      if (isNaN(idx) || idx < 0 || idx >= tagBdDanhSach.length) return;
+      tagBdDanhSach.splice(idx, 1);
+      tagBdVeDanhSach();
+    });
+  }
+  if (btnTagBdThem) {
+    btnTagBdThem.addEventListener("click", function () {
+      if (tagBdDangDan) return;
+      var qtyEl = document.getElementById("tbQty");
+      var qty = tagBdSoLuongHopLe(qtyEl ? qtyEl.value : "");
+      if (qty === null) {
+        show(outTagBd, "Số lượng phải là 500 hoặc bội của 1000 (1000, 2000, 3000…).", "warn");
+        return;
+      }
+      show(outTagBd, "Đang đọc tag đang chọn…");
+      btnTagBdThem.disabled = true;
+      evalJsx(loadDanTagBdJsx() + "dcDanTagBdDocTag()", function (res) {
+        btnTagBdThem.disabled = false;
+        var text = String(res || "");
+        if (text.indexOf("OKJSON:") !== 0) {
+          handleRes(outTagBd, text);
+          return;
+        }
+        var data;
+        try {
+          data = JSON.parse(text.substring(7));
+        } catch (parseError) {
+          show(outTagBd, "Không đọc được dữ liệu tag từ Illustrator.", "warn");
+          return;
+        }
+        if (!data || !data.tags || !data.tags.length) {
+          show(outTagBd, "Không có tag hợp lệ trong vùng chọn.", "warn");
+          return;
+        }
+        for (var i = 0; i < data.tags.length; i++) {
+          var t = data.tags[i];
+          tagBdDanhSach.push({ id: t.id, name: t.name, w: t.w, h: t.h, twoSided: !!t.twoSided, qty: qty });
+        }
+        tagBdVeDanhSach();
+        show(
+          outTagBd,
+          "Đã thêm " + data.tags.length + " tag, số lượng " + qty + " (bài " + tagBdBai(qty) + ", " + tagBdSoCon(qty) + " con/tag). Chọn tiếp hoặc bấm Dàn tag.",
+          "ok",
+        );
+      });
+    });
+  }
+  if (btnTagBdXoa) {
+    btnTagBdXoa.addEventListener("click", function () {
+      if (tagBdDangDan) return;
+      tagBdDanhSach = [];
+      tagBdVeDanhSach();
+      show(outTagBd, "Đã xoá danh sách.");
+    });
+  }
+  // Xem trước tên file theo khối đầu tiên của lượt Dàn gần nhất (chưa có thì ghi khổ mẫu).
+  function tagBdTenMau() {
+    var prefix = (document.getElementById("tbPrefix") || {}).value || "1088";
+    var start = parseInt((document.getElementById("tbStart") || {}).value, 10);
+    if (isNaN(start)) start = 1;
+    var pad = parseInt((document.getElementById("tbPad") || {}).value, 10);
+    if (isNaN(pad)) pad = 0;
+    var cm = (document.getElementById("tbCanMang") || {}).value || "cm";
+    var ngay = (document.getElementById("tbNgay") || {}).value || "";
+    var note = String((document.getElementById("tbNote") || {}).value || "").replace(/^\s+|\s+$/g, "");
+    var sttStr = String(start);
+    while (sttStr.length < pad) sttStr = "0" + sttStr;
+    var hop = "10",
+      kho = "110 x 458";
+    if (tagBdKhoiCuoi && tagBdKhoiCuoi.jobs && tagBdKhoiCuoi.jobs.length && tagBdKhoiCuoi.jobs[0].blocks.length) {
+      var b = tagBdKhoiCuoi.jobs[0].blocks[0];
+      hop = String(tagBdKhoiCuoi.jobs[0].hop);
+      kho = tagBdSo(b.w - 2) + " x " + tagBdSo(b.h - 2);
+    }
+    return prefix + " - " + sttStr + " - " + hop + " hop " + kho + (note ? " - " + note : "") + " - " + cm + " - " + ngay + ".pdf";
+  }
+  function tagBdCapNhatXemTruoc() {
+    if (tbPreview) tbPreview.textContent = tagBdTenMau() + (tagBdKhoiCuoi ? "" : "  (khổ ví dụ)");
+  }
+  ["tbStart", "tbPad", "tbCanMang", "tbNgay", "tbNote"].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) {
+      el.addEventListener("input", tagBdCapNhatXemTruoc);
+      el.addEventListener("change", tagBdCapNhatXemTruoc);
+    }
+  });
+  ["tbQty", "tbStart", "tbPad", "tbNgay", "tbNote", "tbFolder"].forEach(attachSelectFirst);
+  (function tagBdNgayHomNay() {
+    var el = document.getElementById("tbNgay");
+    if (el && !el.value) el.value = String(new Date().getDate());
+  })();
+  // Hỏi Illustrator có bao nhiêu cặp artboard TagBD để hiện/ẩn khối xuất PDF.
+  function tagBdCapNhatXuat() {
+    if (!tagBdExport) return;
+    evalJsx(loadDanTagBdJsx() + "dcDanTagBdDemArtboard()", function (res) {
+      var text = String(res || ""),
+        n = text.indexOf("OK:") === 0 ? parseInt(text.substring(3), 10) : 0;
+      if (isNaN(n)) n = 0;
+      if (n > 0) tagBdExport.classList.remove("hidden");
+      else tagBdExport.classList.add("hidden");
+      tagBdCapNhatXemTruoc();
+    });
+  }
+  (function () {
+    var tabTagBd = document.querySelector('.tab[data-tab="tagbd"]');
+    if (tabTagBd) tabTagBd.addEventListener("click", tagBdCapNhatXuat);
+  })();
+  if (btnTagBdDan) {
+    btnTagBdDan.addEventListener("click", function () {
+      if (!tagBdDanhSach.length) {
+        show(outTagBd, "Chưa có tag nào trong danh sách. Chọn tag, nhập số lượng rồi bấm Thêm.", "warn");
+        return;
+      }
+      if (!window.DanTagBd || typeof window.DanTagBd.packAsync !== "function") {
+        show(outTagBd, "Chưa nạp được lõi ghép khối (js/dan_tag_bd.js).", "warn");
+        return;
+      }
+      var tags = [];
+      for (var i = 0; i < tagBdDanhSach.length; i++) {
+        var t = tagBdDanhSach[i];
+        tags.push({ id: t.id, name: t.name, w: t.w, h: t.h, qty: t.qty });
+      }
+      tagBdKhoa(true);
+      show(outTagBd, "Đang suy nghĩ cách ghép khối…");
+      window.DanTagBd.packAsync(
+        { tags: tags },
+        function (progress) {
+          if (progress && progress.total) show(outTagBd, "Đang suy nghĩ… " + progress.done + "/" + progress.total);
+        },
+        function (result) {
+          if (!result || !result.ok) {
+            tagBdKhoa(false);
+            show(outTagBd, result && result.error ? result.error : "Không ghép được khối.", "warn");
+            return;
+          }
+          show(outTagBd, "Đã tìm xong, đang đóng artboard… " + (result.detail || ""));
+          evalJsx(loadDanTagBdJsx() + "dcDanTagBdVe(" + jsStr(JSON.stringify(result)) + ")", function (res) {
+            tagBdKhoa(false);
+            handleRes(outTagBd, res);
+            if (String(res || "").indexOf("OK:") === 0) {
+              tagBdDanhSach = [];
+              tagBdVeDanhSach();
+              tagBdKhoiCuoi = result;
+              tagBdCapNhatXuat();
+            }
+          });
+        },
+      );
+    });
+  }
+  if (btnTagBdPickFolder) {
+    btnTagBdPickFolder.addEventListener("click", function () {
+      btnTagBdPickFolder.disabled = true;
+      evalJsx(loadDanTagBdJsx() + "dcPickFolder()", function (res) {
+        btnTagBdPickFolder.disabled = false;
+        var text = String(res || "");
+        if (text.indexOf("OK:") === 0) {
+          var el = document.getElementById("tbFolder");
+          if (el) el.value = text.substring(3);
+        }
+      });
+    });
+  }
+  if (btnTagBdXuat) {
+    btnTagBdXuat.addEventListener("click", function () {
+      var opts = {
+        prefix: (document.getElementById("tbPrefix") || {}).value || "1088",
+        start: (document.getElementById("tbStart") || {}).value || "1",
+        pad: (document.getElementById("tbPad") || {}).value || "0",
+        canMang: (document.getElementById("tbCanMang") || {}).value || "cm",
+        ngay: (document.getElementById("tbNgay") || {}).value || "",
+        folder: (document.getElementById("tbFolder") || {}).value || "",
+        note: (document.getElementById("tbNote") || {}).value || "",
+      };
+      show(outTagBdXuat, "Đang xuất PDF…");
+      btnTagBdXuat.disabled = true;
+      evalJsx(loadDanTagBdJsx() + "dcDanTagBdXuatPdf(" + jsStr(JSON.stringify(opts)) + ")", function (res) {
+        btnTagBdXuat.disabled = false;
+        handleRes(outTagBdXuat, res);
+      });
+    });
+  }
+  tagBdVeDanhSach();
+  tagBdCapNhatXemTruoc();
 
   // ---- Auto Save PDF ----
   var btnAutoSave = document.getElementById("btnAutoSave");
