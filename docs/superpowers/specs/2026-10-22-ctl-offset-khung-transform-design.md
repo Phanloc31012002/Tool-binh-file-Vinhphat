@@ -1,5 +1,8 @@
 # CTL Offset theo khung Transform — thiết kế (22/10/2026)
 
+> **Trạng thái 22/10 15:54:** chỉ làm mục 1 (không raster, đo Transform) — đã giao bản thử. Mục 2 (họ A6,
+> lớp khổ theo vừa tờ) và mục 3 (khổ ngang) **huỷ** theo anh Lộc: "ko cần làm a6 và ngang đâu".
+
 Yêu cầu của anh Lộc (chat 22/10, 14:49–15:25), gộp ba việc trên cùng hai lệnh **Đóng ghim giữa**
 (`dcRunSignature8`) và **Keo gáy** (`dcRunKeoGay`) của tab CTL Offset, cộng Catalogue dùng chung
 bước chuẩn bị trang:

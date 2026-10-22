@@ -6,7 +6,7 @@ test đỏ → sửa → xanh → chạy bộ test liên quan → commit local (
 
 ## GĐ0 — Mốc hình học (trước khi đụng code dàn)
 
-- [ ] `tests/ctl_golden.test.js`: dùng mock Illustrator sẵn có của `ctl_a5_geometry`/`ctl_geometry`/
+- [x] `tests/ctl_golden.test.js`: dùng mock Illustrator sẵn có của `ctl_a5_geometry`/`ctl_geometry`/
   `keo_gay_a5` để ghi `faces` (type/label/row/top/bottom/leftFace/rightFace/sheetNo) + lưới
   `nominalGridFor` (cellW/H, content, gridLeft/Top/Bottom, colLines, rowLines) cho:
   Đóng ghim A4 20,9 × 30 (bìa + 12/16/32 trang), A5 14,8 × 21 (bìa + 4/8/16/32/60 trang);
@@ -15,25 +15,25 @@ test đỏ → sửa → xanh → chạy bộ test liên quan → commit local (
 
 ## GĐ1 — Không raster, đo Transform, tick mặc định bật
 
-- [ ] Lib: `dcChuanBiTrangDan(doc, item, rongMm, caoMm)` trong khối "ĐO KHỔ DÙNG CHUNG" (+ test đơn
+- [x] Lib: `dcChuanBiTrangDan(doc, item, rongMm, caoMm)` trong khối "ĐO KHỔ DÙNG CHUNG" (+ test đơn
   vị với mock `transform`/`getScaleMatrix`: đúng khổ → không đụng; sai khổ → ma trận đúng; không đo
   được → throw).
-- [ ] Đóng ghim: `prepareSignaturePages` dùng hàm mới; `sizeMM`/`centerAt`/`centerItem`/
+- [x] Đóng ghim: `prepareSignaturePages` dùng hàm mới; `sizeMM`/`centerAt`/`centerItem`/
   `buildPairGroup`/`centerGroupAt`/`squeezeAboutCentre`/`groupPages` đo bằng `dcKhungThanhPham`;
   bỏ `clipMaskBounds`/`visibleUnion` riêng; bỏ `flat.rotate(90)` chỉ khi GĐ3 (GĐ1 giữ swap cũ).
-- [ ] Keo gáy: `prepareKeoGayPages` không flatten; `sizeMM` → Transform.
-- [ ] Catalogue (5 chỗ 16560/17351/18211/18948/19521): thay flatten+resize bằng hàm mới.
-- [ ] `tests/ctl_khong_raster.test.js`: ba nhóm lệnh không chứa `dcFlattenForImposition(`;
+- [x] Keo gáy: `prepareKeoGayPages` không flatten; `sizeMM` → Transform.
+- [x] Catalogue (5 chỗ 16560/17351/18211/18948/19521): thay flatten+resize bằng hàm mới.
+- [x] `tests/ctl_khong_raster.test.js`: ba nhóm lệnh không chứa `dcFlattenForImposition(`;
   `dcFlattenForImposition` chỉ còn định nghĩa (+ Dàn Card nếu có); mock chạy `prepareSignaturePages`
   với group clip có nội dung tràn → tâm đặt = tâm khung Transform.
-- [ ] Panel: `hdrTransform` mặc định bật (`checked`, localStorage mặc định true); sửa
+- [x] Panel: `hdrTransform` mặc định bật (`checked`, localStorage mặc định true); sửa
   `do_khung_transform` ("mặc định tắt" → bật) và hint tooltip.
-- [ ] Nâng `dcSignature8AutoPonVersion`, `dcKeoGayAutoPonVersion`, `dcCatalogueAutoVersion` +
+- [x] Nâng `dcSignature8AutoPonVersion`, `dcKeoGayAutoPonVersion`, `dcCatalogueAutoVersion` +
   ngưỡng main.js; `jsx_versions`; `LICH_SU_CAP_NHAT`; `panel_copy` hash.
-- [ ] Chạy: ctl_golden, ctl_khong_raster, ctl_geometry, ctl_a5_geometry, ctl_a5_notes,
+- [x] Chạy: ctl_golden, ctl_khong_raster, ctl_geometry, ctl_a5_geometry, ctl_a5_notes,
   ctl_canvas_origin, keo_gay_a5, catalogue*, do_khung_transform, jsx_versions, panel_copy.
 
-## GĐ2 — Lớp khổ theo vừa tờ + họ A6
+## GĐ2 — Lớp khổ theo vừa tờ + họ A6 — **HUỶ** (anh Lộc 22/10 15:54: "ko cần làm a6 và ngang đâu")
 
 - [ ] `dcCtlLopKho(w, h)` (lib, dùng chung Đóng ghim/Keo gáy) + `tests/ctl_lop_kho.test.js`
   (14,8 × 21 → A5; 20,9 × 30 → A4; 10,5 × 14,8 → A6; 9 × 13 → A6; 15,2 × 21,5 → A4 kèm lý do A5;
@@ -46,7 +46,7 @@ test đỏ → sửa → xanh → chạy bộ test liên quan → commit local (
 - [ ] `ctl_package.js` nhãn form A6; hint tab CTL.
 - [ ] `tests/ctl_a6_plan.test.js`; golden A4/A5 vẫn khớp.
 
-## GĐ3 — Khổ ngang
+## GĐ3 — Khổ ngang — **HUỶ** (cùng lý do)
 
 - [ ] `formSpec(type, ngang)` chuyển vị (rotated/gutter↔rowGap); bỏ `SMALL_SOURCE_IS_LANDSCAPE`
   (sửa regex `ctl_a5_geometry`).
