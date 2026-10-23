@@ -347,5 +347,28 @@ function rectOf(p) {
   const rc = E.pack({ tags: [tag("nho", 100, 20, 1000), tag("to", 112, 72, 1000)], budgetMs: 100000 });
   assert.equal(rc.jobs[0].daBop, 0);
   dauTien(rc.jobs[0], "nho");
+  // (c) Khít: 1000 + 2000 dàn chung là "nhân thêm con" — không để chỗ trống kẹt giữa hai cụm.
+  //     A 112 × 60 (1000) + B 112 × 72 (2000) trong khối 2 × 3: A@0, B@60, B@132, trống 72 mm dồn xuống cuối.
+  const rd = E.pack({ tags: [tag("A", 112, 60, 1000), tag("B", 112, 72, 2000)], budgetMs: 100000 });
+  assert.equal(rd.ok, true, rd.error);
+  const bd = rd.jobs[0].blocks[0];
+  const ys = bd.places.map((p) => [p.id, p.x, p.y]).sort((u, v) => u[2] - v[2]);
+  assert.deepEqual(ys, [["A", 0, 0], ["B", 0, 60], ["B", 0, 132]], "khít từ trên xuống: " + JSON.stringify(bd.places));
+  dauTien(rd.jobs[0], "A");
+  // Nhát cắt: chỉ giữa các con và một nhát tách phần trống cuối, không có nhát thừa trong vùng trống.
+  assert.deepEqual(
+    bd.cuts.map((c) => c.axis + c.at).sort(),
+    ["H132", "H204", "H60"],
+    JSON.stringify(bd.cuts),
+  );
+  // Tổng quát: mọi khối trong các ca trên không có con nào "treo" — con nào cũng chạm cạnh trên của khối
+  // hoặc chạm đáy một con khác; chạm cạnh trái của khối hoặc cạnh phải một con khác.
+  for (const r of [ra, rb, rc, rd])
+    for (const b of r.jobs[0].blocks)
+      for (const p of b.places) {
+        const tren = p.y < 1e-9 || b.places.some((q) => q !== p && Math.abs(q.y + q.h - p.y) < 1e-6 && q.x < p.x + p.w - 1e-6 && q.x + q.w > p.x + 1e-6);
+        const trai = p.x < 1e-9 || b.places.some((q) => q !== p && Math.abs(q.x + q.w - p.x) < 1e-6 && q.y < p.y + p.h - 1e-6 && q.y + q.h > p.y + 1e-6);
+        assert.ok(tren && trai, "con treo giữa chỗ trống: " + JSON.stringify(p) + " trong " + JSON.stringify(b.places));
+      }
   console.log("Phần 5 (con đầu danh sách ở góc trên trái, nối tiếp theo danh sách): ok");
 }
