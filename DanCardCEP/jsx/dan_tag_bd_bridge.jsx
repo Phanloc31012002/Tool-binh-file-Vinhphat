@@ -6,7 +6,7 @@
 // 2 trang. Phần ghép khối chạy ở Chromium của CEP (dan_tag_bd.js).
 // Luật chốt với anh Lộc 22/10/2026: docs/THIET_KE_DAN_TAG_BD.md
 // ============================================================
-var dcDanTagBdVersion = 4;
+var dcDanTagBdVersion = 5;
 if (typeof dcDanTagBdNguon === "undefined") var dcDanTagBdNguon = {};
 if (typeof dcDanTagBdNguonDem === "undefined") var dcDanTagBdNguonDem = 1;
 
@@ -336,14 +336,17 @@ function dcDanTagBdSoKho(mm) {
   var v = Math.round((mm - 2) * 10) / 10;
   return String(v);
 }
-function dcDanTagBdTenArtboard(k, bai, w, h, mat) {
-  return "TagBD " + k + " - bai " + bai + " - " + dcDanTagBdSoKho(w) + " x " + dcDanTagBdSoKho(h) + " - " + mat;
+// Số hộp ghi vào tên artboard để lúc Xuất PDF lấy lại (bài 1000 = 10 hộp; danh sách không có tag 1000 mà lõi
+// chọn "không nhân con" thì 2000 = 1 con ghi 20 hộp…).
+function dcDanTagBdTenArtboard(k, bai, hop, w, h, mat) {
+  return "TagBD " + k + " - bai " + bai + " - " + hop + " hop - " + dcDanTagBdSoKho(w) + " x " + dcDanTagBdSoKho(h) + " - " + mat;
 }
-// Đọc tên artboard TagBD -> {k, bai, mat} hoặc null.
+// Đọc tên artboard TagBD -> {k, bai, hop, mat} hoặc null. Tên cũ (chưa ghi hộp) → hộp theo bài.
 function dcDanTagBdDocTen(name) {
-  var m = /^TagBD (\d+) - bai (\d+) - ([\d.]+) x ([\d.]+) - (truoc|sau)$/.exec(String(name || ""));
+  var m = /^TagBD (\d+) - bai (\d+)(?: - (\d+) hop)? - ([\d.]+) x ([\d.]+) - (truoc|sau)$/.exec(String(name || ""));
   if (!m) return null;
-  return { k: parseInt(m[1], 10), bai: parseInt(m[2], 10), w: m[3], h: m[4], mat: m[5] };
+  var bai = parseInt(m[2], 10);
+  return { k: parseInt(m[1], 10), bai: bai, hop: m[3] ? parseInt(m[3], 10) : bai === 500 ? 5 : 10, w: m[4], h: m[5], mat: m[6] };
 }
 // Đếm cặp artboard TagBD trong tài liệu đang mở: "OK:n".
 function dcDanTagBdDemArtboard() {
@@ -505,6 +508,9 @@ function dcDanTagBdVe(planText) {
     for (ji = 0; ji < plan.jobs.length; ji++) {
       job = plan.jobs[ji];
       if (!job || (job.bai !== 500 && job.bai !== 1000) || !isArray(job.blocks) || !job.blocks.length) fail("Phương án bài " + (ji + 1) + " không hợp lệ.");
+      // Số hộp: lõi đưa (10 × cách chia con cho bài 1000, 5 cho bài 500); thiếu thì theo bài.
+      if (job.hop === undefined || job.hop === null) job.hop = job.bai === 500 ? 5 : 10;
+      if (!num(job.hop) || job.hop < 1 || Math.floor(job.hop) !== job.hop || job.hop > 9999) fail("Số hộp của bài " + job.bai + " không hợp lệ (" + job.hop + ").");
       for (bi = 0; bi < job.blocks.length; bi++) {
         blk = job.blocks[bi];
         if (
@@ -599,11 +605,12 @@ function dcDanTagBdVe(planText) {
       } catch (noteError) {}
       return layer;
     }
-    var black = new CMYKColor();
-    black.cyan = 0;
-    black.magenta = 0;
-    black.yellow = 0;
-    black.black = 100;
+    // Dấu cắt màu đỏ C0 M100 Y100 K0 (anh Lộc 23/10) cho thợ cắt nhìn rõ trên bài in.
+    var red = new CMYKColor();
+    red.cyan = 0;
+    red.magenta = 100;
+    red.yellow = 100;
+    red.black = 0;
     function drawMark(layer, x1, y1, x2, y2) {
       var line = layer.pathItems.add();
       line.setEntirePath([
@@ -613,7 +620,7 @@ function dcDanTagBdVe(planText) {
       line.closed = false;
       line.filled = false;
       line.stroked = true;
-      line.strokeColor = black;
+      line.strokeColor = red;
       line.strokeWidth = DC_TAGBD_MARK_PT;
       try {
         line.note = "DANCARD_TAGBD_MARK";
@@ -685,7 +692,7 @@ function dcDanTagBdVe(planText) {
       var frontBoard = doc.artboards.add(rect);
       createdArtboards.push(frontBoard);
       try {
-        frontBoard.name = dcDanTagBdTenArtboard(k, job.bai, blk.w, blk.h, "truoc");
+        frontBoard.name = dcDanTagBdTenArtboard(k, job.bai, job.hop, blk.w, blk.h, "truoc");
       } catch (nameError) {}
       var frontLayer = addLayer("Tag BD " + k + " - trước");
       for (pi = 0; pi < blk.places.length; pi++) {
@@ -697,7 +704,7 @@ function dcDanTagBdVe(planText) {
       var backBoard = doc.artboards.add(backRect);
       createdArtboards.push(backBoard);
       try {
-        backBoard.name = dcDanTagBdTenArtboard(k, job.bai, blk.w, blk.h, "sau");
+        backBoard.name = dcDanTagBdTenArtboard(k, job.bai, job.hop, blk.w, blk.h, "sau");
       } catch (backNameError) {}
       var backLayer = addLayer("Tag BD " + k + " - sau");
       for (pi = 0; pi < blk.places.length; pi++) {
@@ -708,7 +715,7 @@ function dcDanTagBdVe(planText) {
         placeCopy(back, backLayer, -p.rot, backRect[0] + xBack * MM, backRect[1] - p.y * MM, p.w * MM, p.h * MM, true, p.bopX, p.bopY);
       }
       drawCutMarks(backLayer, backRect, W, blk.cuts, true);
-      made.push(k + " (bài " + job.bai + ", " + blk.cols + " × " + blk.rows + " ô, " + blk.places.length + " con)");
+      made.push(k + " (bài " + job.bai + ", " + job.hop + " hộp, " + blk.cols + " × " + blk.rows + " ô, " + blk.places.length + " con)");
     }
     try {
       doc.artboards.setActiveArtboardIndex(firstNewIndex);
@@ -769,7 +776,7 @@ function dcDanTagBdTimCap(doc) {
   for (i = 0; i < doc.artboards.length; i++) {
     t = dcDanTagBdDocTen(doc.artboards[i].name);
     if (!t) continue;
-    var entry = { index: i, rect: doc.artboards[i].artboardRect.slice(0), bai: t.bai, k: t.k };
+    var entry = { index: i, rect: doc.artboards[i].artboardRect.slice(0), bai: t.bai, hop: t.hop, k: t.k };
     if (t.mat === "truoc") fronts[t.k] = entry;
     else backs[t.k] = entry;
   }
@@ -782,7 +789,7 @@ function dcDanTagBdTimCap(doc) {
   for (i = 0; i < ks.length; i++) {
     k = ks[i];
     if (!backs[k]) throw new Error("Khối TagBD " + k + " thiếu artboard mặt sau. Hãy dàn lại khối này.");
-    pairs.push({ k: k, bai: fronts[k].bai, front: fronts[k].rect, back: backs[k].rect });
+    pairs.push({ k: k, bai: fronts[k].bai, hop: fronts[k].hop, front: fronts[k].rect, back: backs[k].rect });
   }
   return pairs;
 }
@@ -868,7 +875,7 @@ function dcDanTagBdXuatPdf(optionsText) {
           " - " +
           (padN > 0 ? pad0(stt, padN) : String(stt)) +
           " - " +
-          (pr.bai === 500 ? 5 : 10) +
+          pr.hop +
           " hop " +
           dcDanTagBdSoKho(wMm) +
           " x " +

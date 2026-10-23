@@ -26,7 +26,7 @@ function parseOk(text) {
 // ---------- dcDanTagBdDocTag ----------
 {
   const { mock, c } = load();
-  assert.equal(c.dcDanTagBdVersion, 4);
+  assert.equal(c.dcDanTagBdVersion, 5);
   // Hàng 1: trước 112 × 72 (trái) + sau (phải). Hàng 2: tag 1 mặt 56 × 91. Hàng 3: trước + sau 92 × 40, mặt sau lệch 0,3 mm.
   const f1 = box(mock, 0, 300, 112, 72, "f1");
   const b1 = box(mock, 150, 300, 112, 72, "b1");
@@ -147,10 +147,10 @@ const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 0.01, (msg || "") + " " 
   assert.deepEqual(mock.doc.artboards[0].artboardRect, [0, 100, 400, 0]);
   const names = mock.doc.artboards.slice(1).map((b) => b.name);
   assert.deepEqual(names, [
-    "TagBD 1 - bai 1000 - 110 x 90 - truoc",
-    "TagBD 1 - bai 1000 - 110 x 90 - sau",
-    "TagBD 2 - bai 1000 - 54 x 90 - truoc",
-    "TagBD 2 - bai 1000 - 54 x 90 - sau",
+    "TagBD 1 - bai 1000 - 10 hop - 110 x 90 - truoc",
+    "TagBD 1 - bai 1000 - 10 hop - 110 x 90 - sau",
+    "TagBD 2 - bai 1000 - 10 hop - 54 x 90 - truoc",
+    "TagBD 2 - bai 1000 - 10 hop - 54 x 90 - sau",
   ]);
   const front1 = mock.doc.artboards[1].artboardRect,
     back1 = mock.doc.artboards[2].artboardRect;
@@ -199,6 +199,9 @@ const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 0.01, (msg || "") + " " 
   assert.equal(s.filter((it) => it.note === "DANCARD_TAGBD_MARK").length, 4);
   const vBack = s.filter((it) => it.note === "DANCARD_TAGBD_MARK").map((m) => m.geometricBounds).filter((b) => Math.abs(b[0] - b[2]) < 0.01);
   near(vBack[0][0], back1[0] + (112 - 56) * MM, "nhát dọc lật: 112 − 56");
+  // Dấu cắt đỏ C0 M100 Y100 K0.
+  const mark0 = s.find((it) => it.note === "DANCARD_TAGBD_MARK");
+  assert.deepEqual([mark0.strokeColor.cyan, mark0.strokeColor.magenta, mark0.strokeColor.yellow, mark0.strokeColor.black], [0, 100, 100, 0], "dấu cắt đỏ");
   // Khối 2: con xoay 90: mặt trước xoay +90, mặt sau xoay −90 và x' = 56 − 0 − 40 = 16.
   const f3c = layers[2].pageItems.find((it) => it.identity === "f3");
   assert.equal(f3c.angle, 90);
@@ -212,7 +215,7 @@ const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 0.01, (msg || "") + " " 
   // Dàn lần 2: số thứ tự nối tiếp (3, 4), né các cặp đã có → nối tiếp bên phải, vẫn hàng trên cùng.
   const res2 = c.dcDanTagBdVe(JSON.stringify(plan()));
   assert.match(res2, /^OK: /, res2);
-  assert.equal(mock.doc.artboards[5].name, "TagBD 3 - bai 1000 - 110 x 90 - truoc");
+  assert.equal(mock.doc.artboards[5].name, "TagBD 3 - bai 1000 - 10 hop - 110 x 90 - truoc");
   near(mock.doc.artboards[5].artboardRect[0], mock.doc.artboards[4].artboardRect[2] + 10 * MM, "lượt 2 nối tiếp bên phải lượt 1");
   near(mock.doc.artboards[5].artboardRect[1], front1[1], "lượt 2 vẫn hàng trên cùng");
   // Hết bề ngang canvas thì tự xuống hàng: chèn một artboard bận chiếm gần hết phần còn lại của hàng.
@@ -221,7 +224,7 @@ const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 0.01, (msg || "") + " " 
     mock.doc.artboards.push({ name: "ban", artboardRect: [r6[2] + 10 * MM, 7200 - 10 * MM, 7200 - 10 * MM - 50 * MM, 7200 - 10 * MM - 92 * MM] });
     const res3 = c.dcDanTagBdVe(JSON.stringify(plan()));
     assert.match(res3, /^OK: /, res3);
-    const f5 = mock.doc.artboards.find((b) => b.name === "TagBD 5 - bai 1000 - 110 x 90 - truoc").artboardRect;
+    const f5 = mock.doc.artboards.find((b) => b.name === "TagBD 5 - bai 1000 - 10 hop - 110 x 90 - truoc").artboardRect;
     near(f5[0], -7200 + 10 * MM, "xuống hàng: về mép trái");
     assert.ok(f5[1] <= front1[3] - 10 * MM + 0.01, "xuống hàng: nằm dưới hàng 1, top=" + f5[1] + " ≤ " + (front1[3] - 10 * MM));
     mock.doc.artboards.splice(mock.doc.artboards.findIndex((b) => b.name === "ban"), 1);
@@ -418,6 +421,34 @@ const OPTS = { prefix: "1088", start: "1", pad: "2", canMang: "cm", ngay: "22", 
   );
   assert.ok(io.tempDocs.every((d) => d.closed));
   console.log("dcDanTagBdXuatPdf (lỗi giữa chừng): ok");
+}
+// Số hộp theo lõi (danh sách không có tag 1000, lõi chọn "không nhân": 2000 = 1 con → 20 hộp): ghi vào tên
+// artboard rồi Xuất PDF lấy lại; artboard tên kiểu cũ (chưa ghi hộp) vẫn đọc được, hộp theo bài.
+{
+  const { mock, c } = load({ rect: [0, 100, 400, 0] });
+  registerSources(mock, c);
+  const p = plan();
+  p.jobs[0].hop = 20;
+  const res = c.dcDanTagBdVe(JSON.stringify(p));
+  assert.match(res, /^OK: /, res);
+  assert.match(res, /20 hộp/);
+  assert.equal(mock.doc.artboards[1].name, "TagBD 1 - bai 1000 - 20 hop - 110 x 90 - truoc");
+  assert.equal(JSON.stringify(c.dcDanTagBdDocTen("TagBD 7 - bai 1000 - 110 x 90 - sau")), JSON.stringify({ k: 7, bai: 1000, hop: 10, w: "110", h: "90", mat: "sau" }));
+  assert.equal(c.dcDanTagBdDocTen("TagBD 8 - bai 500 - 166 x 90 - truoc").hop, 5);
+  assert.equal(c.dcDanTagBdDocTen("TagBD 9 - bai 1000 - 30 hop - 166 x 90 - truoc").hop, 30);
+  const io = withPdfMocks(mock, c);
+  assert.match(c.dcDanTagBdXuatPdf(JSON.stringify(OPTS)), /^OK: Đã lưu 2\/2 file PDF/);
+  assert.deepEqual(
+    io.saves.map((s) => s.path),
+    ["D:/PDF/1088 - 01 - 20 hop 110 x 90 - cm - 22.pdf", "D:/PDF/1088 - 02 - 20 hop 54 x 90 - cm - 22.pdf"],
+  );
+  // Số hộp lạ → ERR, không tạo gì.
+  const bad = plan();
+  bad.jobs[0].hop = 2.5;
+  const n = mock.doc.artboards.length;
+  assert.match(c.dcDanTagBdVe(JSON.stringify(bad)), /^ERR: .*hộp/);
+  assert.equal(mock.doc.artboards.length, n);
+  console.log("dcDanTagBdVe/XuatPdf (số hộp theo lõi): ok");
 }
 
 // ---------- Sửa theo soát mã: mặt sau phải cùng khổ mặt trước; khổ nguồn đổi sau khi Thêm thì báo ----------

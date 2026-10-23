@@ -16,7 +16,7 @@
 })(typeof window !== "undefined" ? window : this, function () {
   "use strict";
 
-  var VERSION = 3;
+  var VERSION = 4;
   // Bóp để vừa khối khi cụm chỉ dư chút ít so với n ô:
   //  - mức 1: mỗi con bớt tối đa 1 mm theo chiều đang thiếu (cột thiếu 6 mm có 6 con → mỗi con 1 mm);
   //    chỗ trống trong khối hút trước, con chỉ bớt phần còn lại;
@@ -884,12 +884,43 @@
         throw new Error(
           "Tag " + (t.name || t.id) + " khổ " + r2(t.w) + " × " + r2(t.h) + " mm không lọt tờ " + biggest.w + " × " + biggest.h + " mm (kể cả xoay).",
         );
-      if (!jobsByBai[bai]) jobsByBai[bai] = { bai: bai, hop: bai === 500 ? 5 : 10, pieces: [], tags: [] };
+      if (!jobsByBai[bai]) jobsByBai[bai] = { bai: bai, tags: [] };
       jobsByBai[bai].tags.push({ id: t.id, name: t.name || t.id, w: t.w, h: t.h, qty: qty, copies: copies });
-      for (var k = 0; k < copies; k++) jobsByBai[bai].pieces.push({ id: t.id, w: t.w, h: t.h });
+    }
+    // Mỗi bài → các phương án chia con. Số con của các tag có ước chung g; chia cho ước d của g thì mỗi
+    // tag còn copies/d con và hộp = 10 × d (2000 = 1 con ghi 20 hộp). Danh sách có tag 1000 → g = 1 →
+    // chỉ một phương án như cũ. Bài 500 luôn 1 con, 5 hộp. Chọn phương án ở finish(): tổng ô × hộp nhỏ
+    // nhất, bằng nhau thì ít con hơn (không nhân).
+    function gcd(a, b) {
+      while (b) {
+        var r = a % b;
+        a = b;
+        b = r;
+      }
+      return a;
     }
     var jobs = [];
-    for (i = 0; i < order.length; i++) if (jobsByBai[order[i]]) jobs.push(jobsByBai[order[i]]);
+    for (i = 0; i < order.length; i++) {
+      var nhom = jobsByBai[order[i]];
+      if (!nhom) continue;
+      var g = 0,
+        ti;
+      for (ti = 0; ti < nhom.tags.length; ti++) g = gcd(g, nhom.tags[ti].copies);
+      var uoc = [];
+      for (var d = 1; d <= g; d++) if (g % d === 0) uoc.push(d);
+      for (var ui = uoc.length - 1; ui >= 0; ui--) {
+        // Ít con nhất trước (chia nhiều) — tìm nhanh, có khối cơ bản sớm.
+        var dd = uoc[ui],
+          job = { bai: nhom.bai, chia: dd, hop: (nhom.bai === 500 ? 5 : 10) * dd, pieces: [], tags: [], soPhuongAn: uoc.length };
+        for (ti = 0; ti < nhom.tags.length; ti++) {
+          var tg = nhom.tags[ti],
+            soCon = tg.copies / dd;
+          job.tags.push({ id: tg.id, name: tg.name, w: tg.w, h: tg.h, qty: tg.qty, copies: soCon });
+          for (var k = 0; k < soCon; k++) job.pieces.push({ id: tg.id, w: tg.w, h: tg.h });
+        }
+        jobs.push(job);
+      }
+    }
     return jobs;
   }
 
@@ -1298,12 +1329,43 @@
         lines = [],
         ji,
         job;
+      // Chọn phương án chia con cho từng bài: tổng ô × hộp nhỏ nhất; bằng nhau thì ít con hơn (chia nhiều).
+      var chon = {},
+        soSanh = {};
       for (ji = 0; ji < jobs.length; ji++) {
         job = jobs[ji];
         chotBop(job);
         if (!job.best) {
+          if (job.soPhuongAn > 1) continue; // phương án phụ không ra khối thì bỏ, bài vẫn còn phương án khác
           output = { ok: false, error: "Bài " + job.bai + ": không tìm được cách ghép khối nào trong giới hạn tìm." };
           return;
+        }
+        job.chiPhi = planCells(job.best) * job.hop;
+        if (!soSanh[job.bai]) soSanh[job.bai] = [];
+        soSanh[job.bai].push(job);
+        var hienTai = chon[job.bai];
+        if (!hienTai || job.chiPhi < hienTai.chiPhi || (job.chiPhi === hienTai.chiPhi && job.chia > hienTai.chia)) chon[job.bai] = job;
+      }
+      for (ji = 0; ji < jobs.length; ji++)
+        if (!chon[jobs[ji].bai]) {
+          output = { ok: false, error: "Bài " + jobs[ji].bai + ": không tìm được cách ghép khối nào trong giới hạn tìm." };
+          return;
+        }
+      for (ji = 0; ji < jobs.length; ji++) {
+        job = jobs[ji];
+        if (chon[job.bai] !== job) continue;
+        if (soSanh[job.bai].length > 1) {
+          // Có nhiều cách chia (danh sách không có tag 1000): ghi rõ đã so gì và chọn gì.
+          var ds = soSanh[job.bai].slice(0).sort(function (a, b) {
+            return b.chia - a.chia;
+          });
+          var moTa = [];
+          for (var si = 0; si < ds.length; si++) {
+            var pa = ds[si],
+              ten = pa.chia === ds[0].chia ? "không nhân (" + pa.hop + " hộp)" : "nhân " + (ds[0].chia / pa.chia) + " (" + pa.hop + " hộp)";
+            moTa.push(ten + " " + planCells(pa.best) + " ô = " + pa.chiPhi);
+          }
+          lines.push("Bài " + job.bai + ": " + moTa.join(", ") + " → chọn " + (job.chia === ds[0].chia ? "không nhân, " + job.hop + " hộp" : "nhân " + ds[0].chia / job.chia + ", " + job.hop + " hộp") + ".");
         }
         var cells = planCells(job.best),
           blocks = [],
@@ -1381,6 +1443,7 @@
         outJobs.push({
           bai: job.bai,
           hop: job.hop,
+          chia: job.chia, // số con mỗi tag đã chia cho ước này (1 = như nhập; 2 = 2000 ghi 20 hộp, 1 con)
           tags: job.tags,
           blocks: blocks,
           cells: cells,

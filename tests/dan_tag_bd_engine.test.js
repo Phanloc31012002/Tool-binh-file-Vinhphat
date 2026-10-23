@@ -171,11 +171,13 @@ function rectOf(p) {
   assert.equal(i.jobs[0].proven, false);
   assert.match(i.detail, /tối thiểu lý thuyết 3/);
 
-  // (j) 10 000 con 112 × 72 → 10 con, 16 ô, dưới 4 s.
+  // (j) 10 000 con 112 × 72, không có tag 1000 → thử chia 1/2/5/10: chia 2 = 5 con 8 ô × 20 hộp = 160, không
+  //     chia = 10 con 16 ô × 10 = 160 → bằng nhau lấy ít con hơn: 5 con, 8 ô, 20 hộp; dưới 4 s.
   const j = elapsed(() => E.pack({ tags: [tag("A", 112, 72, 10000)] }));
   assert.equal(j.ok, true, j.error);
-  assert.equal(j.jobs[0].blocks.reduce((s, blk) => s + blk.places.length, 0), 10);
-  assert.equal(j.jobs[0].cells, 16);
+  assert.equal(j.jobs[0].blocks.reduce((s, blk) => s + blk.places.length, 0), 5);
+  assert.equal(j.jobs[0].cells, 8);
+  assert.equal(j.jobs[0].hop, 20);
   assert.ok(j.__ms < 4000, "10 000 con: " + j.__ms + " ms");
 
   // (m) một khối phải 8 ô nhưng hai khối chỉ 7 ô: 112 × 184 + 112 × 92 + 56 × 92.
@@ -384,4 +386,56 @@ function rectOf(p) {
         assert.ok(tren && trai, "con treo giữa chỗ trống: " + JSON.stringify(p) + " trong " + JSON.stringify(b.places));
       }
   console.log("Phần 5 (con đầu danh sách ở góc trên trái, nối tiếp theo danh sách): ok");
+}
+
+// ---------- Phần 6: danh sách không có tag 1000 → thử mọi cách chia con, ghi hộp theo cách chia ----------
+// Mọi tag đều 2000, 3000, 4000… thì số con có ước chung g; chia cho ước d của g → mỗi tag ít con hơn, hộp
+// = 10 × d (2000 = 1 con ghi 20 hộp). Chọn cách có tổng ô × hộp nhỏ nhất; bằng nhau thì ít con hơn (không
+// nhân). Có tag 1000 (g = 1) thì như cũ.
+{
+  function tag(id, w, h, qty) {
+    return { id: id, name: id, w: w, h: h, qty: qty };
+  }
+  // (a) Ca anh Lộc 23/10: 92 × 92 + 42 × 92 + 32 × 52, mỗi tag 2000. Không nhân: 3 ô (3 × 1), 20 hộp = 60;
+  //     nhân 2: 6 ô × 10 = 60 → bằng nhau → lấy không nhân.
+  const ra = E.pack({ tags: [tag("oao", 92, 92, 2000), tag("the", 42, 92, 2000), tag("nho", 32, 52, 2000)], budgetMs: 100000 });
+  assert.equal(ra.ok, true, ra.error);
+  const ja = ra.jobs[0];
+  assert.equal(ja.bai, 1000);
+  assert.equal(ja.hop, 20, ra.detail);
+  assert.equal(ja.chia, 2);
+  assert.equal(ja.cells, 3, ra.detail);
+  assert.equal(ja.pieces, 3);
+  assert.deepEqual(ja.tags.map((t) => t.copies), [1, 1, 1]);
+  assert.match(ra.detail, /20 hộp/);
+  assert.match(ra.detail, /không nhân/i);
+  // (b) 2 tag 112 × 60, mỗi tag 2000: không nhân 4 ô (2 × 2) × 20 = 80; nhân 2: 6 ô (2 × 3) × 10 = 60 → nhân 2.
+  const rb = E.pack({ tags: [tag("a", 112, 60, 2000), tag("b", 112, 60, 2000)], budgetMs: 100000 });
+  assert.equal(rb.jobs[0].hop, 10, rb.detail);
+  assert.equal(rb.jobs[0].chia, 1);
+  assert.equal(rb.jobs[0].cells, 6, rb.detail);
+  assert.deepEqual(rb.jobs[0].tags.map((t) => t.copies), [2, 2]);
+  assert.match(rb.detail, /nhân 2/i);
+  // (c) Có tag 1000 → ước chung 1, như cũ: 10 hộp, con 1 + 2.
+  const rc = E.pack({ tags: [tag("a", 112, 60, 1000), tag("b", 112, 60, 2000)], budgetMs: 100000 });
+  assert.equal(rc.jobs[0].hop, 10);
+  assert.equal(rc.jobs[0].chia, 1);
+  assert.deepEqual(rc.jobs[0].tags.map((t) => t.copies), [1, 2]);
+  assert.doesNotMatch(rc.detail, /hộp/);
+  // (d) Một tag 92 × 92 × 4000: chia 4 → 1 con 2 ô × 40 = 80; chia 2 → 2 con 4 ô × 20 = 80; không chia → 4 con
+  //     7 ô (7 × 1) × 10 = 70 → không chia thắng dù nhiều con hơn.
+  const rd = E.pack({ tags: [tag("oao", 92, 92, 4000)], budgetMs: 100000 });
+  assert.equal(rd.jobs[0].hop, 10, rd.detail);
+  assert.equal(rd.jobs[0].cells, 7, rd.detail);
+  assert.deepEqual(rd.jobs[0].tags.map((t) => t.copies), [4]);
+  // (e) Bài 500 không đổi: 5 hộp, 1 con.
+  const re = E.pack({ tags: [tag("oao", 92, 92, 500)], budgetMs: 100000 });
+  assert.equal(re.jobs[0].hop, 5);
+  assert.equal(re.jobs[0].chia, 1);
+  // (f) 3000 + 6000: ước chung 3 → thử chia 1 và 3; kết quả phải là một trong hai và hộp khớp.
+  const rf = E.pack({ tags: [tag("a", 92, 92, 3000), tag("b", 42, 92, 6000)], budgetMs: 100000 });
+  assert.ok(rf.jobs[0].chia === 1 || rf.jobs[0].chia === 3, rf.detail);
+  assert.equal(rf.jobs[0].hop, 10 * rf.jobs[0].chia);
+  assert.deepEqual(rf.jobs[0].tags.map((t) => t.copies), [3 / rf.jobs[0].chia, 6 / rf.jobs[0].chia]);
+  console.log("Phần 6 (không có tag 1000 → chia con, hộp theo cách chia): ok");
 }
