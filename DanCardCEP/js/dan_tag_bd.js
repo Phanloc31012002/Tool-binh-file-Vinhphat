@@ -728,12 +728,13 @@
     out.bop = { soCon: soCon, maxMm: Math.round(maxMm * 100) / 100, muc2: muc2 };
     return out;
   }
-  // Sắp bố cục theo thứ tự danh sách (như Dàn tối ưu/KTS) và dồn khít: tag thêm trước nằm trước — con
-  // đầu danh sách ở góc trên trái, các con sau nối tiếp trái → phải, trên → dưới theo cây cắt; chỗ trống
-  // dồn về cuối mỗi dãy (1000 + 2000 dàn chung là "nhân thêm con", không để trống kẹt giữa hai cụm).
-  // Các nhát cùng trục lồng nhau gom thành một dãy; đổi chỗ các phần trong dãy vẫn là nhát thẳng xuyên
-  // suốt, nên chỉ đổi chỗ: khổ con, số ô, mức bóp giữ nguyên. hang(place) = chỉ số tag trong danh sách.
-  // Không dựng lại được cây thì giữ nguyên.
+  // Sắp bố cục theo thứ tự danh sách (như Dàn tối ưu/KTS) và dồn khít về góc trên trái: tag thêm trước
+  // nằm trước — con đầu danh sách ở góc trên trái, các con sau nối tiếp trái → phải, trên → dưới theo cây
+  // cắt. Mỗi nhánh chỉ chiếm đúng khổ gọn của nội dung (dãy dọc cộng bề rộng các con, dãy ngang cộng
+  // chiều cao), phần dư dồn hết về cuối dãy — nên 1000 + 2000 dàn chung là "nhân thêm con", không có
+  // chỗ trống kẹt giữa hai cụm, nhát cắt và dấu cắt nằm ngay mép con. Các nhát cùng trục lồng nhau gom
+  // thành một dãy; đổi chỗ/đổi độ dài các phần trong dãy vẫn là nhát thẳng xuyên suốt, nên khổ con, số ô,
+  // mức bóp giữ nguyên. hang(place) = chỉ số tag trong danh sách. Không dựng lại được cây thì giữ nguyên.
   function sapTheoDanhSach(places, cuts, W, H, hang) {
     var tree = treeFromLayout(places, cuts, W, H);
     if (!tree) return null;
@@ -744,45 +745,83 @@
         b = nhoNhat(n.b);
       return a < b ? a : b;
     }
-    function don(n) {
-      if (n.kind === "empty" || n.kind === "piece") return n;
-      var kind = n.kind,
-        day = [],
-        i;
+    // Các phần (không trống) của dãy nhát cùng trục bắt đầu từ n.
+    function gomDay(n) {
+      var day = [];
       (function gom(m) {
-        if (m.kind === kind) {
+        if (m.kind === n.kind) {
           gom(m.a);
           gom(m.b);
-        } else day.push(don(m));
+        } else if (m.kind !== "empty") day.push(m);
       })(n);
-      // Gộp các chỗ trống trong dãy thành một, để cuối; con theo thứ tự danh sách, bằng nhau giữ thứ tự cũ.
-      var trong = null,
-        con = [];
+      return day;
+    }
+    // Khổ gọn của một nhánh: con giữ khổ, chỗ trống = 0.
+    function khoGon(n) {
+      if (n.kind === "empty") return { w: 0, h: 0 };
+      if (n.kind === "piece") return { w: n.w, h: n.h };
+      var day = gomDay(n),
+        w = 0,
+        h = 0,
+        i,
+        k;
       for (i = 0; i < day.length; i++) {
-        if (day[i].kind === "empty") {
-          if (!trong) trong = { kind: "empty", w: day[i].w, h: day[i].h };
-          else if (kind === "V") trong.w += day[i].w;
-          else trong.h += day[i].h;
-        } else con.push({ hang: nhoNhat(day[i]), thuTu: con.length, nut: day[i] });
+        k = khoGon(day[i]);
+        if (n.kind === "V") {
+          w += k.w;
+          h = Math.max(h, k.h);
+        } else {
+          h += k.h;
+          w = Math.max(w, k.w);
+        }
       }
+      return { w: w, h: h };
+    }
+    function trong(w, h) {
+      return { kind: "empty", w: w, h: h };
+    }
+    // Dựng lại nhánh n vừa khít vùng w × h: nội dung ở góc trên trái, chỗ trống dồn cuối.
+    function dung(n, w, h) {
+      if (n.kind === "empty") return trong(w, h);
+      if (n.kind === "piece") {
+        var p = { kind: "piece", p: n.p, w: n.w, h: n.h };
+        if (h > n.h + 1e-9) p = { kind: "H", a: p, b: trong(n.w, h - n.h), w: n.w, h: h };
+        if (w > n.w + 1e-9) p = { kind: "V", a: p, b: trong(w - n.w, h), w: w, h: h };
+        return p;
+      }
+      var kind = n.kind,
+        day = gomDay(n),
+        con = [],
+        i;
+      for (i = 0; i < day.length; i++) con.push({ hang: nhoNhat(day[i]), thuTu: i, nut: day[i], kho: khoGon(day[i]) });
       con.sort(function (u, v) {
         return u.hang - v.hang || u.thuTu - v.thuTu;
       });
-      var ds = [];
-      for (i = 0; i < con.length; i++) ds.push(con[i].nut);
-      if (trong) ds.push(trong);
-      if (ds.length === 1) return ds[0];
-      var nut = ds[ds.length - 1];
-      for (i = ds.length - 2; i >= 0; i--) {
-        var a = ds[i];
-        nut =
-          kind === "V"
-            ? { kind: "V", a: a, b: nut, w: a.w + nut.w, h: Math.max(a.h, nut.h) }
-            : { kind: "H", a: a, b: nut, w: Math.max(a.w, nut.w), h: a.h + nut.h };
+      var ds = [],
+        da = 0;
+      for (i = 0; i < con.length; i++) {
+        if (kind === "V") {
+          ds.push(dung(con[i].nut, con[i].kho.w, h));
+          da += con[i].kho.w;
+        } else {
+          ds.push(dung(con[i].nut, w, con[i].kho.h));
+          da += con[i].kho.h;
+        }
       }
+      var du = (kind === "V" ? w : h) - da;
+      if (du < -EPS) throw new Error("khổ gọn vượt vùng");
+      if (du > 1e-9) ds.push(kind === "V" ? trong(du, h) : trong(w, du));
+      if (!ds.length) return trong(w, h);
+      var nut = ds[ds.length - 1];
+      for (i = ds.length - 2; i >= 0; i--)
+        nut = kind === "V" ? { kind: "V", a: ds[i], b: nut, w: ds[i].w + nut.w, h: h } : { kind: "H", a: ds[i], b: nut, w: w, h: ds[i].h + nut.h };
       return nut;
     }
-    tree = don(tree);
+    try {
+      tree = dung(tree, W, H);
+    } catch (e) {
+      return null;
+    }
     var out = { places: [], cuts: [] };
     layoutTuCay(tree, 0, 0, out);
     return out.places.length === places.length ? out : null;

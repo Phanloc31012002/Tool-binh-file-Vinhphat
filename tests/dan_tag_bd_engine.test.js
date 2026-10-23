@@ -361,9 +361,22 @@ function rectOf(p) {
     ["H132", "H204", "H60"],
     JSON.stringify(bd.cuts),
   );
+  // (d) Ca anh Lộc 23/10 (test.pdf): 2 con 112 × 72 + 3 con 77 × 107 + 2 card 92 × 92 trong khối 6 × 2.
+  //     Nhát dọc tách hai card phải sát mép con rộng nhất bên trái (231), không lấy "phần còn lại" (244)
+  //     rồi hở 13 mm; dấu cắt nhờ vậy nằm ngay mép con.
+  const re = E.pack({ tags: [tag("hd", 112, 72, 2000), tag("ba", 77, 107, 3000), tag("oao", 92, 92, 2000)], budgetMs: 100000 });
+  assert.equal(re.ok, true, re.error);
+  assert.equal(re.jobs[0].blocks.length, 1, re.detail);
+  const be = re.jobs[0].blocks[0];
+  assert.equal(be.cells, 12, re.detail);
+  const oao = be.places.filter((p) => p.id === "oao");
+  assert.equal(oao.length, 2);
+  const phai = Math.max(...be.places.filter((p) => p.id !== "oao").map((p) => p.x + p.w));
+  for (const p of oao) assert.equal(p.x, phai, "card OAO phải sát mép phải cụm bên trái (" + phai + "): " + JSON.stringify(p));
+  assert.ok(be.cuts.some((c) => c.axis === "V" && c.at === phai && c.from === 0 && c.to === 184), "nhát dọc ở " + phai + ": " + JSON.stringify(be.cuts));
   // Tổng quát: mọi khối trong các ca trên không có con nào "treo" — con nào cũng chạm cạnh trên của khối
   // hoặc chạm đáy một con khác; chạm cạnh trái của khối hoặc cạnh phải một con khác.
-  for (const r of [ra, rb, rc, rd])
+  for (const r of [ra, rb, rc, rd, re])
     for (const b of r.jobs[0].blocks)
       for (const p of b.places) {
         const tren = p.y < 1e-9 || b.places.some((q) => q !== p && Math.abs(q.y + q.h - p.y) < 1e-6 && q.x < p.x + p.w - 1e-6 && q.x + q.w > p.x + 1e-6);
