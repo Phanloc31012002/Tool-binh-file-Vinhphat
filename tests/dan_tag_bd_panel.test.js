@@ -44,7 +44,7 @@ const html = fs.readFileSync(path.join(__dirname, "../DanCardCEP/index.html"), "
   assert.match(main, /tagbd: document\.getElementById\("pane-tagbd"\)/);
   for (const token of ["function loadDanTagBdJsx", "dcDanTagBdDocTag()", "dcDanTagBdVe(", "dcDanTagBdXuatPdf(", "dcDanTagBdDemArtboard()", "packAsync("])
     assert.ok(main.indexOf(token) >= 0, "main.js thiếu " + token);
-  assert.match(main, /dcDanTagBdVersion < 6/);
+  assert.match(main, /dcDanTagBdVersion < 7/);
 }
 
 // ---------- Động: chạy lát mã thật ----------
@@ -173,7 +173,7 @@ function panel() {
   p.nodes.tbQty.value = "2000";
   p.handlers["btnTagBdThem:click"]();
   assert.equal(p.expressions.length, 1);
-  assert.match(p.expressions[0].expression, /dcDanTagBdVersion < 6/);
+  assert.match(p.expressions[0].expression, /dcDanTagBdVersion < 7/);
   assert.match(p.expressions[0].expression, /dcDanTagBdDocTag\(\)/);
   p.expressions[0].callback('OKJSON:{"tags":[{"id":"tag_1","w":112,"h":72,"twoSided":true,"name":"Tag 1"},{"id":"tag_2","w":56,"h":91,"twoSided":false,"name":"Nhỏ"}]}');
   assert.match(p.nodes.tagBdList.innerHTML, /112 × 72/);

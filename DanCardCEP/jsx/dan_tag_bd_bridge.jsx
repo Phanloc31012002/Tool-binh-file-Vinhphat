@@ -6,7 +6,7 @@
 // 2 trang. Phần ghép khối chạy ở Chromium của CEP (dan_tag_bd.js).
 // Luật chốt với anh Lộc 22/10/2026: docs/THIET_KE_DAN_TAG_BD.md
 // ============================================================
-var dcDanTagBdVersion = 6;
+var dcDanTagBdVersion = 7;
 if (typeof dcDanTagBdNguon === "undefined") var dcDanTagBdNguon = {};
 if (typeof dcDanTagBdNguonDem === "undefined") var dcDanTagBdNguonDem = 1;
 
@@ -343,11 +343,15 @@ function dcDanTagBdTenArtboard(k, bai, hop, w, h, mat) {
   return "TagBD " + k + " - bai " + bai + " - " + hop + " hop - " + dcDanTagBdSoKho(w) + " x " + dcDanTagBdSoKho(h) + " - " + mat;
 }
 // Đọc tên artboard TagBD -> {k, bai, hop, mat} hoặc null. Tên cũ (chưa ghi hộp) → hộp theo bài.
+// Hai regex tách bạch (không dùng nhóm tuỳ chọn) để ExtendScript không nhầm chỉ số nhóm.
 function dcDanTagBdDocTen(name) {
-  var m = /^TagBD (\d+) - bai (\d+)(?: - (\d+) hop)? - ([\d.]+) x ([\d.]+) - (truoc|sau|1 mat)$/.exec(String(name || ""));
+  var ten = String(name || ""),
+    m = /^TagBD (\d+) - bai (\d+) - (\d+) hop - ([\d.]+) x ([\d.]+) - (truoc|sau|1 mat)$/.exec(ten);
+  if (m) return { k: parseInt(m[1], 10), bai: parseInt(m[2], 10), hop: parseInt(m[3], 10), w: m[4], h: m[5], mat: m[6] };
+  m = /^TagBD (\d+) - bai (\d+) - ([\d.]+) x ([\d.]+) - (truoc|sau)$/.exec(ten);
   if (!m) return null;
   var bai = parseInt(m[2], 10);
-  return { k: parseInt(m[1], 10), bai: bai, hop: m[3] ? parseInt(m[3], 10) : bai === 500 ? 5 : 10, w: m[4], h: m[5], mat: m[6] };
+  return { k: parseInt(m[1], 10), bai: bai, hop: bai === 500 ? 5 : 10, w: m[3], h: m[4], mat: m[5] };
 }
 // Đếm cặp artboard TagBD trong tài liệu đang mở: "OK:n".
 function dcDanTagBdDemArtboard() {
@@ -982,17 +986,22 @@ function dcDanTagBdXuatPdf(optionsText) {
     // Chép một mặt sang tài liệu tạm theo cách Auto Save: KHÔNG ép toạ độ tuyệt đối của tài liệu nguồn.
     // Bản sao đầu rơi đâu thì cả mặt dời theo đó (giữ vị trí tương đối giữa các object), artboard
     // của mặt = khung nguồn + đúng độ dời ấy. `want` (nếu có) là độ dời bắt buộc (mặt sau đặt cạnh mặt trước).
+    // Nhân bản cả mặt một lượt khi tài liệu nguồn đang active, rồi mới chuyển sang tài liệu tạm MỘT lần
+    // để đo/kéo (trước đây đổi tài liệu qua lại cho từng object — mỗi lần đổi Illustrator vẽ lại cả tài
+    // liệu nguồn, hàng chục object là chờ rất lâu).
     function copyFace(entries, tmp, lay, faceRect, want) {
-      var delta = want || null;
-      for (var i = 0; i < entries.length; i++) {
-        app.activeDocument = doc;
-        var dup = entries[i].item.duplicate(lay, ElementPlacement.PLACEATEND);
-        app.activeDocument = tmp;
-        var after = dup.geometricBounds;
+      var delta = want || null,
+        dups = [],
+        i;
+      app.activeDocument = doc;
+      for (i = 0; i < entries.length; i++) dups.push(entries[i].item.duplicate(lay, ElementPlacement.PLACEATEND));
+      app.activeDocument = tmp;
+      for (i = 0; i < entries.length; i++) {
+        var after = dups[i].geometricBounds;
         if (!delta) delta = [after[0] - entries[i].bounds[0], after[1] - entries[i].bounds[1]];
         var dx = entries[i].bounds[0] + delta[0] - after[0],
           dy = entries[i].bounds[1] + delta[1] - after[1];
-        if (Math.abs(dx) > EPS || Math.abs(dy) > EPS) dup.translate(dx, dy);
+        if (Math.abs(dx) > EPS || Math.abs(dy) > EPS) dups[i].translate(dx, dy);
       }
       if (!delta) delta = [0, 0];
       return [faceRect[0] + delta[0], faceRect[1] + delta[1], faceRect[2] + delta[0], faceRect[3] + delta[1]];
@@ -1050,8 +1059,12 @@ function dcDanTagBdXuatPdf(optionsText) {
     var soMotMat = 0;
     for (i = 0; i < jobs.length; i++) if (jobs[i].pair.motMat) soMotMat++;
     var moTaTrang = soMotMat === 0 ? "mỗi khối 2 trang trước/sau" : soMotMat === jobs.length ? "khối 1 mặt, mỗi file 1 trang" : jobs.length - soMotMat + " file 2 trang trước/sau, " + soMotMat + " file 1 mặt 1 trang";
-    if (!errs.length) return "OK: Đã lưu " + done + "/" + jobs.length + " file PDF (" + moTaTrang + ").\nThư mục: " + folder.fsName;
-    return (done > 0 ? "OK: " : "ERR: ") + "Lưu được " + done + "/" + jobs.length + " file.\nLỗi:\n- " + errs.join("\n- ") + "\nThư mục: " + folder.fsName;
+    // Ghi rõ artboard nào ra file nào (số hộp đọc từ tên artboard) để dò được ngay khi sai.
+    var danhSach = [];
+    for (i = 0; i < jobs.length; i++)
+      danhSach.push("TagBD " + jobs[i].pair.k + " (bài " + jobs[i].pair.bai + ", " + jobs[i].pair.hop + " hộp" + (jobs[i].pair.motMat ? ", 1 mặt" : "") + ") → " + jobs[i].name);
+    if (!errs.length) return "OK: Đã lưu " + done + "/" + jobs.length + " file PDF (" + moTaTrang + ").\n" + danhSach.join("\n") + "\nThư mục: " + folder.fsName;
+    return (done > 0 ? "OK: " : "ERR: ") + "Lưu được " + done + "/" + jobs.length + " file.\nLỗi:\n- " + errs.join("\n- ") + "\n" + danhSach.join("\n") + "\nThư mục: " + folder.fsName;
   } catch (e) {
     try {
       if (doc) app.activeDocument = doc;

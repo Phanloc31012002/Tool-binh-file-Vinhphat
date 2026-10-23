@@ -26,7 +26,7 @@ function parseOk(text) {
 // ---------- dcDanTagBdDocTag ----------
 {
   const { mock, c } = load();
-  assert.equal(c.dcDanTagBdVersion, 6);
+  assert.equal(c.dcDanTagBdVersion, 7);
   // Hàng 1: trước 112 × 72 (trái) + sau (phải). Hàng 2: tag 1 mặt 56 × 91. Hàng 3: trước + sau 92 × 40, mặt sau lệch 0,3 mm.
   const f1 = box(mock, 0, 300, 112, 72, "f1");
   const b1 = box(mock, 150, 300, 112, 72, "b1");
@@ -340,8 +340,24 @@ const OPTS = { prefix: "1088", start: "1", pad: "2", canMang: "cm", ngay: "22", 
         return copy;
       };
     }
+  // Đếm số lần đổi tài liệu active: mỗi mặt chỉ đổi 2 lần (nhân bản cả mặt rồi mới sang tài liệu tạm),
+  // không đổi cho từng object (11 object mặt 1 mà đổi 22 lần là rất chậm trên file nặng).
+  let doiTaiLieu = 0,
+    activeDoc = c.app.activeDocument;
+  Object.defineProperty(c.app, "activeDocument", {
+    configurable: true,
+    get: () => activeDoc,
+    set: (d) => {
+      doiTaiLieu++;
+      activeDoc = d;
+    },
+  });
   const res = c.dcDanTagBdXuatPdf(JSON.stringify(OPTS));
   assert.match(res, /^OK: Đã lưu 3\/3 file PDF/, res);
+  assert.ok(doiTaiLieu <= 3 * 5 + 1, "đổi tài liệu " + doiTaiLieu + " lần cho 3 khối");
+  // Ghi rõ artboard nào → file nào, kèm số hộp đọc từ tên artboard.
+  assert.match(res, /TagBD 1 \(bài 1000, 10 hộp\) → 1088 - 01 - 10 hop 110 x 90 - cm - 22\.pdf/);
+  assert.match(res, /TagBD 3 \(bài 500, 5 hộp\) → 1088 - 03 - 5 hop 166 x 90 - cm - 22\.pdf/);
   assert.deepEqual(
     io.saves.map((s) => s.path),
     ["D:/PDF/1088 - 01 - 10 hop 110 x 90 - cm - 22.pdf", "D:/PDF/1088 - 02 - 10 hop 54 x 90 - cm - 22.pdf", "D:/PDF/1088 - 03 - 5 hop 166 x 90 - cm - 22.pdf"],

@@ -4687,7 +4687,7 @@
         "if (typeof dcKhungThanhPham !== 'function' || typeof dcPickFolder !== 'function') { $.evalFile(" +
         jsStr(libPath) +
         "); } " +
-        "if (typeof dcDanTagBdVe !== 'function' || typeof dcDanTagBdXuatPdf !== 'function' || typeof dcDanTagBdVersion === 'undefined' || dcDanTagBdVersion < 6) { $.evalFile(" +
+        "if (typeof dcDanTagBdVe !== 'function' || typeof dcDanTagBdXuatPdf !== 'function' || typeof dcDanTagBdVersion === 'undefined' || dcDanTagBdVersion < 7) { $.evalFile(" +
         jsStr(bridgePath) +
         "); } "
       );
