@@ -305,3 +305,47 @@ function rectOf(p) {
   assert.doesNotMatch(rf.detail, /bóp/);
   console.log("Phần 4 (bóp theo dãy ≤ 1 mm/con, mức 2 cả cụm ăn thêm 1–2 mm): ok");
 }
+
+// ---------- Phần 5: con đầu danh sách ở góc trên trái, các con sau nối tiếp theo danh sách ----------
+// Như Dàn tối ưu/KTS: tag thêm trước nằm trước. Bố cục guillotine cho phép đổi chỗ hai bên của bất kỳ
+// nhát cắt nào mà vẫn hợp lệ, nên chỉ sắp lại chỗ — số ô, khổ con, mức bóp giữ nguyên.
+{
+  function tag(id, w, h, qty) {
+    return { id: id, name: id, w: w, h: h, qty: qty };
+  }
+  function dauTien(job, id) {
+    const b = job.blocks[0];
+    const p = b.places.find((q) => q.id === id && q.x === 0 && q.y === 0);
+    assert.ok(p, "con " + id + " phải ở góc trên trái (0, 0): " + JSON.stringify(b.places));
+    const pieces = b.places.map((q) => ({ id: q.id, w: q.rot ? q.h : q.w, h: q.rot ? q.w : q.h }));
+    assert.equal(E.verify(b.places, b.cuts, b.w, b.h, pieces), null, "vẫn hợp lệ sau khi sắp");
+  }
+  // (a) Ca thật 22/10 (7 con, có bóp): card "tp" thêm trước → góc trên trái; đảo danh sách thì "den" lên đầu.
+  const ra = E.pack({ tags: [tag("tp", 56, 92, 1000), tag("cn", 56, 92, 1000), tag("den", 112, 77, 3000), tag("hg", 112, 71, 2000)], budgetMs: 100000 });
+  assert.equal(ra.ok, true, ra.error);
+  assert.equal(ra.jobs[0].cells, 10, ra.detail);
+  assert.equal(ra.jobs[0].daBop, 7, "bóp như cũ");
+  dauTien(ra.jobs[0], "tp");
+  const rb = E.pack({ tags: [tag("den", 112, 77, 3000), tag("hg", 112, 71, 2000), tag("tp", 56, 92, 1000), tag("cn", 56, 92, 1000)], budgetMs: 100000 });
+  assert.equal(rb.jobs[0].cells, 10);
+  dauTien(rb.jobs[0], "den");
+  // Thứ tự theo cây cắt: đọc các con theo nhát cắt từ gốc (trái → phải, trên → dưới) thì chỉ số tag không giảm
+  // ở mỗi nhánh so với nhánh sau nó — tức con "cn" (thứ 2) không nằm sau "den"/"hg" trong cùng một dãy.
+  const b = ra.jobs[0].blocks[0];
+  const tree = E.treeFromLayout(b.places, b.cuts, b.w, b.h);
+  assert.ok(tree, "dựng lại được cây cắt");
+  const rank = { tp: 0, cn: 1, den: 2, hg: 3 };
+  function minRank(n) {
+    if (n.kind === "empty") return Infinity;
+    if (n.kind === "piece") return rank[n.p.id];
+    const a = minRank(n.a), c = minRank(n.b);
+    assert.ok(a <= c, "nhánh trước phải chứa con có thứ tự nhỏ hơn nhánh sau: " + a + " > " + c);
+    return Math.min(a, c);
+  }
+  minRank(tree);
+  // (b) Không bóp: 2 tag khác khổ, tag đầu ở (0, 0) dù nhỏ hơn.
+  const rc = E.pack({ tags: [tag("nho", 100, 20, 1000), tag("to", 112, 72, 1000)], budgetMs: 100000 });
+  assert.equal(rc.jobs[0].daBop, 0);
+  dauTien(rc.jobs[0], "nho");
+  console.log("Phần 5 (con đầu danh sách ở góc trên trái, nối tiếp theo danh sách): ok");
+}

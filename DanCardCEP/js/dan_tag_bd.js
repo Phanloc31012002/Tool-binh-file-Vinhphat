@@ -16,7 +16,7 @@
 })(typeof window !== "undefined" ? window : this, function () {
   "use strict";
 
-  var VERSION = 2;
+  var VERSION = 3;
   // Bóp để vừa khối khi cụm chỉ dư chút ít so với n ô:
   //  - mức 1: mỗi con bớt tối đa 1 mm theo chiều đang thiếu (cột thiếu 6 mm có 6 con → mỗi con 1 mm);
   //    chỗ trống trong khối hút trước, con chỉ bớt phần còn lại;
@@ -728,6 +728,30 @@
     out.bop = { soCon: soCon, maxMm: Math.round(maxMm * 100) / 100, muc2: muc2 };
     return out;
   }
+  // Sắp bố cục theo thứ tự danh sách (như Dàn tối ưu/KTS): tag thêm trước nằm trước — con đầu danh
+  // sách ở góc trên trái, các con sau nối tiếp trái → phải, trên → dưới theo cây cắt. Hai bên của bất
+  // kỳ nhát cắt nào đổi chỗ cho nhau vẫn là nhát thẳng xuyên suốt, nên chỉ đổi chỗ: khổ con, số ô, mức
+  // bóp giữ nguyên. hang(place) = chỉ số tag trong danh sách. Không dựng lại được cây thì giữ nguyên.
+  function sapTheoDanhSach(places, cuts, W, H, hang) {
+    var tree = treeFromLayout(places, cuts, W, H);
+    if (!tree) return null;
+    function nhoNhat(n) {
+      if (n.kind === "empty") return Infinity; // chỗ trống dồn về cuối
+      if (n.kind === "piece") return hang(n.p);
+      var a = nhoNhat(n.a),
+        b = nhoNhat(n.b);
+      if (b < a) {
+        var t = n.a;
+        n.a = n.b;
+        n.b = t;
+      }
+      return a < b ? a : b;
+    }
+    nhoNhat(tree);
+    var out = { places: [], cuts: [] };
+    layoutTuCay(tree, 0, 0, out);
+    return out.places.length === places.length ? out : null;
+  }
   // Tìm cách bóp để bộ con vừa khối W × H: nới khối thêm dy (cao) / dx (rộng) từ ít tới nhiều,
   // xếp nguyên khổ rồi co về. packFn(w, h) trả kết quả packInto (có layouts).
   function bopKhoi(pieces, W, H, packFn) {
@@ -1210,14 +1234,23 @@
         var cells = planCells(job.best),
           blocks = [],
           names = [],
-          bi;
+          bi,
+          thuTu = {};
+        for (bi = 0; bi < job.tags.length; bi++) thuTu[job.tags[bi].id] = bi;
+        function hang(p) {
+          return thuTu[p.id] === undefined ? Infinity : thuTu[p.id];
+        }
         for (bi = 0; bi < job.best.blocks.length; bi++) {
           var blk = job.best.blocks[bi],
             counts = {},
             places = [],
             pi;
-          for (pi = 0; pi < blk.places.length; pi++) {
-            var p = blk.places[pi];
+          // Con đầu danh sách ở góc trên trái, các con sau nối tiếp theo danh sách (như Dàn tối ưu/KTS).
+          var sap = sapTheoDanhSach(blk.places, blk.cuts, blk.shape.w, blk.shape.h, hang),
+            srcPlaces = sap ? sap.places : blk.places,
+            srcCuts = sap ? sap.cuts : blk.cuts;
+          for (pi = 0; pi < srcPlaces.length; pi++) {
+            var p = srcPlaces[pi];
             counts[p.id] = (counts[p.id] || 0) + 1;
             places.push({ id: p.id, copy: counts[p.id], x: p.x, y: p.y, w: p.w, h: p.h, rot: p.rot, bopX: p.bopX || 1, bopY: p.bopY || 1 });
           }
@@ -1228,7 +1261,7 @@
             h: blk.shape.h,
             cells: blk.shape.cells,
             places: places,
-            cuts: blk.cuts.slice(0),
+            cuts: srcCuts.slice(0),
             bop: blk.bop || null, // { soCon, maxMm, muc2 } khi khối này có con bị bóp
           });
         }
@@ -1369,6 +1402,7 @@
     BOP_MOI_CON_MM: BOP_MOI_CON_MM,
     BOP_THEM_CUM_MM: BOP_THEM_CUM_MM,
     treeFromLayout: treeFromLayout,
+    sapTheoDanhSach: sapTheoDanhSach,
     coBoCuc: coBoCuc,
     bopKhoi: bopKhoi,
     packInto: packInto,
