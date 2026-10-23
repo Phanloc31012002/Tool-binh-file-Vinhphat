@@ -26,7 +26,7 @@ function parseOk(text) {
 // ---------- dcDanTagBdDocTag ----------
 {
   const { mock, c } = load();
-  assert.equal(c.dcDanTagBdVersion, 3);
+  assert.equal(c.dcDanTagBdVersion, 4);
   // Hàng 1: trước 112 × 72 (trái) + sau (phải). Hàng 2: tag 1 mặt 56 × 91. Hàng 3: trước + sau 92 × 40, mặt sau lệch 0,3 mm.
   const f1 = box(mock, 0, 300, 112, 72, "f1");
   const b1 = box(mock, 150, 300, 112, 72, "b1");
@@ -142,7 +142,7 @@ const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 0.01, (msg || "") + " " 
   assert.match(res, /^OK: /, res);
   assert.match(res, /2 khối/);
   assert.match(res, /Bài 1000: 2 khối/);
-  // Artboard: cũ giữ nguyên, thêm 2 cặp, tên đúng, khổ đúng, nằm dưới mọi thứ đang có.
+  // Artboard: cũ giữ nguyên, thêm 2 cặp, tên đúng, khổ đúng, bắt đầu từ góc trên trái canvas (như Dàn tối ưu/KTS).
   assert.equal(mock.doc.artboards.length, 5);
   assert.deepEqual(mock.doc.artboards[0].artboardRect, [0, 100, 400, 0]);
   const names = mock.doc.artboards.slice(1).map((b) => b.name);
@@ -157,8 +157,12 @@ const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 0.01, (msg || "") + " " 
   near(front1[2] - front1[0], 112 * MM, "rộng khối 1");
   near(front1[1] - front1[3], 92 * MM, "cao khối 1");
   near(back1[0], front1[2] + 10 * MM, "mặt sau cách 10 mm");
-  // Nguồn thấp nhất ở y = 100 mm (tag_3) -> artboard mới phải nằm dưới đó.
-  assert.ok(front1[1] <= 100 * MM - 10 * MM + 0.01, "nằm dưới mọi thứ: top=" + front1[1]);
+  // Góc trên trái canvas (±7200 pt), cách mép 10 mm; nguồn và artboard cũ ở quanh gốc không cản.
+  near(front1[0], -7200 + 10 * MM, "sát mép trái canvas");
+  near(front1[1], 7200 - 10 * MM, "sát mép trên canvas");
+  const front2 = mock.doc.artboards[3].artboardRect;
+  near(front2[0], back1[2] + 10 * MM, "cặp 2 nối tiếp bên phải cặp 1");
+  near(front2[1], front1[1], "cùng hàng");
   assert.equal(c.dcDanTagBdDemArtboard(), "OK:2");
   // Layer: mỗi mặt một layer có note.
   const layers = mock.doc.layers.filter((l) => /^Tag BD /.test(l.name));
@@ -205,18 +209,30 @@ const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 0.01, (msg || "") + " " 
   // Nguồn không bị đụng.
   near(src.f1.geometricBounds[0], 0, "nguồn giữ nguyên");
   assert.equal(mock.doc.layers[0].pageItems.length, 5);
-  // Dàn lần 2: số thứ tự nối tiếp (3, 4) và nằm dưới hàng trước.
+  // Dàn lần 2: số thứ tự nối tiếp (3, 4), né các cặp đã có → nối tiếp bên phải, vẫn hàng trên cùng.
   const res2 = c.dcDanTagBdVe(JSON.stringify(plan()));
   assert.match(res2, /^OK: /, res2);
   assert.equal(mock.doc.artboards[5].name, "TagBD 3 - bai 1000 - 110 x 90 - truoc");
-  assert.ok(mock.doc.artboards[5].artboardRect[1] <= mock.doc.artboards[1].artboardRect[3] - 10 * MM + 0.01, "hàng 2 nằm dưới hàng 1");
-  assert.equal(c.dcDanTagBdDemArtboard(), "OK:4");
+  near(mock.doc.artboards[5].artboardRect[0], mock.doc.artboards[4].artboardRect[2] + 10 * MM, "lượt 2 nối tiếp bên phải lượt 1");
+  near(mock.doc.artboards[5].artboardRect[1], front1[1], "lượt 2 vẫn hàng trên cùng");
+  // Hết bề ngang canvas thì tự xuống hàng: chèn một artboard bận chiếm gần hết phần còn lại của hàng.
+  {
+    const r6 = mock.doc.artboards[8].artboardRect; // cặp 4 mặt sau (cuối hàng)
+    mock.doc.artboards.push({ name: "ban", artboardRect: [r6[2] + 10 * MM, 7200 - 10 * MM, 7200 - 10 * MM - 50 * MM, 7200 - 10 * MM - 92 * MM] });
+    const res3 = c.dcDanTagBdVe(JSON.stringify(plan()));
+    assert.match(res3, /^OK: /, res3);
+    const f5 = mock.doc.artboards.find((b) => b.name === "TagBD 5 - bai 1000 - 110 x 90 - truoc").artboardRect;
+    near(f5[0], -7200 + 10 * MM, "xuống hàng: về mép trái");
+    assert.ok(f5[1] <= front1[3] - 10 * MM + 0.01, "xuống hàng: nằm dưới hàng 1, top=" + f5[1] + " ≤ " + (front1[3] - 10 * MM));
+    mock.doc.artboards.splice(mock.doc.artboards.findIndex((b) => b.name === "ban"), 1);
+  }
+  assert.equal(c.dcDanTagBdDemArtboard(), "OK:6"); // 3 lượt × 2 cặp
   assert.equal(c.app.coordinateSystem, "user-coordinates");
   // Phương án hỏng -> ERR, không tạo gì.
   const bad = plan();
   bad.jobs[0].blocks[0].places[0].id = "tag_khong_co";
   assert.match(c.dcDanTagBdVe(JSON.stringify(bad)), /^ERR: /);
-  assert.equal(mock.doc.artboards.length, 9);
+  assert.equal(mock.doc.artboards.length, 13); // 1 cũ + 3 lượt × 4
   console.log("dcDanTagBdVe: ok");
 }
 // Lỗi giữa chừng (duplicate thứ 2 hỏng) -> gỡ sạch artboard/layer vừa tạo, nguồn còn nguyên.

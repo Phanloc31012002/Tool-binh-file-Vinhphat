@@ -26,7 +26,7 @@ for (const [name, want] of Object.entries(thresholds))
 for (const [name, min] of Object.entries({
   dcDanToiUuVersion: 23, dcDanTuTroVersion: 12, dcDanBeNestingVersion: 13, dcSignature8AutoPonVersion: 41,
   dcKeoGayAutoPonVersion: 14, dcCatalogueAutoVersion: 14, dcClipToSizeVersion: 9, dcAutoCutMarksVersion: 2,
-  dcDanTheoMauVersion: 3, dcCtlOffsetPdfVersion: 6, dcDanTagBdVersion: 3,
+  dcDanTheoMauVersion: 3, dcCtlOffsetPdfVersion: 6, dcDanTagBdVersion: 4,
 }))
   assert.ok(defined(name) >= min, name + " phải ≥ " + min + " (đang " + defined(name) + ")");
 console.log("jsx_versions: ok");

@@ -6,7 +6,7 @@
 // 2 trang. Phần ghép khối chạy ở Chromium của CEP (dan_tag_bd.js).
 // Luật chốt với anh Lộc 22/10/2026: docs/THIET_KE_DAN_TAG_BD.md
 // ============================================================
-var dcDanTagBdVersion = 3;
+var dcDanTagBdVersion = 4;
 if (typeof dcDanTagBdNguon === "undefined") var dcDanTagBdNguon = {};
 if (typeof dcDanTagBdNguonDem === "undefined") var dcDanTagBdNguonDem = 1;
 
@@ -368,7 +368,10 @@ function dcDanTagBdVungBan(doc, canvasHalf) {
     li;
   for (i = 0; i < doc.artboards.length; i++) {
     try {
-      rects.push(doc.artboards[i].artboardRect.slice(0));
+      var ab = doc.artboards[i].artboardRect.slice(0);
+      // Artboard phủ gần hết canvas là nền làm việc, không phải tờ cần né (như Dàn tối ưu).
+      if (ab[2] - ab[0] >= canvasHalf * 1.84 && ab[1] - ab[3] >= canvasHalf * 1.84) continue;
+      rects.push(ab);
     } catch (boardError) {}
   }
   var layerCount = 0;
@@ -401,7 +404,9 @@ function dcDanTagBdVungBan(doc, canvasHalf) {
   return rects;
 }
 
-// Cấp chỗ cho các khối: hàng mới nằm dưới mọi thứ đang có, trái -> phải, cặp trước/sau cạnh nhau.
+// Cấp chỗ cho các khối y như Dàn tối ưu/KTS: bắt đầu từ góc trên trái canvas, đặt từng cặp trước/sau
+// (cạnh nhau, cách GAP) sang phải; vượt mép phải canvas thì tự xuống hàng và đi tiếp từ mép trái; chỗ
+// đã có artboard/bài cũ thì nhảy qua bên phải nó. Hết canvas theo chiều dọc mới báo lỗi.
 // sizes: [{w, h}] mm. Trả mảng rect mặt trước [l, t, r, b] (pt); mặt sau = dịch phải w + GAP.
 function dcDanTagBdViTri(doc, sizes, MM) {
   var EPS = 0.01,
@@ -415,36 +420,49 @@ function dcDanTagBdViTri(doc, sizes, MM) {
   var busy = dcDanTagBdVungBan(doc, canvasHalf),
     i;
   var left = -canvasHalf + gap,
+    top = canvasHalf - gap,
     right = canvasHalf - gap,
-    bottom = -canvasHalf + gap,
-    rowTop = canvasHalf - gap;
-  if (busy.length) {
-    var minBottom = Number.MAX_VALUE,
-      minLeft = Number.MAX_VALUE;
-    for (i = 0; i < busy.length; i++) {
-      if (busy[i][3] < minBottom) minBottom = busy[i][3];
-      if (busy[i][0] < minLeft) minLeft = busy[i][0];
-    }
-    rowTop = minBottom - gap;
-    if (minLeft > left) left = minLeft;
+    bottom = -canvasHalf + gap;
+  function overlap(a, b) {
+    return a[0] < b[2] - EPS && a[2] > b[0] + EPS && a[3] < b[1] - EPS && a[1] > b[3] + EPS;
   }
   var positions = [],
-    x = left,
-    rowH = 0;
+    cx = left,
+    cy = top;
   for (i = 0; i < sizes.length; i++) {
     var w = sizes[i].w * MM,
       h = sizes[i].h * MM,
-      pairW = w * 2 + gap;
+      pairW = w * 2 + gap,
+      attempts = 0,
+      placed = false;
     if (pairW > right - left + EPS) throw new Error("Khối " + (i + 1) + " rộng quá canvas (cặp trước/sau " + Math.round(pairW / MM) + " mm). Hãy mở Large Canvas.");
-    if (x + pairW > right + EPS) {
-      x = left;
-      rowTop -= rowH + gap;
-      rowH = 0;
+    while (attempts++ < 5000) {
+      if (cx + pairW > right + EPS) {
+        // Hết bề ngang canvas: xuống hàng, đi tiếp từ mép trái.
+        cx = left;
+        cy -= h + gap;
+        continue;
+      }
+      if (cy - h < bottom - EPS) throw new Error("Không còn chỗ trong canvas để đóng đủ artboard. Hãy xoá bớt artboard/bài cũ hoặc mở tài liệu mới.");
+      var rect = [cx, cy, cx + pairW, cy - h],
+        blocker = null,
+        bi;
+      for (bi = 0; bi < busy.length; bi++)
+        if (overlap(rect, busy[bi])) {
+          blocker = busy[bi];
+          break;
+        }
+      if (blocker) {
+        cx = blocker[2] + gap;
+        continue;
+      }
+      busy.push(rect);
+      positions.push([cx, cy, cx + w, cy - h]);
+      cx += pairW + gap;
+      placed = true;
+      break;
     }
-    if (rowTop - h < bottom - EPS) throw new Error("Không còn chỗ trong canvas để đóng đủ artboard. Hãy xoá bớt artboard/bài cũ hoặc mở tài liệu mới.");
-    positions.push([x, rowTop, x + w, rowTop - h]);
-    if (h > rowH) rowH = h;
-    x += pairW + gap;
+    if (!placed) throw new Error("Không tìm được vị trí trong canvas để đặt artboard mới.");
   }
   return positions;
 }
