@@ -2052,7 +2052,7 @@
       var jsxPath = extensionRoot + "/jsx/dan_card_lib.jsx";
       var danBeBridgePath = extensionRoot + "/jsx/dan_be_bridge.jsx";
       return (
-        "if (typeof dcDanToiUu !== 'function' || typeof dcCopyToiUuNoteToAllArtboards !== 'function' || typeof dcCopyToiUuNoteToOddArtboards !== 'function' || typeof dcDanToiUuVersion === 'undefined' || dcDanToiUuVersion < 24) { $.evalFile(" +
+        "if (typeof dcDanToiUu !== 'function' || typeof dcCopyToiUuNoteToAllArtboards !== 'function' || typeof dcCopyToiUuNoteToOddArtboards !== 'function' || typeof dcDanToiUuVersion === 'undefined' || dcDanToiUuVersion < 25) { $.evalFile(" +
         jsStr(jsxPath) +
         "); } " +
         "if (typeof dcDanBePrepare !== 'function' || typeof dcDanBeRender !== 'function' || typeof dcDanBeNestingVersion === 'undefined' || dcDanBeNestingVersion < 14) { $.evalFile(" +

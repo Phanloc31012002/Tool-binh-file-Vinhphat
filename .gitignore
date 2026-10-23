@@ -25,3 +25,5 @@ cloudflare-worker/generated/
 # Dependencies and generated test reports are not source code.
 node_modules/
 coverage/
+
+DanCardCEP/assets/icon.ai

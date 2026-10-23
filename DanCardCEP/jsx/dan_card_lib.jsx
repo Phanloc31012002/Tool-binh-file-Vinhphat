@@ -4358,7 +4358,7 @@ function dcDanToiUuV2(pageWidthText, pageHeightText) {
 //  - Artboard moi tu xep theo luoi canvas, trai sang phai roi xuong hang.
 //  - Tach hinh chu nhat de tan dung khoang trong chu L, van cat dao duoc.
 // ============================================================
-var dcDanToiUuVersion = 24;
+var dcDanToiUuVersion = 25;
 // Chỉ gọi sau khi dựng thành công. Chỉ xoá khung, không bao giờ xoá bài bên trong.
 function dcRemoveOldCanvasArtboards(doc, oldCount) {
   var removed = 0;
@@ -6163,13 +6163,84 @@ function dcDanToiUu(
       return 1 + planComplexity(plan.first) + planComplexity(plan.second);
     }
 
-    function isBetter(candidate, best) {
+    // Khung bao thật của phương án (neo góc trên trái vùng) và số nhát dao ước lượng:
+    // dao thẳng xuyên suốt, các dải cùng khổ chồng lên nhau cắt một lượt, dải ngắn hơn
+    // khung chung tốn thêm một nhát xén. Cache trên plan vì bộ tìm gọi lặp rất nhiều.
+    function planExtent(plan) {
+      if (!plan || plan.kind === "empty" || plan.count <= 0)
+        return { w: 0, h: 0, cuts: 0 };
+      if (plan._dcKtsDo) return plan._dcKtsDo;
+      var w = 0,
+        h = 0,
+        cuts = 0,
+        lines = 0,
+        bi,
+        band,
+        used,
+        full,
+        a,
+        b;
+      if (plan.kind === "strips") {
+        for (bi = 0; bi < plan.bands.length; bi++) {
+          band = plan.bands[bi];
+          if (plan.direction === "row") {
+            w = Math.max(w, band.cells * band.cellW);
+            h += band.repeat * band.cellH;
+          } else {
+            h = Math.max(h, band.cells * band.cellH);
+            w += band.repeat * band.cellW;
+          }
+          cuts += Math.max(0, band.cells - 1);
+          lines += band.repeat;
+        }
+        cuts += Math.max(0, lines - 1);
+        for (bi = 0; bi < plan.bands.length; bi++) {
+          band = plan.bands[bi];
+          used =
+            plan.direction === "row"
+              ? band.cells * band.cellW
+              : band.cells * band.cellH;
+          full = plan.direction === "row" ? w : h;
+          if (used < full - EPS) cuts++;
+        }
+      } else {
+        a = planExtent(plan.first);
+        b = planExtent(plan.second);
+        if (plan.kind === "splitV") {
+          w = Math.max(a.w, a.w > 0 && b.w > 0 ? plan.cut + b.w : b.w);
+          h = Math.max(a.h, b.h);
+          cuts = a.cuts + b.cuts + (a.w > 0 && b.w > 0 ? 1 : 0);
+          if (a.h > 0 && a.h < h - EPS) cuts++;
+          if (b.h > 0 && b.h < h - EPS) cuts++;
+        } else {
+          w = Math.max(a.w, b.w);
+          h = Math.max(a.h, a.h > 0 && b.h > 0 ? plan.cut + b.h : b.h);
+          cuts = a.cuts + b.cuts + (a.h > 0 && b.h > 0 ? 1 : 0);
+          if (a.w > 0 && a.w < w - EPS) cuts++;
+          if (b.w > 0 && b.w < w - EPS) cuts++;
+        }
+      }
+      plan._dcKtsDo = { w: w, h: h, cuts: cuts };
+      return plan._dcKtsDo;
+    }
+
+    // Lề dư từ mức này (ngoài 3 mm an toàn) coi là "không kịch mép"; dư hơn nữa không
+    // được tính thêm, để không xoay cả tờ chỉ vì chênh vài mm.
+    var KTS_GOM = 5 * MM;
+    // Cùng số con: không kịch mép → ít nhát dao → ít khối/dải → nhiều con không xoay.
+    function isBetter(candidate, best, regionW, regionH) {
       if (!candidate) return false;
       if (!best) return true;
       if (candidate.count !== best.count) return candidate.count > best.count;
-      if (candidate.normalCount !== best.normalCount)
-        return candidate.normalCount > best.normalCount;
-      return planComplexity(candidate) < planComplexity(best);
+      var dc = planExtent(candidate),
+        db = planExtent(best);
+      var gapC = Math.min(KTS_GOM, regionW - dc.w, regionH - dc.h);
+      var gapB = Math.min(KTS_GOM, regionW - db.w, regionH - db.h);
+      if (Math.abs(gapC - gapB) > EPS) return gapC > gapB;
+      if (dc.cuts !== db.cuts) return dc.cuts < db.cuts;
+      if (planComplexity(candidate) !== planComplexity(best))
+        return planComplexity(candidate) < planComplexity(best);
+      return candidate.normalCount > best.normalCount;
     }
 
     function bestStripPlan(regionW, regionH) {
@@ -6186,7 +6257,7 @@ function dcDanToiUu(
           regionW,
           regionH,
         );
-        if (isBetter(rowPlan, best)) best = rowPlan;
+        if (isBetter(rowPlan, best, regionW, regionH)) best = rowPlan;
       }
 
       var normalColumnMax = floorFit(regionW, sourceW);
@@ -6205,7 +6276,7 @@ function dcDanToiUu(
           regionW,
           regionH,
         );
-        if (isBetter(columnPlan, best)) best = columnPlan;
+        if (isBetter(columnPlan, best, regionW, regionH)) best = columnPlan;
       }
       return best;
     }
@@ -6265,7 +6336,7 @@ function dcDanToiUu(
           normalCount: leftPlan.normalCount + rightPlan.normalCount,
           rotatedCount: leftPlan.rotatedCount + rightPlan.rotatedCount,
         };
-        if (isBetter(verticalPlan, best)) best = verticalPlan;
+        if (isBetter(verticalPlan, best, regionW, regionH)) best = verticalPlan;
       }
 
       cuts = cutValues(regionH);
@@ -6282,7 +6353,7 @@ function dcDanToiUu(
           normalCount: topPlan.normalCount + bottomPlan.normalCount,
           rotatedCount: topPlan.rotatedCount + bottomPlan.rotatedCount,
         };
-        if (isBetter(horizontalPlan, best)) best = horizontalPlan;
+        if (isBetter(horizontalPlan, best, regionW, regionH)) best = horizontalPlan;
       }
       planMemo[memoKey] = best;
       return best;
@@ -6998,6 +7069,17 @@ function dcDanToiUu(
       "Đã tạo " +
       sheetCount +
       " artboard và canh giữa artwork; các tờ đã tự xuống hàng khi hết bề ngang.";
+    if (!mixedSizes) {
+      var doKts = planExtent(bestPlan);
+      detail +=
+        " Cụm gom giữa tờ, cách mép ngang " +
+        dcMmText(MARGIN + (usableW - doKts.w) / 2) +
+        " mm, dọc " +
+        dcMmText(MARGIN + (usableH - doKts.h) / 2) +
+        " mm; khoảng " +
+        doKts.cuts +
+        " nhát dao.";
+    }
     if (twoSided)
       detail =
         "Đã tạo " +

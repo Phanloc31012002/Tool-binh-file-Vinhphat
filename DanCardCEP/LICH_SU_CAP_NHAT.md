@@ -2,6 +2,30 @@
 
 _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
+## v2.20.3 — lỗi github
+
+- vá lỗi commit
+
+---
+
+## v2.20.2 — Dàn KTS gom giữa tờ, không kịch mép, ít nhát dao
+
+- Dàn KTS một mẫu: cùng số con thì chọn cách xếp không kịch ra mép (cụm còn dư lề ít nhất 5 mm ngoài 3 mm an toàn), rồi mới ít nhát dao, rồi ít khối/dải; bỏ ưu tiên xếp nhiều con không xoay vì nó đẩy cụm ra sát mép. Số con không đổi.
+- Card 9 × 5,6 trên 33 × 35,4 vẫn 20 con nhưng gom giữa: cột 6 bên trái, 1 hàng 2 con trên, khối xoay 4 × 3 dưới, cách mép 8–9 mm thay vì 3 mm. Nhiều cỡ khác bớt nhát dao (10 × 7: 9 thay vì 12; 6 × 4: 17 thay vì 23).
+- Kết quả ghi rõ cụm cách mép ngang/dọc bao nhiêu mm và ước lượng số nhát dao.
+- Thêm test kts_gom_giua; nâng mốc nạp nóng Dàn tối ưu lên 25 — cập nhật xong cần đóng hẳn Illustrator rồi mở lại.
+
+---
+
+## v2.20.1 — Dàn KTS gom giữa tờ, không kịch mép, ít nhát dao
+
+- Dàn KTS một mẫu: cùng số con thì chọn cách xếp không kịch ra mép (cụm còn dư lề ít nhất 5 mm ngoài 3 mm an toàn), rồi mới ít nhát dao, rồi ít khối/dải; bỏ ưu tiên xếp nhiều con không xoay vì nó đẩy cụm ra sát mép. Số con không đổi.
+- Card 9 × 5,6 trên 33 × 35,4 vẫn 20 con nhưng gom giữa: cột 6 bên trái, 1 hàng 2 con trên, khối xoay 4 × 3 dưới, cách mép 8–9 mm thay vì 3 mm. Nhiều cỡ khác bớt nhát dao (10 × 7: 9 thay vì 12; 6 × 4: 17 thay vì 23).
+- Kết quả ghi rõ cụm cách mép ngang/dọc bao nhiêu mm và ước lượng số nhát dao.
+- Thêm test kts_gom_giua; nâng mốc nạp nóng Dàn tối ưu lên 25 — cập nhật xong cần đóng hẳn Illustrator rồi mở lại.
+
+---
+
 ## v2.20.0 — Tab Dàn tag BD: ghép tag vào khối ô card cho xưởng Bình Dương
 
 - **Tab mới "Dàn tag BD"**: chọn tag đã tràn (cột trái = mặt trước, cột phải = mặt sau, hàng 1 object = tag 1 mặt), nhập số lượng rồi **Thêm vào danh sách**; làm nhiều lượt cho nhiều số lượng; bấm **Dàn tag** là tool ghép tất cả thành các **khối bội số ô card 9,2 × 5,6 cm đã tràn** (khối `a × b` ô = artboard 56a × 92b mm, tối đa 18 × 7 ô theo tờ 64,4 × 100,8).

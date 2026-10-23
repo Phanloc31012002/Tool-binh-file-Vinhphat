@@ -1,9 +1,9 @@
 {
     "product":  "com.locdev.dancard",
-    "version":  "2.20.0",
-    "title":  "Tab Dàn tag BD cho xưởng Bình Dương; Clip/CTL theo khung Transform, không raster",
-    "description":  "Tab mới \"Dàn tag BD\": chọn tag đã tràn theo hàng (trái = trước, phải = sau), nhập số lượng (500 hoặc bội 1000), tool ghép thành khối bội số ô card 9,2 × 5,6 ít ô nhất, nhát cắt thẳng cho dao công nghiệp, dấu cắt đỏ; bóp từng con ≤ 1 mm (thiếu 1–2 mm nữa thì cả cụm ăn thêm) để vừa khối; con đầu danh sách ở góc trên trái, dồn khít; danh sách không có tag 1000 thì tự chọn nhân con hay ghi thêm hộp (2000 = 1 con, 20 hộp); khối toàn tag 1 mặt xuất PDF 1 trang, tên có \"1 mat\"; artboard đóng từ góc trên trái canvas như Dàn tối ưu; Xuất PDF từng khối tên như Auto Save. Nút Clip ở header = clip theo khung Transform (không hỏi kích thước); Auto Save đo PDF theo Transform; CTL Offset/Keo gáy/Catalogue không raster trước khi dàn, trang nguyên vector, đo và phóng theo khung Transform; tick Transform mặc định bật; Đo khung hiện bảng chi tiết, tìm được mask bọc trong group con. Sửa nét phình ×100 khi bóp/lật khuôn/phóng trang. Cập nhật xong cần đóng hẳn Illustrator rồi mở lại.",
-    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.20.0.zip",
-    "sha256":  "6AAB4843802931DA2CB6623374D3C77FE019C1D862AC307F33865039115E7F9D",
-    "publishedUtc":  "2026-10-23T04:33:04.0294350Z"
+    "version":  "2.20.3",
+    "title":  "lỗi github",
+    "description":  "vá lỗi commit",
+    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.20.3.zip",
+    "sha256":  "D93A638EB18B109DE6E80AC886D5AB31636EA6E3C6CC4CC20F31F09CCBCBCBD6",
+    "publishedUtc":  "2026-10-23T10:55:11.1848774Z"
 }
