@@ -26,7 +26,7 @@ function parseOk(text) {
 // ---------- dcDanTagBdDocTag ----------
 {
   const { mock, c } = load();
-  assert.equal(c.dcDanTagBdVersion, 5);
+  assert.equal(c.dcDanTagBdVersion, 6);
   // Hàng 1: trước 112 × 72 (trái) + sau (phải). Hàng 2: tag 1 mặt 56 × 91. Hàng 3: trước + sau 92 × 40, mặt sau lệch 0,3 mm.
   const f1 = box(mock, 0, 300, 112, 72, "f1");
   const b1 = box(mock, 150, 300, 112, 72, "b1");
@@ -449,6 +449,51 @@ const OPTS = { prefix: "1088", start: "1", pad: "2", canMang: "cm", ngay: "22", 
   assert.match(c.dcDanTagBdVe(JSON.stringify(bad)), /^ERR: .*hộp/);
   assert.equal(mock.doc.artboards.length, n);
   console.log("dcDanTagBdVe/XuatPdf (số hộp theo lõi): ok");
+}
+// Khối toàn tag 1 mặt: chỉ đóng artboard trước (không có artboard "sau" trống), Xuất PDF ra file 1 trang,
+// tên thêm " - 1 mat" sau ghi chú như Auto Save. Khối trộn (có tag 2 mặt) vẫn 2 trang. 4 artboard của 2 khối
+// 2 mặt → 2 file; 1 khối 2 mặt + 1 khối 1 mặt → 2 file (một 2 trang, một 1 trang).
+{
+  const { mock, c } = load({ rect: [0, 100, 400, 0] });
+  registerSources(mock, c);
+  // Khối 1: tag_1 (2 mặt) + tag_2 (1 mặt) → 2 mặt. Khối 2 đổi thành tag_2 (1 mặt) duy nhất → 1 mặt.
+  const p = plan();
+  p.jobs[0].blocks[1].places = [{ id: "tag_2", copy: 1, x: 0, y: 0, w: 56, h: 20, rot: 0 }];
+  p.jobs[0].blocks[1].cuts = [{ axis: "H", at: 20, from: 0, to: 56 }];
+  const res = c.dcDanTagBdVe(JSON.stringify(p));
+  assert.match(res, /^OK: /, res);
+  assert.match(res, /3 artboard/, res);
+  assert.match(res, /1 mặt/, res);
+  const names = mock.doc.artboards.slice(1).map((b) => b.name);
+  assert.deepEqual(names, [
+    "TagBD 1 - bai 1000 - 10 hop - 110 x 90 - truoc",
+    "TagBD 1 - bai 1000 - 10 hop - 110 x 90 - sau",
+    "TagBD 2 - bai 1000 - 10 hop - 54 x 90 - 1 mat",
+  ]);
+  // Layer mặt sau chỉ có ở khối 1.
+  assert.deepEqual(mock.doc.layers.filter((l) => /^Tag BD /.test(l.name)).map((l) => l.name), ["Tag BD 1 - trước", "Tag BD 1 - sau", "Tag BD 2 - trước"]);
+  // Khối 1 mặt vẫn chiếm chỗ đúng một artboard, cặp sau nối tiếp bên phải nó (không chừa chỗ mặt sau).
+  const f2 = mock.doc.artboards[3].artboardRect;
+  const res2 = c.dcDanTagBdVe(JSON.stringify(p));
+  assert.match(res2, /^OK: /, res2);
+  near(mock.doc.artboards[4].artboardRect[0], f2[2] + 10 * MM, "khối 3 nối tiếp ngay sau artboard 1 mặt");
+  assert.equal(c.dcDanTagBdDemArtboard(), "OK:4");
+  const io = withPdfMocks(mock, c);
+  const out = c.dcDanTagBdXuatPdf(JSON.stringify(Object.assign({}, OPTS, { note: "Lan 2" })));
+  assert.match(out, /^OK: Đã lưu 4\/4 file PDF/, out);
+  assert.deepEqual(
+    io.saves.map((s) => s.path),
+    [
+      "D:/PDF/1088 - 01 - 10 hop 110 x 90 - Lan 2 - cm - 22.pdf",
+      "D:/PDF/1088 - 02 - 10 hop 54 x 90 - Lan 2 - 1 mat - cm - 22.pdf",
+      "D:/PDF/1088 - 03 - 10 hop 110 x 90 - Lan 2 - cm - 22.pdf",
+      "D:/PDF/1088 - 04 - 10 hop 54 x 90 - Lan 2 - 1 mat - cm - 22.pdf",
+    ],
+  );
+  assert.equal(io.saves[0].pages.length, 2);
+  assert.equal(io.saves[1].pages.length, 1, "khối 1 mặt → 1 trang");
+  assert.match(out, /1 trang/);
+  console.log("dcDanTagBdVe/XuatPdf (khối 1 mặt): ok");
 }
 
 // ---------- Sửa theo soát mã: mặt sau phải cùng khổ mặt trước; khổ nguồn đổi sau khi Thêm thì báo ----------

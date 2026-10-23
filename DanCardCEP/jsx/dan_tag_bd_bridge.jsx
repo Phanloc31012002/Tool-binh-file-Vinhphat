@@ -6,7 +6,7 @@
 // 2 trang. Phần ghép khối chạy ở Chromium của CEP (dan_tag_bd.js).
 // Luật chốt với anh Lộc 22/10/2026: docs/THIET_KE_DAN_TAG_BD.md
 // ============================================================
-var dcDanTagBdVersion = 5;
+var dcDanTagBdVersion = 6;
 if (typeof dcDanTagBdNguon === "undefined") var dcDanTagBdNguon = {};
 if (typeof dcDanTagBdNguonDem === "undefined") var dcDanTagBdNguonDem = 1;
 
@@ -338,12 +338,13 @@ function dcDanTagBdSoKho(mm) {
 }
 // Số hộp ghi vào tên artboard để lúc Xuất PDF lấy lại (bài 1000 = 10 hộp; danh sách không có tag 1000 mà lõi
 // chọn "không nhân con" thì 2000 = 1 con ghi 20 hộp…).
+// mat: "truoc"/"sau" (khối 2 mặt) hoặc "1 mat" (khối toàn tag 1 mặt: chỉ một artboard, PDF 1 trang).
 function dcDanTagBdTenArtboard(k, bai, hop, w, h, mat) {
   return "TagBD " + k + " - bai " + bai + " - " + hop + " hop - " + dcDanTagBdSoKho(w) + " x " + dcDanTagBdSoKho(h) + " - " + mat;
 }
 // Đọc tên artboard TagBD -> {k, bai, hop, mat} hoặc null. Tên cũ (chưa ghi hộp) → hộp theo bài.
 function dcDanTagBdDocTen(name) {
-  var m = /^TagBD (\d+) - bai (\d+)(?: - (\d+) hop)? - ([\d.]+) x ([\d.]+) - (truoc|sau)$/.exec(String(name || ""));
+  var m = /^TagBD (\d+) - bai (\d+)(?: - (\d+) hop)? - ([\d.]+) x ([\d.]+) - (truoc|sau|1 mat)$/.exec(String(name || ""));
   if (!m) return null;
   var bai = parseInt(m[2], 10);
   return { k: parseInt(m[1], 10), bai: bai, hop: m[3] ? parseInt(m[3], 10) : bai === 500 ? 5 : 10, w: m[4], h: m[5], mat: m[6] };
@@ -356,7 +357,7 @@ function dcDanTagBdDemArtboard() {
       n = 0;
     for (var i = 0; i < doc.artboards.length; i++) {
       var t = dcDanTagBdDocTen(doc.artboards[i].name);
-      if (t && t.mat === "truoc") n++;
+      if (t && (t.mat === "truoc" || t.mat === "1 mat")) n++;
     }
     return "OK:" + n;
   } catch (e) {
@@ -410,7 +411,8 @@ function dcDanTagBdVungBan(doc, canvasHalf) {
 // Cấp chỗ cho các khối y như Dàn tối ưu/KTS: bắt đầu từ góc trên trái canvas, đặt từng cặp trước/sau
 // (cạnh nhau, cách GAP) sang phải; vượt mép phải canvas thì tự xuống hàng và đi tiếp từ mép trái; chỗ
 // đã có artboard/bài cũ thì nhảy qua bên phải nó. Hết canvas theo chiều dọc mới báo lỗi.
-// sizes: [{w, h}] mm. Trả mảng rect mặt trước [l, t, r, b] (pt); mặt sau = dịch phải w + GAP.
+// sizes: [{w, h, haiMat}] mm. Trả mảng rect mặt trước [l, t, r, b] (pt); mặt sau (khối 2 mặt) = dịch phải
+// w + GAP; khối 1 mặt chỉ chiếm chỗ một artboard.
 function dcDanTagBdViTri(doc, sizes, MM) {
   var EPS = 0.01,
     gap = DC_TAGBD_GAP_MM * MM,
@@ -435,7 +437,7 @@ function dcDanTagBdViTri(doc, sizes, MM) {
   for (i = 0; i < sizes.length; i++) {
     var w = sizes[i].w * MM,
       h = sizes[i].h * MM,
-      pairW = w * 2 + gap,
+      pairW = sizes[i].haiMat === false ? w : w * 2 + gap,
       attempts = 0,
       placed = false;
     if (pairW > right - left + EPS) throw new Error("Khối " + (i + 1) + " rộng quá canvas (cặp trước/sau " + Math.round(pairW / MM) + " mm). Hãy mở Large Canvas.");
@@ -569,8 +571,14 @@ function dcDanTagBdVe(planText) {
       var ten = dcDanTagBdDocTen(doc.artboards[ai].name);
       if (ten && ten.k > k0) k0 = ten.k;
     }
+    // Khối toàn tag 1 mặt: không đóng artboard "sau" trống, chỉ chiếm chỗ một artboard, PDF 1 trang.
     var sizes = [];
-    for (bi = 0; bi < blocks.length; bi++) sizes.push({ w: blocks[bi].blk.w, h: blocks[bi].blk.h });
+    for (bi = 0; bi < blocks.length; bi++) {
+      var haiMat = false;
+      for (pi = 0; pi < blocks[bi].blk.places.length; pi++) if (dcDanTagBdNguon[blocks[bi].blk.places[pi].id].back) haiMat = true;
+      blocks[bi].haiMat = haiMat;
+      sizes.push({ w: blocks[bi].blk.w, h: blocks[bi].blk.h, haiMat: haiMat });
+    }
     var positions = dcDanTagBdViTri(doc, sizes, MM);
 
     try {
@@ -681,7 +689,8 @@ function dcDanTagBdVe(planText) {
 
     var firstNewIndex = doc.artboards.length,
       made = [],
-      totalPieces = 0;
+      totalPieces = 0,
+      soArtboard = 0;
     for (bi = 0; bi < blocks.length; bi++) {
       blk = blocks[bi].blk;
       job = blocks[bi].job;
@@ -691,8 +700,9 @@ function dcDanTagBdVe(planText) {
       var backRect = [rect[2] + DC_TAGBD_GAP_MM * MM, rect[1], rect[2] + DC_TAGBD_GAP_MM * MM + W * MM, rect[3]];
       var frontBoard = doc.artboards.add(rect);
       createdArtboards.push(frontBoard);
+      soArtboard++;
       try {
-        frontBoard.name = dcDanTagBdTenArtboard(k, job.bai, job.hop, blk.w, blk.h, "truoc");
+        frontBoard.name = dcDanTagBdTenArtboard(k, job.bai, job.hop, blk.w, blk.h, blocks[bi].haiMat ? "truoc" : "1 mat");
       } catch (nameError) {}
       var frontLayer = addLayer("Tag BD " + k + " - trước");
       for (pi = 0; pi < blk.places.length; pi++) {
@@ -701,6 +711,11 @@ function dcDanTagBdVe(planText) {
         totalPieces++;
       }
       drawCutMarks(frontLayer, rect, W, blk.cuts, false);
+      if (!blocks[bi].haiMat) {
+        made.push(k + " (bài " + job.bai + ", " + job.hop + " hộp, " + blk.cols + " × " + blk.rows + " ô, " + blk.places.length + " con, 1 mặt)");
+        continue;
+      }
+      soArtboard++;
       var backBoard = doc.artboards.add(backRect);
       createdArtboards.push(backBoard);
       try {
@@ -730,8 +745,10 @@ function dcDanTagBdVe(planText) {
       "OK: Đã đóng " +
       blocks.length +
       " khối (" +
-      blocks.length * 2 +
-      " artboard trước/sau), " +
+      soArtboard +
+      " artboard" +
+      (soArtboard === blocks.length * 2 ? " trước/sau" : soArtboard === blocks.length ? ", toàn khối 1 mặt" : ", khối 1 mặt chỉ một artboard") +
+      "), " +
       totalPieces +
       " con: khối " +
       made.join("; ") +
@@ -777,8 +794,9 @@ function dcDanTagBdTimCap(doc) {
     t = dcDanTagBdDocTen(doc.artboards[i].name);
     if (!t) continue;
     var entry = { index: i, rect: doc.artboards[i].artboardRect.slice(0), bai: t.bai, hop: t.hop, k: t.k };
-    if (t.mat === "truoc") fronts[t.k] = entry;
-    else backs[t.k] = entry;
+    entry.motMat = t.mat === "1 mat";
+    if (t.mat === "sau") backs[t.k] = entry;
+    else fronts[t.k] = entry;
   }
   var ks = [],
     k;
@@ -788,8 +806,8 @@ function dcDanTagBdTimCap(doc) {
   });
   for (i = 0; i < ks.length; i++) {
     k = ks[i];
-    if (!backs[k]) throw new Error("Khối TagBD " + k + " thiếu artboard mặt sau. Hãy dàn lại khối này.");
-    pairs.push({ k: k, bai: fronts[k].bai, hop: fronts[k].hop, front: fronts[k].rect, back: backs[k].rect });
+    if (!fronts[k].motMat && !backs[k]) throw new Error("Khối TagBD " + k + " thiếu artboard mặt sau. Hãy dàn lại khối này.");
+    pairs.push({ k: k, bai: fronts[k].bai, hop: fronts[k].hop, motMat: fronts[k].motMat, front: fronts[k].rect, back: fronts[k].motMat ? null : backs[k].rect });
   }
   return pairs;
 }
@@ -881,6 +899,7 @@ function dcDanTagBdXuatPdf(optionsText) {
           " x " +
           dcDanTagBdSoKho(hMm) +
           notePart +
+          (pr.motMat ? " - 1 mat" : "") +
           " - " +
           canMang +
           " - " +
@@ -982,18 +1001,24 @@ function dcDanTagBdXuatPdf(optionsText) {
       var tmp = null,
         completed = false,
         frontItems = itemsFor(job.pair.front),
-        backItems = itemsFor(job.pair.back);
+        backItems = job.pair.back ? itemsFor(job.pair.back) : [];
       if (!frontItems.length) throw new Error("Artboard mặt trước của khối " + job.pair.k + " trống.");
       try {
         tmp = app.documents.add(DocumentColorSpace.CMYK);
         var lay = tmp.layers[0];
         var frontTmp = copyFace(frontItems, tmp, lay, job.pair.front, null);
-        // Trang 2 nằm bên phải trang 1, cách 20 mm, cùng mép trên (như Auto Save).
-        var wantBack = [frontTmp[2] + 20 * MM - job.pair.back[0], frontTmp[1] - job.pair.back[1]];
-        var backTmp = copyFace(backItems, tmp, lay, job.pair.back, wantBack);
-        app.activeDocument = tmp;
-        tmp.artboards[0].artboardRect = frontTmp;
-        tmp.artboards.add(backTmp);
+        if (job.pair.back) {
+          // Trang 2 nằm bên phải trang 1, cách 20 mm, cùng mép trên (như Auto Save).
+          var wantBack = [frontTmp[2] + 20 * MM - job.pair.back[0], frontTmp[1] - job.pair.back[1]];
+          var backTmp = copyFace(backItems, tmp, lay, job.pair.back, wantBack);
+          app.activeDocument = tmp;
+          tmp.artboards[0].artboardRect = frontTmp;
+          tmp.artboards.add(backTmp);
+        } else {
+          // Khối 1 mặt: PDF 1 trang.
+          app.activeDocument = tmp;
+          tmp.artboards[0].artboardRect = frontTmp;
+        }
         tmp.saveAs(new File(job.path), makePdfOptions());
         completed = true;
       } finally {
@@ -1022,7 +1047,10 @@ function dcDanTagBdXuatPdf(optionsText) {
     try {
       app.activeDocument = doc;
     } catch (backError) {}
-    if (!errs.length) return "OK: Đã lưu " + done + "/" + jobs.length + " file PDF (mỗi khối 2 trang trước/sau).\nThư mục: " + folder.fsName;
+    var soMotMat = 0;
+    for (i = 0; i < jobs.length; i++) if (jobs[i].pair.motMat) soMotMat++;
+    var moTaTrang = soMotMat === 0 ? "mỗi khối 2 trang trước/sau" : soMotMat === jobs.length ? "khối 1 mặt, mỗi file 1 trang" : jobs.length - soMotMat + " file 2 trang trước/sau, " + soMotMat + " file 1 mặt 1 trang";
+    if (!errs.length) return "OK: Đã lưu " + done + "/" + jobs.length + " file PDF (" + moTaTrang + ").\nThư mục: " + folder.fsName;
     return (done > 0 ? "OK: " : "ERR: ") + "Lưu được " + done + "/" + jobs.length + " file.\nLỗi:\n- " + errs.join("\n- ") + "\nThư mục: " + folder.fsName;
   } catch (e) {
     try {
