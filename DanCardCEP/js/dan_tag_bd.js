@@ -16,7 +16,7 @@
 })(typeof window !== "undefined" ? window : this, function () {
   "use strict";
 
-  var VERSION = 4;
+  var VERSION = 5;
   // Bóp để vừa khối khi cụm chỉ dư chút ít so với n ô:
   //  - mức 1: mỗi con bớt tối đa 1 mm theo chiều đang thiếu (cột thiếu 6 mm có 6 con → mỗi con 1 mm);
   //    chỗ trống trong khối hút trước, con chỉ bớt phần còn lại;
@@ -29,6 +29,9 @@
   var MAX_ROWS = 7; // tờ 64,4 cm = 7 × 92
   var EPS = 0.01;
   var DEFAULT_BUDGET = 40000;
+  var DEFAULT_BUDGET_MS = 6000; // thời gian tìm mặc định của một lượt Dàn tag
+  var BOP_MUC2_TOI_DA_CON = 12;
+  var BOP_NGAN_SACH = 300000; // số nút tìm cho một khổ khối ở pha bóp (khoảng 0,3 s): chỉ thử khổ ít ô hơn thật // bóp mức 2 (nới khối rồi co cả cụm) chậm: chỉ thử khi khối ít con
 
   function r2(n) {
     return Math.round(n * 100) / 100;
@@ -73,7 +76,60 @@
     return types;
   }
 
+  // Xếp theo KHỔ, không theo tag: các tag khác nhau mà cùng khổ (8 tag 92 × 52 của 8 khách) là một loại
+  // trong bộ tìm, nên DFS không thử lại cùng một bố cục chỉ vì đổi chỗ hai tag cùng khổ (ca thật 29/10:
+  // 20 tag, 7 khổ — tìm theo tag hết 4 s còn 32 ô, theo khổ ra 28 ô ngay). Xếp xong mới gán tag thật vào
+  // chỗ theo thứ tự đọc (trên → dưới, trái → phải) và thứ tự trong danh sách; góc xoay tính lại theo tag.
   function packInto(pieces, W, H, options) {
+    groupTypes(pieces); // kiểm "cùng id nhưng khác khổ"
+    var classes = [],
+      byKey = {},
+      lop = [],
+      i,
+      k,
+      c,
+      p;
+    for (i = 0; i < pieces.length; i++) {
+      p = pieces[i];
+      var key = r2(Math.min(p.w, p.h)) + "x" + r2(Math.max(p.w, p.h));
+      c = byKey[key];
+      if (!c) {
+        c = { id: "#" + classes.length, w: p.w, h: p.h, list: [] };
+        byKey[key] = c;
+        classes.push(c);
+      }
+      c.list.push(p);
+      lop.push({ id: c.id, w: c.w, h: c.h });
+    }
+    var raw = packCore(lop, W, H, options);
+    if (!raw.ok) return raw;
+    function ganTag(layout) {
+      var places = layout.places.slice(0).sort(function (a, b) {
+          return Math.abs(a.y - b.y) > EPS ? a.y - b.y : a.x - b.x;
+        }),
+        next = {},
+        out = [],
+        m;
+      for (m = 0; m < places.length; m++) {
+        var q = places[m],
+          ci = Number(q.id.substring(1)),
+          n = next[ci] || 0,
+          src = classes[ci].list[n];
+        next[ci] = n + 1;
+        var rot = Math.abs(q.w - src.w) <= EPS && Math.abs(q.h - src.h) <= EPS ? 0 : 90;
+        out.push({ id: src.id, x: q.x, y: q.y, w: q.w, h: q.h, rot: rot });
+      }
+      return { places: out, cuts: layout.cuts };
+    }
+    var layouts = [];
+    for (k = 0; k < raw.layouts.length; k++) layouts.push(ganTag(raw.layouts[k]));
+    raw.layouts = layouts;
+    raw.places = layouts[0].places;
+    raw.cuts = layouts[0].cuts;
+    return raw;
+  }
+
+  function packCore(pieces, W, H, options) {
     options = options || {};
     var budget = options.budget || DEFAULT_BUDGET;
     var collect = options.collect || 1;
@@ -97,6 +153,40 @@
       if (!fitsAny) return result;
     }
 
+    // Cận trên phần phủ được của một hình trống: mọi đường thẳng ngang cắt qua hình chỉ đi qua các con
+    // có tổng cạnh ≤ bề ngang hình, nên phủ tối đa theo ngang = tổng cạnh lớn nhất ≤ bề ngang (cạnh lấy
+    // từ mọi loại, mọi hướng, dùng lặp — chỉ để chặn, không cần đúng số con). Đơn vị 0,01 mm. Hình 224 mm
+    // mà con rộng 91 mm thì chỉ phủ được 182 → hao 42 mm cả chiều cao, cắt nhánh sớm thay vì tìm mù.
+    var LIM = Math.round(Math.max(W, H) * 100) + 1,
+      reach = new Uint8Array(LIM),
+      phu = new Int32Array(LIM),
+      dims = [],
+      seenDim = {},
+      s,
+      d;
+    for (i = 0; i < types.length; i++)
+      for (j = 0; j < types[i].orients.length; j++) {
+        d = Math.round(types[i].orients[j].w * 100);
+        if (d > 0 && !seenDim[d]) {
+          seenDim[d] = true;
+          dims.push(d);
+        }
+      }
+    reach[0] = 1;
+    for (s = 0; s < LIM; s++) {
+      if (!reach[s]) continue;
+      for (j = 0; j < dims.length; j++) if (s + dims[j] < LIM) reach[s + dims[j]] = 1;
+    }
+    for (s = 0, d = 0; s < LIM; s++) {
+      if (reach[s]) d = s;
+      phu[s] = d;
+    }
+    function phuToiDa(len) {
+      var idx = Math.round(len * 100);
+      if (idx >= LIM) idx = LIM - 1;
+      return idx < 0 ? 0 : phu[idx] / 100;
+    }
+
     var failed = {};
     var nodes = 0;
     var places = [],
@@ -104,8 +194,10 @@
     var found = [];
     var lastType = -1;
 
+    // Các hình trống độc lập nhau (guillotine) và con xoay được, nên xếp được hay không chỉ phụ thuộc
+    // khổ hình (không phụ thuộc chỗ, cũng như w × h hay h × w): khoá nhớ theo khổ để gộp trạng thái.
     function rectKey(r) {
-      return r2(r.x) + "," + r2(r.y) + "," + r2(r.w) + "," + r2(r.h);
+      return r.w <= r.h ? r2(r.w) + "x" + r2(r.h) : r2(r.h) + "x" + r2(r.w);
     }
     function stateKey(free) {
       var keys = [],
@@ -114,16 +206,20 @@
       keys.sort();
       return keys.join(";") + "|" + remaining.join(",");
     }
+    // Lấp hình trống NHỎ NHẤT trước (ít cách đặt nhất, sai thì lộ sớm — "fail-first"). Các hình độc lập
+    // nhau nên thứ tự lấp không làm mất bố cục nào; trước đây lấp theo trên-trái nên trộn lẫn các vùng,
+    // một bố cục được dựng lại theo rất nhiều thứ tự và tìm mãi không hết (ca 20 tag ngày 29/10).
     function pickFree(free) {
       var best = -1,
-        k;
+        k,
+        a,
+        ba = 0;
       for (k = 0; k < free.length; k++) {
-        if (
-          best < 0 ||
-          free[k].y < free[best].y - EPS ||
-          (Math.abs(free[k].y - free[best].y) <= EPS && free[k].x < free[best].x - EPS)
-        )
+        a = free[k].w * free[k].h;
+        if (best < 0 || a < ba - EPS) {
           best = k;
+          ba = a;
+        }
       }
       return best;
     }
@@ -151,6 +247,15 @@
         if (!fits) return false;
       }
       return true;
+    }
+    function someTypeFits(r) {
+      var k, o, t;
+      for (k = 0; k < types.length; k++) {
+        if (!remaining[k]) continue;
+        t = types[k];
+        for (o = 0; o < t.orients.length; o++) if (t.orients[o].w <= r.w + EPS && t.orients[o].h <= r.h + EPS) return true;
+      }
+      return false;
     }
     function remainingCount() {
       var s = 0,
@@ -196,8 +301,25 @@
         found.push(snapshot());
         return found.length >= collect;
       }
+      // Hình trống không con nào còn lại lọt là phần hao: bỏ khỏi danh sách (khoá nhớ gọn hơn), rồi chặn
+      // theo phần phủ tối đa của các hình còn dùng được.
+      var kept = [],
+        usable = 0,
+        fk,
+        fr,
+        u;
+      for (fk = 0; fk < free.length; fk++) {
+        fr = free[fk];
+        if (!someTypeFits(fr)) continue;
+        // Bố cục guillotine dồn về góc thì bề ngang/chiều cao đã dùng là tổng các cạnh con → ≤ phủ tối đa.
+        u = phuToiDa(fr.w) * phuToiDa(fr.h);
+        if (u <= EPS) continue;
+        kept.push(fr);
+        usable += u;
+      }
+      free = kept;
       if (!free.length) return false;
-      if (remainingArea() > freeArea(free) + EPS) return false;
+      if (remainingArea() > usable + EPS) return false;
       if (!everyTypeFits(free)) return false;
       var key = stateKey(free);
       if (failed[key]) return false;
@@ -205,7 +327,10 @@
       var fi = pickFree(free);
       var r = free[fi];
       var rest = free.slice(0, fi).concat(free.slice(fi + 1));
+      // Các cách đặt con vào góc hình trống: loại (cùng loại con vừa đặt trước, rồi con lớn trước) ×
+      // hướng × cách chia phần còn lại.
       var order = typeOrder(),
+        choices = [],
         oi,
         k,
         t,
@@ -213,7 +338,9 @@
         split,
         prevLast,
         ow,
-        oh;
+        oh,
+        ci,
+        ch;
       for (oi = 0; oi < order.length; oi++) {
         k = order[oi];
         t = types[k];
@@ -221,46 +348,54 @@
           ow = t.orients[o].w;
           oh = t.orients[o].h;
           if (ow > r.w + EPS || oh > r.h + EPS) continue;
-          for (split = 0; split < 2; split++) {
-            var next = rest.slice(0),
-              addedCuts = 0;
-            var rightW = r.w - ow,
-              bottomH = r.h - oh;
-            if (split === 0) {
-              // Nhát ngang trước: dải dưới chạy suốt bề ngang hình trống.
-              if (bottomH > EPS) {
-                cuts.push({ axis: "H", at: r.y + oh, from: r.x, to: r.x + r.w });
-                addedCuts++;
-                next.push({ x: r.x, y: r.y + oh, w: r.w, h: bottomH });
-              }
-              if (rightW > EPS) {
-                cuts.push({ axis: "V", at: r.x + ow, from: r.y, to: r.y + oh });
-                addedCuts++;
-                next.push({ x: r.x + ow, y: r.y, w: rightW, h: oh });
-              }
-            } else {
-              // Nhát dọc trước: cột phải chạy suốt chiều cao hình trống.
-              if (rightW <= EPS && bottomH <= EPS) continue; // trùng cách 0
-              if (rightW <= EPS || bottomH <= EPS) continue; // chỉ một nhát: cách 0 đã thử
-              cuts.push({ axis: "V", at: r.x + ow, from: r.y, to: r.y + r.h });
-              addedCuts++;
-              next.push({ x: r.x + ow, y: r.y, w: rightW, h: r.h });
-              cuts.push({ axis: "H", at: r.y + oh, from: r.x, to: r.x + ow });
-              addedCuts++;
-              next.push({ x: r.x, y: r.y + oh, w: ow, h: bottomH });
-            }
-            places.push({ id: t.id, x: r.x, y: r.y, w: ow, h: oh, rot: t.orients[o].rot });
-            remaining[k]--;
-            prevLast = lastType;
-            lastType = k;
-            var stop = search(next);
-            lastType = prevLast;
-            remaining[k]++;
-            places.pop();
-            while (addedCuts-- > 0) cuts.pop();
-            if (stop) return true;
-          }
+          var rw = r.w - ow,
+            bh = r.h - oh;
+          choices.push({ k: k, o: o, split: 0, ow: ow, oh: oh });
+          if (rw > EPS && bh > EPS) choices.push({ k: k, o: o, split: 1, ow: ow, oh: oh });
         }
+      }
+      for (ci = 0; ci < choices.length; ci++) {
+        ch = choices[ci];
+        k = ch.k;
+        t = types[k];
+        ow = ch.ow;
+        oh = ch.oh;
+        split = ch.split;
+        var next = rest.slice(0),
+          addedCuts = 0;
+        var rightW = r.w - ow,
+          bottomH = r.h - oh;
+        if (split === 0) {
+          // Nhát ngang trước: dải dưới chạy suốt bề ngang hình trống.
+          if (bottomH > EPS) {
+            cuts.push({ axis: "H", at: r.y + oh, from: r.x, to: r.x + r.w });
+            addedCuts++;
+            next.push({ x: r.x, y: r.y + oh, w: r.w, h: bottomH });
+          }
+          if (rightW > EPS) {
+            cuts.push({ axis: "V", at: r.x + ow, from: r.y, to: r.y + oh });
+            addedCuts++;
+            next.push({ x: r.x + ow, y: r.y, w: rightW, h: oh });
+          }
+        } else {
+          // Nhát dọc trước: cột phải chạy suốt chiều cao hình trống.
+          cuts.push({ axis: "V", at: r.x + ow, from: r.y, to: r.y + r.h });
+          addedCuts++;
+          next.push({ x: r.x + ow, y: r.y, w: rightW, h: r.h });
+          cuts.push({ axis: "H", at: r.y + oh, from: r.x, to: r.x + ow });
+          addedCuts++;
+          next.push({ x: r.x, y: r.y + oh, w: ow, h: bottomH });
+        }
+        places.push({ id: t.id, x: r.x, y: r.y, w: ow, h: oh, rot: t.orients[ch.o].rot });
+        remaining[k]--;
+        prevLast = lastType;
+        lastType = k;
+        var stop = search(next);
+        lastType = prevLast;
+        remaining[k]++;
+        places.pop();
+        while (addedCuts-- > 0) cuts.pop();
+        if (stop) return true;
       }
       // Bỏ trống hình này.
       if (search(rest)) return true;
@@ -495,7 +630,10 @@
   //  ngược lại — đúng như bóp tay trong Illustrator.
   // ------------------------------------------------------------------
   function treeFromLayout(places, cuts, W, H) {
+    var EPS2 = 0.05, // khổ/chỗ làm tròn 0,01 nên lệch vài phần trăm mm vẫn là khít
+      sau = 0;
     function build(x, y, w, h) {
+      if (++sau > 4000) return null; // chặn đệ quy vô tận khi số lệch do làm tròn
       var inside = [],
         i,
         p,
@@ -522,15 +660,17 @@
       }
       if (inside.length === 1) {
         p = inside[0];
-        if (Math.abs(p.w - w) <= EPS && Math.abs(p.h - h) <= EPS) return { kind: "piece", p: p, w: p.w, h: p.h };
+        if (Math.abs(p.w - w) <= EPS2 && Math.abs(p.h - h) <= EPS2) return { kind: "piece", p: p, w: p.w, h: p.h };
         // Con ở góc trên trái, phần còn lại trống (nhát bị bỏ vì hai bên đều trống).
-        if (Math.abs(p.x - x) <= EPS && Math.abs(p.y - y) <= EPS) {
-          if (p.w < w - EPS) {
+        if (Math.abs(p.x - x) <= EPS2 && Math.abs(p.y - y) <= EPS2) {
+          if (p.w < w - EPS2) {
             a = build(x, y, p.w, h);
             return a ? { kind: "V", a: a, b: { kind: "empty", w: w - p.w, h: h }, w: w, h: h } : null;
           }
-          a = build(x, y, w, p.h);
-          return a ? { kind: "H", a: a, b: { kind: "empty", w: w, h: h - p.h }, w: w, h: h } : null;
+          if (p.h < h - EPS2) {
+            a = build(x, y, w, p.h);
+            return a ? { kind: "H", a: a, b: { kind: "empty", w: w, h: h - p.h }, w: w, h: h } : null;
+          }
         }
       }
       return null;
@@ -849,6 +989,119 @@
     return null;
   }
 
+
+  // ------------------------------------------------------------------
+  //  BÓP MỨC 1 NHANH (29/10): xếp mọi con ở khổ đã bóp sẵn (mỗi chiều bớt 1 mm) bằng đúng bộ xếp
+  //  guillotine, rồi "nở" từng con về khổ thật theo cây cắt: chỗ trống hút trước, chỗ nào còn dư
+  //  thì con lấy lại đủ khổ, chỉ dãy nào thật sự thiếu mới bóp (chia theo sức co, mỗi con ≤ 1 mm).
+  //  Một lần xếp thay cho hàng chục lần nới khối của bopKhoi, nên chạy được với 20 tag khác nhau
+  //  (ca 29/10: 20 tag → 28 ô như bình tay, thay vì 32 ô vì hết giờ trước khi kịp bóp).
+  // ------------------------------------------------------------------
+  function khoBop(v) {
+    return r2(Math.max(v - BOP_MOI_CON_MM, v * 0.9));
+  }
+  function piecesBop(pieces) {
+    var out = [];
+    for (var i = 0; i < pieces.length; i++) out.push({ id: pieces[i].id, w: khoBop(pieces[i].w), h: khoBop(pieces[i].h) });
+    return out;
+  }
+  // layout: bố cục xếp bằng khổ đã bóp trong khối W × H; goc[id] = { w, h } khổ thật.
+  // Trả { places, cuts, bop } (places có bopX/bopY) hoặc null.
+  function noRaKhoThat(layout, W, H, goc) {
+    var tree = treeFromLayout(layout.places, layout.cuts, W, H);
+    if (!tree) return null;
+    function tram(v) {
+      return Math.round(v * 100);
+    }
+    function nom(p, truc) {
+      var g = goc[p.id],
+        gw = p.rot ? g.h : g.w,
+        gh = p.rot ? g.w : g.h;
+      return tram(truc === "x" ? gw : gh);
+    }
+    // Cần (d) và nhỏ nhất (m) theo trục, đơn vị 0,01 mm. Dãy nối tiếp theo trục thì cộng, song song thì lấy max.
+    function can(n, truc) {
+      var key = "_c" + truc;
+      if (n[key]) return n[key];
+      var r;
+      if (n.kind === "empty") r = { d: 0, m: 0 };
+      else if (n.kind === "piece") r = { d: nom(n.p, truc), m: tram(truc === "x" ? n.p.w : n.p.h) };
+      else {
+        var a = can(n.a, truc),
+          b = can(n.b, truc),
+          noiTiep = (n.kind === "V") === (truc === "x");
+        r = noiTiep ? { d: a.d + b.d, m: a.m + b.m } : { d: Math.max(a.d, b.d), m: Math.max(a.m, b.m) };
+      }
+      n[key] = r;
+      return r;
+    }
+    function trong(Ax, Ay) {
+      return { kind: "empty", w: Ax / 100, h: Ay / 100 };
+    }
+    // Dựng lại nhánh vừa khít vùng Ax × Ay (0,01 mm).
+    function dung(n, Ax, Ay) {
+      if (n.kind === "empty") return trong(Ax, Ay);
+      if (n.kind === "piece") {
+        var nx = nom(n.p, "x"),
+          ny = nom(n.p, "y"),
+          px = Math.min(Ax, nx),
+          py = Math.min(Ay, ny);
+        if (px < tram(n.p.w) || py < tram(n.p.h)) return null; // không thể: vùng nhỏ hơn khổ đã bóp
+        var q = {
+          kind: "piece",
+          p: { id: n.p.id, rot: n.p.rot, w: px / 100, h: py / 100, bopX: px / nx, bopY: py / ny, w0: nx / 100, h0: ny / 100 },
+          w: px / 100,
+          h: py / 100,
+        };
+        if (py < Ay) q = { kind: "H", a: q, b: trong(px, Ay - py), w: px / 100, h: Ay / 100 };
+        if (px < Ax) q = { kind: "V", a: q, b: trong(Ax - px, Ay), w: Ax / 100, h: Ay / 100 };
+        return q;
+      }
+      var truc = n.kind === "V" ? "x" : "y",
+        A = truc === "x" ? Ax : Ay,
+        ca = can(n.a, truc),
+        cb = can(n.b, truc),
+        Aa;
+      if (ca.m + cb.m > A) return null;
+      if (ca.d + cb.d <= A) Aa = ca.d;
+      else {
+        var s = ca.d + cb.d - A,
+          sucA = ca.d - ca.m,
+          sucB = cb.d - cb.m,
+          sa = sucA + sucB > 0 ? Math.round((s * sucA) / (sucA + sucB)) : 0;
+        sa = Math.min(Math.max(sa, s - sucB, 0), sucA, s);
+        Aa = ca.d - sa;
+      }
+      if (n.a.kind === "empty" && Aa <= 0) return truc === "x" ? dung(n.b, Ax, Ay) : dung(n.b, Ax, Ay);
+      if (n.b.kind === "empty" && A - Aa <= 0) return dung(n.a, Ax, Ay);
+      var a = truc === "x" ? dung(n.a, Aa, Ay) : dung(n.a, Ax, Aa),
+        b = truc === "x" ? dung(n.b, A - Aa, Ay) : dung(n.b, Ax, A - Aa);
+      if (!a || !b) return null;
+      return { kind: n.kind, a: a, b: b, w: Ax / 100, h: Ay / 100 };
+    }
+    var moi = dung(tree, tram(W), tram(H));
+    if (!moi) return null;
+    var out = { places: [], cuts: [] };
+    layoutTuCay(moi, 0, 0, out);
+    var soCon = 0,
+      maxMm = 0,
+      muc2 = 0;
+    for (var i = 0; i < out.places.length; i++) {
+      var p = out.places[i],
+        g = goc[p.id],
+        w0 = p.rot ? g.h : g.w,
+        h0 = p.rot ? g.w : g.h,
+        mm = Math.max(w0 - p.w, h0 - p.h);
+      if (p.bopX === undefined) p.bopX = 1;
+      if (p.bopY === undefined) p.bopY = 1;
+      if (mm > 1e-6) soCon++;
+      if (mm > BOP_MOI_CON_MM + 1e-6) muc2++;
+      maxMm = Math.max(maxMm, mm);
+    }
+    out.bop = { soCon: soCon, maxMm: Math.round(maxMm * 100) / 100, muc2: muc2 };
+    return out;
+  }
+
   // ------------------------------------------------------------------
   //  Đầu vào: tags [{ id, name, w, h, qty }]. Tách bài 500 / bài 1000 và nhân con.
   // ------------------------------------------------------------------
@@ -930,22 +1183,24 @@
     for (var i = 0; i < plan.blocks.length; i++) s += plan.blocks[i].shape.cells;
     return s;
   }
-  // Thứ tự ưu tiên khi so hai phương án: ít ô → ít khối → ít nhát cắt → ít con phải xoay
-  // (cùng chiều cho dễ kiểm) → nhiều cặp con cùng tag kề nhau.
+  // Thứ tự ưu tiên khi so hai phương án: ít ô → ít con bị bóp (ưu tiên không bóp) → ít khối → ít nhát
+  // cắt → ít con phải xoay (cùng chiều cho dễ kiểm) → nhiều cặp con cùng tag kề nhau.
   function planScore(plan) {
     var cuts = 0,
       adjacent = 0,
       rotated = 0,
+      bop = 0,
       i,
       k,
       sc;
     for (i = 0; i < plan.blocks.length; i++) {
+      if (plan.blocks[i].bop) bop += plan.blocks[i].bop.soCon;
       sc = scoreLayout(plan.blocks[i].places, plan.blocks[i].cuts);
       cuts += sc.cuts;
       adjacent += sc.adjacent;
       for (k = 0; k < plan.blocks[i].places.length; k++) if (plan.blocks[i].places[k].rot) rotated++;
     }
-    return [planCells(plan), plan.blocks.length, cuts, rotated, -adjacent];
+    return [planCells(plan), bop, plan.blocks.length, cuts, rotated, -adjacent];
   }
   function betterPlan(a, b) {
     if (!b) return true;
@@ -1074,7 +1329,7 @@
   //  Bộ tìm từng bước (để panel hiện tiến độ). pack() chạy tới khi xong.
   // ------------------------------------------------------------------
   function createSearch(input) {
-    var budgetMs = input && input.budgetMs ? input.budgetMs : 4000;
+    var budgetMs = input && input.budgetMs ? input.budgetMs : DEFAULT_BUDGET_MS;
     var shapes = blockShapes();
     var jobs,
       error = null,
@@ -1083,6 +1338,8 @@
       timedOut = false,
       exhausted = false,
       jobIndex = 0,
+      jobStartedAt = null,
+      jobWindow = 0,
       memo = {},
       output = null;
     try {
@@ -1092,41 +1349,81 @@
       finished = true;
       output = { ok: false, error: error };
     }
-    function packRaw(pieces, w, h, collect, budget) {
-      var key = pieceKey(pieces) + "@" + r2(w) + "x" + r2(h) + "#" + (collect || 1) + "/" + (budget || 0);
+    function packRaw(pieces, w, h, collect, budget, tag) {
+      var key = (tag || "") + pieceKey(pieces) + "@" + r2(w) + "x" + r2(h) + "#" + (collect || 1) + "/" + (budget || 0);
       if (!memo[key]) {
         memo[key] = packInto(pieces, w, h, { collect: collect || 1, budget: budget || DEFAULT_BUDGET });
         if (memo[key].exhausted && !budget) exhausted = true;
       }
       return memo[key];
     }
-    // Xếp nguyên khổ; ở pha bóp (job.bopMode) mà chưa vừa thì thử bóp (bopKhoi). Kết quả bóp mang
-    // bop = { soCon, maxMm, muc2 } và places có bopX/bopY.
-    var bopMode = false;
+    // Xếp nguyên khổ (không bóp).
     function packMemo(pieces, shape, collect, budget) {
-      var r = packRaw(pieces, shape.w, shape.h, collect, budget);
-      if (r.ok || !bopMode) return r;
-      var key = "bop:" + pieceKey(pieces) + "@" + shape.cols + "x" + shape.rows + "/" + (budget || 0);
-      if (!memo[key]) {
-        var co = bopKhoi(pieces, shape.w, shape.h, function (w, h) {
-          return packRaw(pieces, w, h, 4, budget);
-        });
-        memo[key] = co ? { ok: true, places: co.places, cuts: co.cuts, layouts: [{ places: co.places, cuts: co.cuts }], bop: co.bop } : { ok: false, places: [], cuts: [], layouts: [] };
+      return packRaw(pieces, shape.w, shape.h, collect, budget);
+    }
+    // Xếp có quyền bóp: nguyên khổ vừa thì thôi; không thì bóp mức 1 nhanh (xếp khổ đã bóp rồi nở về khổ
+    // thật); vẫn không được mà ít con thì thử thêm cách cũ có mức 2 (nới khối rồi co cả cụm).
+    function packBop(pieces, shape, collect, budget, choMuc2) {
+      // Nguyên khổ: dùng lại kết quả pha không bóp (cùng khoá nhớ), không tìm lại với ngân sách lớn.
+      var r = packRaw(pieces, shape.w, shape.h, collect, 0);
+      if (r.ok) return r;
+      var key = "bop:" + pieceKey(pieces) + "@" + shape.cols + "x" + shape.rows + "/" + (budget || 0) + (choMuc2 ? "+2" : "");
+      if (memo[key]) return memo[key];
+      var goc = {},
+        i,
+        best = null;
+      for (i = 0; i < pieces.length; i++) goc[pieces[i].id] = { w: pieces[i].w, h: pieces[i].h };
+      var nho = piecesBop(pieces),
+        rb = packRaw(nho, shape.w, shape.h, 24, budget, "b1:");
+      if (rb.ok) {
+        for (i = 0; i < rb.layouts.length; i++) {
+          var co = noRaKhoThat(rb.layouts[i], shape.w, shape.h, goc);
+          if (!co || verify(co.places, co.cuts, shape.w, shape.h, pieces)) continue;
+          // Ít con bị bóp hơn, rồi bóp nhẹ hơn.
+          if (!best || co.bop.soCon < best.bop.soCon || (co.bop.soCon === best.bop.soCon && co.bop.maxMm < best.bop.maxMm)) best = co;
+        }
       }
+      if (!best && choMuc2 && pieces.length <= BOP_MUC2_TOI_DA_CON) {
+        best = bopKhoi(pieces, shape.w, shape.h, function (w, h) {
+          return packRaw(pieces, w, h, 4, 8000);
+        });
+      }
+      memo[key] = best
+        ? { ok: true, places: best.places, cuts: best.cuts, layouts: [{ places: best.places, cuts: best.cuts }], bop: best.bop }
+        : { ok: false, places: [], cuts: [], layouts: [] };
       return memo[key];
     }
     // Pha tham lam chỉ cần khối cơ bản nhanh: ngân sách nút nhỏ để không treo panel khi nhiều tag khác nhau.
     function packQuick(pieces, shape) {
       return packMemo(pieces, shape, 1, 3000);
     }
+    function packQuickBop(pieces, shape) {
+      return packBop(pieces, shape, 1, 3000, false);
+    }
+    // Diện tích/cận dưới khi được bóp: mỗi con bớt tối đa 1 mm mỗi chiều.
+    function areaBop(pieces) {
+      var area = 0;
+      for (var i = 0; i < pieces.length; i++) area += khoBop(pieces[i].w) * khoBop(pieces[i].h);
+      return area;
+    }
+    function lowerBoundBop(pieces) {
+      return Math.max(1, Math.ceil(areaBop(pieces) / (CELL_W * CELL_H) - 1e-9));
+    }
+    function fitsBop(pieces, shape) {
+      for (var i = 0; i < pieces.length; i++) {
+        var w = khoBop(pieces[i].w),
+          h = khoBop(pieces[i].h);
+        if (!((w <= shape.w + EPS && h <= shape.h + EPS) || (h <= shape.w + EPS && w <= shape.h + EPS))) return false;
+      }
+      return true;
+    }
     function initJob(job) {
-      job.lowerBound = lowerBoundOf(job.pieces);
-      job.best = null;
-      job.bestKhongBop = null; // phương án tốt nhất khi chưa bóp (để so sau pha bóp)
-      job.lowerBoundGoc = job.lowerBound;
-      job.daThuBop = false;
+      job.lowerBoundGoc = lowerBoundOf(job.pieces);
+      job.lowerBoundBop = lowerBoundBop(job.pieces);
+      job.lowerBound = job.lowerBoundGoc;
+      job.best = null; // phương án tốt nhất (có thể có bóp)
+      job.bestGoc = null; // phương án tốt nhất không bóp con nào
       job.phase = "greedy";
-      job.shapeIdx = 0;
       job.T = 0;
       job.cands = null;
       job.candIdx = 0;
@@ -1135,6 +1432,11 @@
     }
     if (jobs) for (var ji = 0; ji < jobs.length; ji++) initJob(jobs[ji]);
 
+    function soConBop(plan) {
+      var s = 0;
+      for (var b = 0; b < plan.blocks.length; b++) if (plan.blocks[b].bop) s += plan.blocks[b].bop.soCon;
+      return s;
+    }
     function consider(job, plan) {
       // Chốt chặn độc lập từng khối rồi mới nhận.
       for (var b = 0; b < plan.blocks.length; b++) {
@@ -1142,24 +1444,38 @@
         if (verify(blk.places, blk.cuts, blk.shape.w, blk.shape.h, blk.pieces)) return false;
       }
       if (betterPlan(plan, job.best)) job.best = plan;
+      if (!soConBop(plan) && betterPlan(plan, job.bestGoc)) job.bestGoc = plan;
       return true;
     }
     function bestCells(job) {
       return job.best ? planCells(job.best) : Infinity;
     }
-    function singleCandidates(job) {
+    // Đã chạm đáy: số ô bằng cận dưới khi được bóp (ít hơn nữa là không thể, kể cả bóp) — và nếu phương án
+    // đang có phải bóp mà số ô đó vẫn có thể đạt không bóp (≥ cận dưới thường) thì chưa dừng, còn tìm cách
+    // không bóp cùng số ô (ưu tiên không bóp).
+    function datDay(job) {
+      if (!job.best) return false;
+      var c = planCells(job.best);
+      return c <= job.lowerBoundBop && (!soConBop(job.best) || c < job.lowerBoundGoc);
+    }
+    function hetBop(job) {
+      return !!job.best && planCells(job.best) <= job.lowerBoundBop;
+    }
+    function singleCandidates(job, bop) {
       var list = [],
-        si;
+        si,
+        lb = bop ? job.lowerBoundBop : job.lowerBoundGoc,
+        area = bop ? areaBop(job.pieces) : areaOf(job.pieces);
       for (si = 0; si < shapes.length; si++) {
-        if (shapes[si].cells < job.lowerBound) continue;
-        if (!allFit(job.pieces, shapes[si])) continue;
-        if (dienTich(job.pieces) > shapes[si].w * shapes[si].h + EPS) continue;
+        if (shapes[si].cells < lb) continue;
+        if (!(bop ? fitsBop(job.pieces, shapes[si]) : allFit(job.pieces, shapes[si]))) continue;
+        if (area > shapes[si].w * shapes[si].h + EPS) continue;
         list.push(shapes[si]);
       }
       return list;
     }
-    // Ứng viên nhiều khối cho tổng ô T: [{ parts, shapesPerPart }].
-    function multiCandidates(job, T) {
+    // Ứng viên nhiều khối cho tổng ô T: [{ groups, shapes }].
+    function multiCandidates(job, T, bop) {
       var list = [],
         parts = job.partitions,
         pi,
@@ -1177,7 +1493,7 @@
         for (var si = 0; si < shapes.length; si++) {
           var sh = shapes[si];
           if (sh.cells < lbs[idx] || sh.cells > remainingCells - minRest) continue;
-          if (!allFit(groups[idx], sh)) continue;
+          if (!(bop ? fitsBop(groups[idx], sh) : allFit(groups[idx], sh))) continue;
           chosen.push(sh);
           rec(idx + 1, remainingCells - sh.cells, chosen);
           chosen.pop();
@@ -1188,7 +1504,7 @@
         lbs = [];
         var sumLb = 0;
         for (gi = 0; gi < groups.length; gi++) {
-          lbs.push(canDuoi(groups[gi]));
+          lbs.push(bop ? lowerBoundBop(groups[gi]) : lowerBoundOf(groups[gi]));
           sumLb += lbs[gi];
         }
         if (sumLb > T) continue;
@@ -1206,97 +1522,85 @@
       }
       greedyDone = true;
     }
-    // Diện tích/cận dưới khi được bóp: mỗi con có thể bớt 1 mm mỗi chiều (+ chút ít mức 2).
-    function areaBop(pieces) {
-      var area = 0;
-      for (var i = 0; i < pieces.length; i++) area += Math.max(0, pieces[i].w - 2) * Math.max(0, pieces[i].h - 2);
-      return area;
+    // Thứ tự pha của một bài (mỗi pha có hạn giờ riêng trong phần thời gian của bài):
+    //  single (1 khối, nguyên khổ) → singleBop (1 khối, được bóp; chỉ khi bóp có thể ít ô hơn) →
+    //  multi (nhiều khối, nguyên khổ) → multiBop (nhiều khối, được bóp) → done.
+    // Pha bóp chạy sớm và có giờ riêng, nên nhiều tag khác nhau cũng không "hết giờ trước khi kịp bóp".
+    var HAN_PHA = { single: 0.3, singleBop: 0.65, multi: 0.82, multiBop: 1 };
+    function quaHan(job) {
+      var han = HAN_PHA[job.phase];
+      return han !== undefined && jobStartedAt !== null && Date.now() - jobStartedAt > jobWindow * han;
     }
-    function lowerBoundBop(pieces) {
-      return Math.max(1, Math.ceil(areaBop(pieces) / (CELL_W * CELL_H) - 1e-9));
-    }
-    function dienTich(pieces) {
-      return bopMode ? areaBop(pieces) : areaOf(pieces);
-    }
-    function canDuoi(pieces) {
-      return bopMode ? lowerBoundBop(pieces) : lowerBoundOf(pieces);
-    }
-    // Pha bóp: xong tìm kiếm thường mà vẫn dư ô so với cận dưới khi bóp → tìm lại với quyền bóp.
-    function batDauBop(job) {
-      if (job.daThuBop || !job.best) return false;
-      job.daThuBop = true;
-      var lb = lowerBoundBop(job.pieces);
-      if (lb >= planCells(job.best)) return false; // bóp cũng không thể ít ô hơn
-      job.bestKhongBop = job.best;
-      job.best = null;
-      job.lowerBound = lb;
+    function batDauPha(job, phase) {
+      job.phase = phase;
       job.cands = null;
       job.candIdx = 0;
       job.done = 0;
       job.total = 1;
-      bopMode = true;
-      return true;
-    }
-    // Chốt sau pha bóp: chỉ nhận phương án bóp khi thật sự ít ô hơn; không thì trả về như chưa bóp.
-    function chotBop(job) {
-      if (!job.bestKhongBop) return;
-      var cellsBop = job.best ? planCells(job.best) : Infinity,
-        cellsGoc = planCells(job.bestKhongBop);
-      if (cellsBop < cellsGoc) {
-        job.cellsTruocBop = cellsGoc;
-        return;
+      if (phase === "single" || phase === "singleBop") {
+        job.cands = singleCandidates(job, phase === "singleBop");
+        job.total = job.cands.length || 1;
+      } else if (phase === "multi" || phase === "multiBop") {
+        job.T = phase === "multiBop" ? job.lowerBoundBop : job.lowerBoundGoc;
+        if (!job.partitions) job.partitions = job.pieces.length >= 2 ? partitions(job.pieces, 3) : [];
       }
-      job.best = job.bestKhongBop;
-      job.lowerBound = job.lowerBoundGoc;
-      job.bestKhongBop = null;
+    }
+    function phaSau(job) {
+      var order = ["single", "singleBop", "multi", "multiBop", "done"],
+        i = order.indexOf(job.phase);
+      var next = order[i + 1] || "done";
+      // Bóp chỉ đáng thử khi cận dưới lúc bóp nhỏ hơn số ô đang có.
+      if ((next === "singleBop" || next === "multiBop") && job.lowerBoundBop >= bestCells(job)) {
+        job.phase = next;
+        return phaSau(job);
+      }
+      if (next !== "done" && datDay(job)) next = "done";
+      batDauPha(job, next);
     }
     function stepJob(job) {
       if (!greedyDone) {
         greedyAll();
         return;
       }
-      if (job.phase === "greedyBop") {
-        var gb = greedyPlan(job.pieces, shapes, packQuick, dienTich);
-        if (gb) consider(job, gb);
-        job.phase = "single";
-        job.cands = singleCandidates(job);
-        job.candIdx = 0;
-        job.total = job.cands.length || 1;
-        job.done = 0;
-        return;
-      }
       if (job.phase === "greedy") {
-        job.phase = "single";
-        job.cands = singleCandidates(job);
-        job.candIdx = 0;
-        job.total = job.cands.length || 1;
-        job.done = 0;
+        // Luôn thử 1 khối dù tham lam đã chạm cận dưới bằng nhiều khối: bằng ô thì 1 khối gọn hơn.
+        batDauPha(job, "single");
         return;
       }
-      if (job.phase === "single") {
-        if (job.candIdx >= job.cands.length || job.cands[job.candIdx].cells > bestCells(job)) {
-          job.phase = "multi";
-          job.T = job.lowerBound;
-          job.partitions = job.pieces.length >= 2 ? partitions(job.pieces, 3) : [];
-          job.cands = null;
+      if (job.phase === "done") return;
+      if (quaHan(job) && job.best) {
+        phaSau(job);
+        return;
+      }
+      if (job.phase === "single" || job.phase === "singleBop") {
+        var bop = job.phase === "singleBop";
+        // Không bóp: thử tới khổ bằng số ô đang có (tìm bố cục đẹp hơn). Có bóp: chỉ khổ ít ô hơn thật
+        // phương án không bóp tốt nhất, và ít ô hơn hoặc bằng phương án đang có.
+        var gioiHan = bestCells(job);
+        if (bop && job.bestGoc) gioiHan = Math.min(gioiHan, planCells(job.bestGoc) - 1);
+        if (job.candIdx >= job.cands.length || job.cands[job.candIdx].cells > gioiHan || (bop && hetBop(job))) {
+          phaSau(job);
           return;
         }
         var shape = job.cands[job.candIdx++];
         job.done = job.candIdx;
-        var r = packMemo(job.pieces, shape, 24);
+        var r = bop ? packBop(job.pieces, shape, 24, BOP_NGAN_SACH, true) : packMemo(job.pieces, shape, 24);
         if (r.ok) {
           for (var li = 0; li < r.layouts.length; li++)
             consider(job, { blocks: [{ shape: shape, pieces: job.pieces, places: r.layouts[li].places, cuts: r.layouts[li].cuts, bop: r.bop }] });
         }
         return;
       }
-      if (job.phase === "multi") {
-        if (job.T >= bestCells(job) || !job.partitions.length) {
-          job.phase = batDauBop(job) ? "greedyBop" : "done";
+      if (job.phase === "multi" || job.phase === "multiBop") {
+        var mb = job.phase === "multiBop";
+        // Nhiều khối không bóp được nhận khi ít ô hơn, hoặc bằng ô mà phương án đang có phải bóp.
+        var dung = job.best && soConBop(job.best) && !mb ? job.T > bestCells(job) : job.T >= bestCells(job);
+        if (dung || !job.partitions.length || (mb ? hetBop(job) : datDay(job))) {
+          phaSau(job);
           return;
         }
         if (!job.cands) {
-          job.cands = multiCandidates(job, job.T);
+          job.cands = multiCandidates(job, job.T, mb);
           job.candIdx = 0;
           job.total = job.cands.length || 1;
           job.done = 0;
@@ -1311,13 +1615,23 @@
         var blocks = [],
           okAll = true;
         for (var gi = 0; gi < cand.groups.length && okAll; gi++) {
-          var rr = packMemo(cand.groups[gi], cand.shapes[gi], 1);
+          var rr = mb ? packBop(cand.groups[gi], cand.shapes[gi], 1, 0, true) : packMemo(cand.groups[gi], cand.shapes[gi], 1);
           if (!rr.ok) okAll = false;
           else blocks.push({ shape: cand.shapes[gi], pieces: cand.groups[gi], places: rr.places, cuts: rr.cuts, bop: rr.bop });
         }
         if (okAll) consider(job, { blocks: blocks });
         return;
       }
+    }
+    // Chốt: phương án bóp chỉ được nhận khi ít ô hơn thật phương án không bóp tốt nhất.
+    function chotBop(job) {
+      if (!job.best || !soConBop(job.best)) return;
+      if (job.bestGoc && planCells(job.bestGoc) <= planCells(job.best)) {
+        job.best = job.bestGoc;
+        return;
+      }
+      job.cellsTruocBop = job.bestGoc ? planCells(job.bestGoc) : null;
+      job.lowerBound = job.lowerBoundBop;
     }
     function finish() {
       finished = true;
@@ -1434,10 +1748,8 @@
             String(bopMax).replace(".", ",") +
             " mm" +
             (bopMuc2 ? ", " + bopMuc2 + " con ăn thêm chút xíu vì chỉ thiếu 1–2 mm" : ", mỗi con ≤ 1 mm") +
-            ") — còn " +
-            cells +
-            " ô thay vì " +
-            job.cellsTruocBop +
+            ")" +
+            (job.cellsTruocBop ? " — còn " + cells + " ô thay vì " + job.cellsTruocBop : "") +
             ".";
         lines.push(line);
         outJobs.push({
@@ -1471,14 +1783,22 @@
         var job = jobs[jobIndex];
         if (job.phase === "done") {
           jobIndex++;
+          jobStartedAt = null;
           continue;
+        }
+        if (jobStartedAt === null && greedyDone) {
+          // Mỗi bài (mỗi cách chia con) một phần thời gian còn lại, để bài trước không ăn hết giờ bài sau.
+          jobStartedAt = Date.now();
+          var conLai = 0;
+          for (var q = jobIndex; q < jobs.length; q++) if (jobs[q].phase !== "done") conLai++;
+          jobWindow = Math.max(0, budgetMs - (jobStartedAt - startedAt)) / Math.max(1, conLai);
         }
         stepJob(job);
         if (Date.now() - startedAt > budgetMs) {
           // Hết giờ: bài nào đã có phương án thì chốt; bài chưa có gì (chưa tới lượt) vẫn phải
-          // chạy pha tham lam để có khối — không bao giờ bỏ bài sau vì bài trước tốn hết giờ.
-          timedOut = true;
-          for (var k = 0; k < jobs.length; k++) if (jobs[k].best || jobs[k].bestKhongBop) jobs[k].phase = "done";
+          // chạy tiếp để có khối — không bao giờ bỏ bài sau vì bài trước tốn hết giờ.
+          if (!timedOut) for (var k = 0; k < jobs.length; k++) if (jobs[k].best && jobs[k].phase !== "done" && !datDay(jobs[k])) timedOut = true;
+          for (var k2 = 0; k2 < jobs.length; k2++) if (jobs[k2].best) jobs[k2].phase = "done";
           continue;
         }
         if (Date.now() - t0 >= (maxMs || 0)) break;
@@ -1542,6 +1862,8 @@
     sapTheoDanhSach: sapTheoDanhSach,
     coBoCuc: coBoCuc,
     bopKhoi: bopKhoi,
+    piecesBop: piecesBop,
+    noRaKhoThat: noRaKhoThat,
     packInto: packInto,
     verify: verify,
     scoreLayout: scoreLayout,

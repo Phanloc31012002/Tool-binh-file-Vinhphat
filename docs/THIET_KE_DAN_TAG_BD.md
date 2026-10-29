@@ -103,9 +103,36 @@ pack({ tags: [{ id, w, h, qty, name }], budgetMs? })
    cha của nó (dao thẳng hạ được).
 8. **Kiểm độc lập** (`verify(job)`): mọi con nằm trong khối, không chồng nhau (khe ≥ 0), mỗi cạnh con không trùng
    mép khối phải nằm trên một nhát cắt, nhát cắt không xuyên qua con nào, đủ số con mỗi tag. Sai → loại phương án.
-9. **Thời gian**: `budgetMs` mặc định 4000; hết giờ thì trả phương án tốt nhất đang có và ghi rõ trong `detail`.
+9. **Thời gian**: `budgetMs` mặc định 4000 (từ 29/10: 6000, xem 4.3); hết giờ thì trả phương án tốt nhất đang có và ghi rõ trong `detail`.
    `packAsync(input, onProgress, done)` chạy từng bước bằng `setTimeout` để panel hiện tiến độ; `pack` đồng bộ cho
    test. Cùng đầu vào → cùng kết quả (không ngẫu nhiên).
+
+### 4.3 Cập nhật 29/10/2026 (lõi VERSION 5) — ca 20 tag ra 32 ô, bình tay 28 ô
+
+Ca thật: 20 tag, mỗi tag 1000 (2 × 211 × 122, 102 × 52, 152 × 72, 54 × 54, 5 × 92 × 48, 8 × 92 × 52, 2 × 92 × 56).
+Tool ra 1 khối 16 × 2 = 32 ô ("hết thời gian tìm 4 s"); anh Lộc bình tay 4 × 7 = 28 ô (644 × 224, bóp ≤ 1 mm).
+Nguyên nhân và cách sửa:
+
+1. **Xếp theo khổ, không theo tag.** 20 tag khác id nhưng chỉ 7 khổ; bộ xếp cũ coi mỗi tag là một loại nên thử lại
+   cùng một bố cục cho mọi cách đổi chỗ hai tag cùng khổ → hết giờ. Giờ `packInto` gộp theo khổ, xếp xong mới gán
+   tag thật vào chỗ (thứ tự đọc + thứ tự danh sách), góc xoay tính lại theo tag.
+2. **Lấp hình trống nhỏ nhất trước** (thay vì trên-trái) và **khoá nhớ theo khổ hình trống** (bỏ toạ độ, w × h = h × w):
+   các hình trống độc lập nên không mất bố cục nào, nhưng không còn dựng lại một bố cục theo hàng nghìn thứ tự.
+3. **Chặn theo phần hao**: hình trống không con nào lọt bị bỏ (hao); phần phủ tối đa của hình = (tổng cạnh lớn
+   nhất ≤ bề ngang) × (tổng cạnh lớn nhất ≤ chiều cao); còn con nhiều hơn phần phủ được → quay lui.
+4. **Bóp mức 1 nhanh**: xếp mọi con ở khổ đã bớt 1 mm mỗi chiều, rồi "nở" về khổ thật theo cây cắt — chỗ trống
+   hút trước, chỉ dãy thật sự thiếu mới bóp, chia theo sức co, mỗi con ≤ 1 mm. Một lần xếp thay cho hàng chục lần
+   nới khối. Bóp mức 2 (cả cụm ăn thêm 1–2 mm) giữ cách cũ, chỉ thử khi khối ≤ 12 con.
+5. **Pha bóp có giờ riêng, chạy sớm**: 1 khối nguyên khổ → 1 khối có bóp → nhiều khối nguyên khổ → nhiều khối có bóp;
+   mỗi pha có hạn trong phần giờ của bài (30 % / 65 % / 82 % / 100 %), mỗi bài một phần giờ còn lại. `budgetMs`
+   mặc định 6000.
+6. **Ưu tiên không bóp**: so phương án theo ít ô → ít con bị bóp → ít khối → ít nhát cắt → ít xoay → nhiều cặp kề.
+   Phương án bóp chỉ được nhận khi ít ô hơn thật phương án không bóp tốt nhất.
+
+Kết quả ca thật: 1 khối 7 × 4 = 28 ô (392 × 368), 16 con bớt ≤ 1 mm, khoảng 1,5 s. Chạy so 50+ ca ngẫu nhiên với
+lõi cũ: không ca nào nhiều ô hơn, nhiều ca ít ô hơn và nhanh hơn nhiều. Test: `tests/dan_tag_bd_engine.test.js` Phần 7.
+Ngoài phạm vi: anh Lộc còn chồng tràn 2 mm giữa các tag cùng mẫu (cắt chung nét thành phẩm) — tool không làm vì
+mất tràn giữa hai tag khác mẫu.
 
 ## 5. Cầu nối Illustrator — `DanCardCEP/jsx/dan_tag_bd_bridge.jsx` (`dcDanTagBdVersion = 1`)
 

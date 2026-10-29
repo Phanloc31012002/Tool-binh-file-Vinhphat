@@ -2,6 +2,16 @@
 
 _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
+## v2.20.4 — Dàn tag BD: xếp theo khổ, bóp nhanh
+
+- Lõi Dàn tag xếp theo khổ thay vì từng tag: nhiều tag khác nhau cùng khổ không còn làm tìm quá lâu.
+- Lấp hình trống nhỏ nhất trước, nhớ trạng thái theo khổ, cắt sớm nhánh không thể chứa hết tag.
+- Bóp ≤ 1 mm/con chạy sớm, có giờ riêng: xếp khổ đã bóp rồi nở về khổ thật, chỉ dãy thiếu mới bị bóp.
+- Bằng số ô thì ưu tiên không bóp, rồi ít khối hơn.
+- Thời gian tìm mặc định 6 giây (trước 4 giây).
+
+---
+
 ## v2.20.3 — lỗi github
 
 - vá lỗi commit

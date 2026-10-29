@@ -269,11 +269,14 @@ function rectOf(p) {
     }
     return job;
   }
-  // (a) Cột 3 × 93 + 2 hàng 92 = 463, dư 3 mm so với 2 × 5 ô (460): 5 dãy, mỗi con bớt 0,6 mm → 10 ô.
+  // (a) 3 con 112 × 93 + 4 card 56 × 92: không bóp phải 11 ô. Bóp 93 → 92 (1 mm) thì vừa 10 ô. Từ 29/10 tool
+  //     chọn bố cục ít con bị bóp nhất: khối 5 × 2, chỉ 3 con 112 × 93 bớt 1 mm chiều cao (trước đây khối
+  //     2 × 5 bóp cả 7 con, mỗi con 0,6 mm).
   const raFull = E.pack({ tags: [tag("hong", 56, 92, 4000), tag("ht", 112, 93, 3000)], budgetMs: 100000 });
   const ra = kiem(raFull, 10, 1, "dư 3 mm");
   assert.equal(ra.blocks.length, 1);
-  assert.match(raFull.detail, /Đã bóp 7 con .*mỗi con ≤ 1 mm.*10 ô thay vì 11/);
+  assert.match(raFull.detail, /Đã bóp 3 con .*mỗi con ≤ 1 mm.*10 ô thay vì 11/);
+  assert.equal(ra.daBop, 3, "chỉ bóp 3 con 112 × 93");
   // (b) 3 × 94 → dư 6 mm, 5 dãy chỉ hút được 5 mm → mức 2 cả cụm ăn thêm 1 mm → vẫn 10 ô, có con bớt > 1 mm.
   const rb = E.pack({ tags: [tag("hong", 56, 92, 4000), tag("ht", 112, 94, 3000)], budgetMs: 100000 });
   goc.ht = [112, 94];
@@ -438,4 +441,54 @@ function rectOf(p) {
   assert.equal(rf.jobs[0].hop, 10 * rf.jobs[0].chia);
   assert.deepEqual(rf.jobs[0].tags.map((t) => t.copies), [3 / rf.jobs[0].chia, 6 / rf.jobs[0].chia]);
   console.log("Phần 6 (không có tag 1000 → chia con, hộp theo cách chia): ok");
+}
+
+// ---------- Phần 7: ca thật 29/10 — 20 tag khác nhau nhưng chỉ 7 khổ ----------
+// Tool cũ tìm theo từng tag nên hết 4 s vẫn chưa xong, chưa kịp tới pha bóp → 32 ô (16 × 2). Bình tay
+// 28 ô (bóp ≤ 1 mm). Giờ xếp theo khổ, lấp hình trống nhỏ nhất trước, bóp mức 1 bằng cách xếp khổ đã
+// bóp rồi nở về khổ thật → 28 ô, mỗi con bớt ≤ 1 mm, xong trong vài giây.
+{
+  const tags = [];
+  let n = 0;
+  function add(w, h, k, name) {
+    for (let i = 0; i < k; i++) tags.push({ id: "tag_" + n++, name: name + (i + 1), w: w, h: h, qty: 1000 });
+  }
+  add(211, 122, 2, "final");
+  add(102, 52, 1, "pink");
+  add(152, 72, 1, "fb");
+  add(54, 54, 1, "buu");
+  add(92, 48, 5, "a48");
+  add(92, 52, 8, "b52");
+  add(92, 56, 2, "c56");
+  const t0 = Date.now();
+  const r = E.pack({ tags: tags });
+  const ms = Date.now() - t0;
+  assert.equal(r.ok, true, r.error);
+  assert.equal(r.jobs.length, 1);
+  const job = r.jobs[0];
+  assert.ok(job.cells <= 28, "phải ≤ 28 ô như bình tay: " + r.detail);
+  assert.equal(job.pieces, 20);
+  const goc = {};
+  for (const t of tags) goc[t.id] = t;
+  for (const b of job.blocks) {
+    const pieces = b.places.map((p) => ({ id: p.id, w: p.w, h: p.h }));
+    assert.equal(E.verify(b.places, b.cuts, b.w, b.h, pieces), null, "verify");
+    for (const p of b.places) {
+      const g = goc[p.id],
+        w0 = p.rot ? g.h : g.w,
+        h0 = p.rot ? g.w : g.h;
+      assert.ok(p.w <= w0 + 1e-6 && p.h <= h0 + 1e-6 && w0 - p.w <= 1 + 1e-6 && h0 - p.h <= 1 + 1e-6, "bóp quá 1 mm: " + JSON.stringify(p));
+    }
+  }
+  assert.ok(ms < 8000, "chạy " + ms + " ms");
+  // Xếp theo khổ: 30 tag khác id cùng khổ 56 × 92 vào 5 × 6 ô (280 × 552) phải ra ngay, không tìm mù.
+  const same = [];
+  for (let i = 0; i < 30; i++) same.push({ id: "k" + i, w: 56, h: 92 });
+  const t1 = Date.now();
+  const f = E.packInto(same, 280, 552);
+  assert.equal(f.ok, true);
+  assert.equal(new Set(f.places.map((p) => p.id)).size, 30, "đủ 30 tag khác nhau");
+  assert.equal(E.verify(f.places, f.cuts, 280, 552, same), null);
+  assert.ok(Date.now() - t1 < 500);
+  console.log("Phần 7 (ca thật 29/10: 20 tag → " + job.cells + " ô, " + ms + " ms): ok");
 }
