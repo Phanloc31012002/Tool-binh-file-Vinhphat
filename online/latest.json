@@ -1,9 +1,9 @@
 {
     "product":  "com.locdev.dancard",
-    "version":  "2.20.5",
-    "title":  "Kênh cập nhật mã chung, gói tải từ Cloudflare",
-    "description":  "- Gói cập nhật tải từ Cloudflare Worker, không tải từ GitHub nữa: máy nhân viên bản cũ nhận bản mới được, repo GitHub để Private được.\r\n- Updater gửi mã chung; khi khoá kênh (KhoaKenhCapNhat.bat) thì máy lạ không tải được bản mới.\r\n- Bộ cài nhân viên mang sẵn mã; thêm KhoaKenhCapNhat, MoKhoaKenhCapNhat, DoiMaCapNhat.\r\n- Thêm test kênh cập nhật (tests/update_channel.test.js).",
-    "packageUrl":  "https://dancard-update.an-ard--etup-23.workers.dev/pkg/DanCardCEP-2.20.5.zip",
-    "sha256":  "20B1F62B4C9B878FDA14853511CFD4E3EF9466BDA2E16F4530183CCFF8983C36",
-    "publishedUtc":  "2026-10-30T01:45:22.9343908Z"
+    "version":  "2.20.6",
+    "title":  "Sửa lỗi cập nhật: Chép gói mới không hoàn tất",
+    "description":  "- Sửa lỗi cập nhật \"Chép gói mới không hoàn tất\": gói cập nhật lồng trong thư mục CongCuBinh, nên updater cũ trên máy có thư mục TEMP dạng rút gọn (8.3) chép đúng chỗ.\r\n- Updater chép theo tên từng file/thư mục, không cắt chuỗi đường dẫn nữa.\r\n- Phát hành không còn hỏi cài wrangler (npx --yes).",
+    "packageUrl":  "https://dancard-update.an-ard--etup-23.workers.dev/pkg/DanCardCEP-2.20.6.zip",
+    "sha256":  "7F1F07BE5930E32E3EAB162778AC0C69C4942CD47AE5F33BFC466B99B201AAE1",
+    "publishedUtc":  "2026-10-30T02:15:03.8658921Z"
 }

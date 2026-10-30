@@ -125,6 +125,16 @@ function get(handle, p, key, env) {
   assert.match(updater, /\$manifestHeaders\['X-CCB-Key'\] = \$updateKey/);
   assert.match(updater, /\$request\.Headers\.Add\('X-CCB-Key', \$UpdateKey\)/);
   assert.match(updater, /\(\[Uri\]\$packageUrl\)\.Host -eq \(\[Uri\]\$manifestUrl\)\.Host/);
+  // Chép gói theo tên file/thư mục, không cắt chuỗi FullName theo độ dài đường dẫn nguồn (TEMP dạng 8.3 làm
+  // lệch → "Chép gói mới không hoàn tất", 30/10/2026).
+  const copyFn = updater.slice(updater.indexOf("function Copy-DirectoryWithProgress"), updater.indexOf("function Schedule-UpdaterPayload"));
+  const copyCode = copyFn.split("\n").filter((l) => !/^\s*#/.test(l)).join("\n");
+  assert.doesNotMatch(copyCode, /Substring/);
+  assert.match(updater, /function Copy-DirectoryLevel/);
+  // Gói ZIP lồng trong thư mục CongCuBinh\ để updater cũ đi nhánh tìm manifest.xml (đường dẫn đã chuẩn hoá).
+  const publish = fs.readFileSync(path.join(repo, "QuanLyNoiBo", "Publish-OnlineUpdate.ps1"), "utf8");
+  assert.match(publish, /\$packageStage = Join-Path \$stageRoot 'CongCuBinh'/);
+  assert.match(publish, /Compress-Archive -LiteralPath \$packageStage/);
   // Mã chung không bao giờ nằm trong file cấu hình trong Git.
   const cfg = JSON.parse(fs.readFileSync(path.join(repo, "updater", "update-config.json"), "utf8").replace(/^﻿/, ""));
   assert.equal(cfg.updateKey, undefined, "updater/update-config.json trong Git không được chứa mã");

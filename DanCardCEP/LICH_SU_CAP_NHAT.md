@@ -2,6 +2,14 @@
 
 _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
+## v2.20.6 — Sửa lỗi cập nhật: Chép gói mới không hoàn tất
+
+- Sửa lỗi cập nhật "Chép gói mới không hoàn tất": gói cập nhật lồng trong thư mục CongCuBinh, nên updater cũ trên máy có thư mục TEMP dạng rút gọn (8.3) chép đúng chỗ.
+- Updater chép theo tên từng file/thư mục, không cắt chuỗi đường dẫn nữa.
+- Phát hành không còn hỏi cài wrangler (npx --yes).
+
+---
+
 ## v2.20.5 — Kênh cập nhật mã chung, gói tải từ Cloudflare
 
 - Gói cập nhật tải từ Cloudflare Worker, không tải từ GitHub nữa: máy nhân viên bản cũ nhận bản mới được, repo GitHub để Private được.

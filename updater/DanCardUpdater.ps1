@@ -178,43 +178,45 @@ function Download-FileWithProgress {
     }
 }
 
-function Copy-DirectoryWithProgress {
-    param([string]$Source, [string]$Destination)
-    # Giữ nguyên cả file ẩn và thư mục rỗng như Copy-Item -Recurse -Force
-    # trước đây, đồng thời tính được tổng byte để hiện phần trăm chính xác.
-    New-Item -ItemType Directory -Path $Destination -Force | Out-Null
-    $prefix = $Source.TrimEnd('\') + '\'
-    $directories = @(Get-ChildItem -LiteralPath $Source -Force -Recurse -Directory)
-    foreach ($directory in $directories) {
-        $relativeDirectory = $directory.FullName.Substring($prefix.Length)
-        New-Item -ItemType Directory -Path (Join-Path $Destination $relativeDirectory) -Force | Out-Null
-    }
-    $files = @(Get-ChildItem -LiteralPath $Source -Force -Recurse -File)
-    [Int64]$total = 0
-    foreach ($file in $files) { $total += [Int64]$file.Length }
-    [Int64]$completed = 0
-    [Int32]$lastPercent = -5
-    $lastPercent = Write-UpdateProgress -Phase 'Chép vào AppData' -Completed 0 -Total $total -LastPercent $lastPercent
-    foreach ($file in $files) {
-        $relativePath = $file.FullName.Substring($prefix.Length)
-        $targetPath = Join-Path $Destination $relativePath
-        New-Item -ItemType Directory -Path (Split-Path -Parent $targetPath) -Force | Out-Null
-        $input = $output = $null
+function Copy-DirectoryLevel {
+    param([System.IO.DirectoryInfo]$SourceDirectory, [string]$TargetPath, [Int64]$Total)
+    [System.IO.Directory]::CreateDirectory($TargetPath) | Out-Null
+    foreach ($file in $SourceDirectory.GetFiles()) {
+        $targetFile = [System.IO.Path]::Combine($TargetPath, $file.Name)
+        $reader = $writer = $null
         try {
-            $input = [System.IO.File]::Open($file.FullName, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::Read)
-            $output = [System.IO.File]::Open($targetPath, [System.IO.FileMode]::Create, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
+            $reader = [System.IO.File]::Open($file.FullName, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::Read)
+            $writer = [System.IO.File]::Open($targetFile, [System.IO.FileMode]::Create, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
             [byte[]]$buffer = New-Object byte[] 131072
-            while (($read = $input.Read($buffer, 0, $buffer.Length)) -gt 0) {
-                $output.Write($buffer, 0, $read)
-                $completed += $read
-                $lastPercent = Write-UpdateProgress -Phase 'Chép vào AppData' -Completed $completed -Total $total -LastPercent $lastPercent
+            while (($read = $reader.Read($buffer, 0, $buffer.Length)) -gt 0) {
+                $writer.Write($buffer, 0, $read)
+                $script:copyCompleted += $read
+                $script:copyLastPercent = Write-UpdateProgress -Phase 'Chép vào AppData' -Completed $script:copyCompleted -Total $Total -LastPercent $script:copyLastPercent
             }
         }
         finally {
-            if ($output) { $output.Dispose() }
-            if ($input) { $input.Dispose() }
+            if ($writer) { $writer.Dispose() }
+            if ($reader) { $reader.Dispose() }
         }
     }
+    foreach ($directory in $SourceDirectory.GetDirectories()) {
+        Copy-DirectoryLevel -SourceDirectory $directory -TargetPath ([System.IO.Path]::Combine($TargetPath, $directory.Name)) -Total $Total
+    }
+}
+
+function Copy-DirectoryWithProgress {
+    param([string]$Source, [string]$Destination)
+    # Chép theo TÊN từng thư mục/file (đệ quy), không cắt chuỗi đường dẫn. Trước đây đường dẫn đích được
+    # tính bằng FullName.Substring(độ dài đường dẫn nguồn); máy có TEMP dạng 8.3 (C:\Users\NGUYEN~1\…)
+    # thì FullName dài hơn chuỗi nguồn, file chép lệch chỗ → "Chép gói mới không hoàn tất" (30/10/2026).
+    # Giữ cả file ẩn và thư mục rỗng như trước.
+    $sourceDirectory = New-Object System.IO.DirectoryInfo((Get-Item -LiteralPath $Source -Force).FullName)
+    [Int64]$total = 0
+    foreach ($file in @(Get-ChildItem -LiteralPath $sourceDirectory.FullName -Force -Recurse -File)) { $total += [Int64]$file.Length }
+    $script:copyCompleted = [Int64]0
+    $script:copyLastPercent = -5
+    $script:copyLastPercent = Write-UpdateProgress -Phase 'Chép vào AppData' -Completed 0 -Total $total -LastPercent $script:copyLastPercent
+    Copy-DirectoryLevel -SourceDirectory $sourceDirectory -TargetPath $Destination -Total $total
     if ($total -eq 0 -and -not $Quiet) { Write-Host '[Chép vào AppData] 100%' -ForegroundColor Cyan }
 }
 
@@ -325,7 +327,7 @@ function Test-IllustratorClosed {
 function Get-PackageRoot {
     param([string]$ExtractRoot)
     $direct = Join-Path $ExtractRoot 'DanCardCEP'
-    if (Test-Path -LiteralPath (Join-Path $direct 'CSXS\manifest.xml')) { return $direct }
+    if (Test-Path -LiteralPath (Join-Path $direct 'CSXS\manifest.xml')) { return (Get-Item -LiteralPath $direct -Force).FullName }
     $matches = Get-ChildItem -LiteralPath $ExtractRoot -Recurse -File -Filter manifest.xml |
     Where-Object { $_.FullName -match '[\\/]DanCardCEP[\\/]CSXS[\\/]manifest\.xml$' }
     if ($matches.Count -ne 1) { throw 'ZIP cập nhật không có đúng một thư mục DanCardCEP hợp lệ.' }
