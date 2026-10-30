@@ -27,3 +27,7 @@ node_modules/
 coverage/
 
 DanCardCEP/assets/icon.ai
+
+# Goi cap nhat tu ban 2.20.5 mang ma chung ben trong: chi de o may quan ly va tren Cloudflare Worker,
+# khong dua len Git. Cac goi cu da co trong Git van giu nguyen.
+online/DanCardCEP-*.zip

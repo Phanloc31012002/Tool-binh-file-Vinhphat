@@ -2,6 +2,15 @@
 
 _Tác giả: Lộc (Code dạo) · Tester: Tân (1 cú) · Duẫn (CTL Offset)_
 
+## v2.20.5 — Kênh cập nhật mã chung, gói tải từ Cloudflare
+
+- Gói cập nhật tải từ Cloudflare Worker, không tải từ GitHub nữa: máy nhân viên bản cũ nhận bản mới được, repo GitHub để Private được.
+- Updater gửi mã chung; khi khoá kênh (KhoaKenhCapNhat.bat) thì máy lạ không tải được bản mới.
+- Bộ cài nhân viên mang sẵn mã; thêm KhoaKenhCapNhat, MoKhoaKenhCapNhat, DoiMaCapNhat.
+- Thêm test kênh cập nhật (tests/update_channel.test.js).
+
+---
+
 ## v2.20.4 — Dàn tag BD: xếp theo khổ, bóp nhanh
 
 - Lõi Dàn tag xếp theo khổ thay vì từng tag: nhiều tag khác nhau cùng khổ không còn làm tìm quá lâu.

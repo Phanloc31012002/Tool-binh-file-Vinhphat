@@ -1,9 +1,9 @@
 {
     "product":  "com.locdev.dancard",
-    "version":  "2.20.4",
-    "title":  "Dàn tag BD: xếp theo khổ, bóp nhanh",
-    "description":  "- Lõi Dàn tag xếp theo khổ thay vì từng tag: nhiều tag khác nhau cùng khổ không còn làm tìm quá lâu.\r\n- Lấp hình trống nhỏ nhất trước, nhớ trạng thái theo khổ, cắt sớm nhánh không thể chứa hết tag.\r\n- Bóp ≤ 1 mm/con chạy sớm, có giờ riêng: xếp khổ đã bóp rồi nở về khổ thật, chỉ dãy thiếu mới bị bóp.\r\n- Bằng số ô thì ưu tiên không bóp, rồi ít khối hơn.\r\n- Thời gian tìm mặc định 6 giây (trước 4 giây).",
-    "packageUrl":  "https://raw.githubusercontent.com/Phanloc31012002/Tool-binh-file-Vinhphat/main/online/DanCardCEP-2.20.4.zip",
-    "sha256":  "B56FE9DAA6D4EDE68044DAFF391E5B488D1A1CBF21E323C1DCEB88028E6C8BBB",
-    "publishedUtc":  "2026-10-29T16:20:59.7585395Z"
+    "version":  "2.20.5",
+    "title":  "Kênh cập nhật mã chung, gói tải từ Cloudflare",
+    "description":  "- Gói cập nhật tải từ Cloudflare Worker, không tải từ GitHub nữa: máy nhân viên bản cũ nhận bản mới được, repo GitHub để Private được.\r\n- Updater gửi mã chung; khi khoá kênh (KhoaKenhCapNhat.bat) thì máy lạ không tải được bản mới.\r\n- Bộ cài nhân viên mang sẵn mã; thêm KhoaKenhCapNhat, MoKhoaKenhCapNhat, DoiMaCapNhat.\r\n- Thêm test kênh cập nhật (tests/update_channel.test.js).",
+    "packageUrl":  "https://dancard-update.an-ard--etup-23.workers.dev/pkg/DanCardCEP-2.20.5.zip",
+    "sha256":  "20B1F62B4C9B878FDA14853511CFD4E3EF9466BDA2E16F4530183CCFF8983C36",
+    "publishedUtc":  "2026-10-30T01:45:22.9343908Z"
 }

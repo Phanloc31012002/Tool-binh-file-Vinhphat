@@ -137,14 +137,24 @@ function Write-UpdateProgress {
 }
 
 function Download-FileWithProgress {
-    param([string]$Url, [string]$Destination)
+    param([string]$Url, [string]$Destination, [string]$UpdateKey = '')
     $request = $response = $input = $output = $null
     try {
         $request = [System.Net.HttpWebRequest]::Create($Url)
         $request.UserAgent = 'CongCuBinhUpdater'
         $request.Timeout = 120000
         $request.ReadWriteTimeout = 120000
-        $response = $request.GetResponse()
+        if (-not [string]::IsNullOrWhiteSpace($UpdateKey)) { $request.Headers.Add('X-CCB-Key', $UpdateKey) }
+        try {
+            $response = $request.GetResponse()
+        }
+        catch [System.Net.WebException] {
+            $failed = $_.Exception.Response
+            if ($failed -and ([int]$failed.StatusCode -eq 403)) {
+                throw 'Kênh cập nhật từ chối máy này (thiếu hoặc sai mã cập nhật). Xin bộ cài mới rồi cài lại.'
+            }
+            throw
+        }
         [Int64]$total = $response.ContentLength
         $input = $response.GetResponseStream()
         $output = [System.IO.File]::Open($Destination, [System.IO.FileMode]::Create, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
@@ -329,6 +339,10 @@ if ([string]::IsNullOrWhiteSpace([string]$config.manifestUrl)) {
     Write-UpdateLog 'Chưa cấu hình manifestUrl online; bỏ qua kiểm tra.' DarkYellow
     exit 0
 }
+# Mã chung của kênh cập nhật (bộ cài/gói cập nhật ghi vào update-config.json). Chỉ gửi cho đúng máy chủ
+# của manifest, không gửi sang máy chủ khác.
+$updateKey = ''
+try { $updateKey = ([string]$config.updateKey).Trim() } catch {}
 
 Register-RecurringCheckTask
 
@@ -362,11 +376,15 @@ try {
     if (-not $state.pendingVersion -and -not [string]::IsNullOrWhiteSpace([string]$state.manifestEtag)) {
         $manifestHeaders['If-None-Match'] = [string]$state.manifestEtag
     }
+    if (-not [string]::IsNullOrWhiteSpace($updateKey)) { $manifestHeaders['X-CCB-Key'] = $updateKey }
     try {
         $manifestResponse = Invoke-WebRequest -Uri $manifestUrl -UseBasicParsing -TimeoutSec 20 -Headers $manifestHeaders
     }
     catch {
         $webResponse = $_.Exception.Response
+        if ($webResponse -and ([int]$webResponse.StatusCode -eq 403)) {
+            throw 'Kênh cập nhật từ chối máy này (thiếu hoặc sai mã cập nhật). Xin bộ cài mới rồi cài lại.'
+        }
         if ($webResponse -and ([int]$webResponse.StatusCode -eq 304)) {
             $state | Add-Member -NotePropertyName lastCheckUtc -NotePropertyValue ([DateTime]::UtcNow.ToString('o')) -Force
             $state | Add-Member -NotePropertyName lastError -NotePropertyValue $null -Force
@@ -448,7 +466,9 @@ try {
     New-Item -ItemType Directory -Path $extractRoot -Force | Out-Null
     try {
         Write-UpdateLog "Đang tải bản $remoteVersion…"
-        Download-FileWithProgress -Url $packageUrl -Destination $zipPath
+        $packageKey = ''
+        if (([Uri]$packageUrl).Host -eq ([Uri]$manifestUrl).Host) { $packageKey = $updateKey }
+        Download-FileWithProgress -Url $packageUrl -Destination $zipPath -UpdateKey $packageKey
         $actualHash = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash.ToUpperInvariant()
         if ($actualHash -ne $expectedHash) { throw 'SHA-256 của gói tải về không khớp manifest.' }
         Expand-Archive -LiteralPath $zipPath -DestinationPath $extractRoot -Force

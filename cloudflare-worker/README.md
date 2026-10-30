@@ -1,14 +1,23 @@
 # DanCard update worker
 
-The worker returns the current `online/latest.json` without making employee
-computers call GitHub's API. `PhatHanhCapNhat.bat` rebuilds and deploys it after
-each release is pushed.
+Worker cập nhật của Công cụ bình (`https://dancard-update.an-ard--etup-23.workers.dev`).
 
-## One-time setup
+- `/latest.json`: manifest của bản đang phát hành (sinh từ `online/latest.json`).
+- `/pkg/DanCardCEP-x.y.z.zip`: gói cập nhật, nằm trong tài nguyên tĩnh của Worker
+  (`cloudflare-worker/generated/assets/pkg`). Từ 2.20.5 gói không tải từ GitHub nữa,
+  nên repo GitHub để Private được.
+- `/health`: luôn trả `ok`.
 
-1. Create a Cloudflare account and deploy with `npx wrangler deploy` from the
-   repository root. Wrangler prints the `workers.dev` URL.
-2. Put `<worker-url>/latest.json` in `updater/update-config.json` before the
-   next release.
+## Kênh mã chung (từ 29/10/2026)
 
-The Worker contains no GitHub token and serves only public update metadata.
+Mã chung nằm ở `QuanLyNoiBo/kenh-cap-nhat.json` (không có trong Git). `Publish-OnlineUpdate.ps1`
+tạo mã ở lần phát hành đầu tiên và chép mã vào `update-config.json` bên trong gói ZIP; bộ cài nhân viên
+(`DongGoiNhanVien.ps1`) cũng mang mã. Updater gửi mã trong header `X-CCB-Key`.
+
+- `batBuocMa: false` (chuyển tiếp): ai cũng tải được, để máy còn updater cũ nhận bản mang mã về.
+- `batBuocMa: true` (đã khoá): thiếu/sai mã → 403. Bật bằng `QuanLyNoiBo/KhoaKenhCapNhat.bat`,
+  mở lại bằng `QuanLyNoiBo/MoKhoaKenhCapNhat.bat`.
+
+`PhatHanhCapNhat.bat` chạy `node cloudflare-worker/build-latest.mjs` (sinh `generated/latest.js` có mã và
+chế độ, chép ZIP vào `generated/assets/pkg`) rồi `npx wrangler deploy` sau mỗi lần phát hành.
+Thư mục `generated/` không đưa lên Git. Test: `node tests/update_channel.test.js`.

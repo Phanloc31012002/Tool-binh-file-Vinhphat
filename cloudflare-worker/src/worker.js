@@ -1,23 +1,16 @@
-import { latestJson } from "../generated/latest.js";
+// Worker cập nhật Công cụ bình. Nội dung (manifest, mã chung, chế độ khoá) do build-latest.mjs sinh ra
+// trong ../generated/latest.js ngay trước mỗi lần deploy; thư mục generated/ không đưa lên Git.
+import * as generated from "../generated/latest.js";
+import { createHandler } from "./handler.js";
 
-const headers = {
-  "Content-Type": "application/json; charset=utf-8",
-  "Cache-Control": "no-store, max-age=0",
-  "Access-Control-Allow-Origin": "*",
-};
+const handle = createHandler({
+  latestJson: generated.latestJson,
+  updateKey: typeof generated.updateKey === "string" ? generated.updateKey : "",
+  batBuocMa: generated.batBuocMa === true,
+});
 
 export default {
-  fetch(request) {
-    const url = new URL(request.url);
-    if (request.method !== "GET") {
-      return new Response("Method not allowed", { status: 405 });
-    }
-    if (url.pathname === "/health") {
-      return new Response("ok", { headers: { "Cache-Control": "no-store" } });
-    }
-    if (url.pathname !== "/latest.json") {
-      return new Response("Not found", { status: 404 });
-    }
-    return new Response(latestJson, { headers });
+  fetch(request, env) {
+    return handle(request, env);
   },
 };
